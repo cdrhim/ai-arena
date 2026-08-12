@@ -50,6 +50,7 @@ export function arenaAuthConfig(env = process.env) {
       arena: envFlag(env.SPARKCLAW_ENABLE_ARENA),
       forum: envFlag(env.SPARKCLAW_ENABLE_FORUM, true),
       b2bPortal: envFlag(env.SPARKCLAW_ENABLE_B2B_PORTAL, true),
+      bounties: envFlag(env.SPARKCLAW_ENABLE_BOUNTIES, false),
       publicTechDisclosure: envFlag(env.SPARKCLAW_ENABLE_PUBLIC_TECH_DISCLOSURE)
     }
   };
@@ -145,6 +146,7 @@ export function viewerFromUser(user, config = arenaAuthConfig()) {
     canSubmitHumanReviews: Boolean(selectedHumanValidator),
     canViewPartnerRequests: canScore || role === "member",
     canConnect: canRequestConnections,
+    canEnterBounties: Boolean(canScore || config.features?.bounties),
     canViewPartners: canScore || role === "member" || role === "b2b_partner"
   };
 }

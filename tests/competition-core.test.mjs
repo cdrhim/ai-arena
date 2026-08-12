@@ -11,7 +11,7 @@ import {
 import { validateAndScoreCsvSubmission } from "../netlify/lib/competition/submission-validator.mjs";
 import { COMPETITION_SEED, DEMO_SOLUTIONS } from "../netlify/lib/competition/competition-seed.mjs";
 
-const partner = { id: "u_partner", email: "founder@example.com", role: "member", canScore: false, canAdmin: false };
+const partner = { id: "u_partner", email: "founder@example.com", role: "member", canScore: false, canAdmin: false, canEnterBounties: true };
 const staff = { id: "u_staff", email: "a.rhim@sparklabs.co.kr", role: "sparklabs", canScore: true, canAdmin: false };
 
 const challenge = COMPETITION_SEED.challenges.find((item) => item.id === "demo-product-classification");
@@ -20,6 +20,10 @@ const documentChallenge = COMPETITION_SEED.challenges.find((item) => item.id ===
 const documentSolution = DEMO_SOLUTIONS[documentChallenge.id];
 const agentSecurityChallenge = COMPETITION_SEED.challenges.find((item) => item.id === "agentic-prompt-injection-defense");
 const agentSecuritySolution = DEMO_SOLUTIONS[agentSecurityChallenge.id];
+const APPROVED_BRIEF_ID = "bounty_req_approved_sponsor";
+const APPROVED_BRIEF_CONTEXT = {
+  bountyRequests: [{ id: APPROVED_BRIEF_ID, status: "published" }]
+};
 const DOCUMENT_TYPE_ROTATION = {
   invoice: "purchase_order",
   purchase_order: "contract",
@@ -60,6 +64,33 @@ function agentSecurityCsv(transform = (row) => row) {
       return headers.map((header) => row[header]).join(",");
     })
   ].join("\n");
+}
+
+function approvedChallengeEvent(source = documentChallenge, at = "2026-06-09T00:00:00.000Z") {
+  return {
+    id: `approved-${source.id}`,
+    type: "competition_challenge_saved",
+    createdAt: at,
+    challenge: {
+      ...source,
+      status: "open",
+      visibility: "public",
+      sponsorBriefId: APPROVED_BRIEF_ID,
+      releaseApprovedAt: at
+    }
+  };
+}
+
+function releasedEvents(events = [], source = documentChallenge) {
+  return [approvedChallengeEvent(source), ...events];
+}
+
+function releasedSnapshot(events = [], viewer = partner, now = "2026-06-10T00:00:00.000Z", source = documentChallenge) {
+  return buildCompetitionSnapshot(releasedEvents(events, source), viewer, now, APPROVED_BRIEF_CONTEXT);
+}
+
+function createReleasedEvent(action, payload, viewer = partner, events = [], now = "2026-06-10T00:00:00.000Z", source = documentChallenge) {
+  return createCompetitionEvent(action, payload, viewer, releasedEvents(events, source), now, APPROVED_BRIEF_CONTEXT);
 }
 
 test("CSV parser handles quoted fields and normal rows", () => {
@@ -184,7 +215,7 @@ test("document workflow rejects values outside the published submission vocabula
 });
 
 test("private scores are hidden from participant snapshots before reveal", () => {
-  const snapshot = buildCompetitionSnapshot([], partner, "2026-06-10T00:00:00.000Z");
+  const snapshot = releasedSnapshot([], partner, "2026-06-10T00:00:00.000Z", challenge);
   const row = snapshot.leaderboards.find((item) => item.challengeId === challenge.id).rows[0];
   assert.equal(snapshot.metrics.challengeSubmissions, 3);
   assert.equal(snapshot.metrics.validatedSubmissions, 3);
@@ -202,7 +233,7 @@ test("persisted legacy events cannot leave immutable seed submissions queued", (
       status: "queued"
     }
   };
-  const snapshot = buildCompetitionSnapshot([staleSeedEvent], partner, "2026-07-26T00:00:00.000Z");
+  const snapshot = releasedSnapshot([staleSeedEvent], partner, "2026-07-26T00:00:00.000Z", challenge);
   assert.equal(snapshot.metrics.validatedSubmissions, 3);
   assert.equal(snapshot.metrics.validationQueue, 0);
 });
@@ -267,7 +298,7 @@ test("submission limit per day is enforced", () => {
   const events = [];
   for (let index = 0; index < documentChallenge.submissionLimitPerDay; index += 1) {
     events.push(
-      createCompetitionEvent(
+      createReleasedEvent(
         "submitCompetitionEntry",
         { challengeId: documentChallenge.id, teamName: "Limit Team", csvText: documentChallenge.sampleSubmissionCsv },
         partner,
@@ -278,7 +309,7 @@ test("submission limit per day is enforced", () => {
   }
   assert.throws(
     () =>
-      createCompetitionEvent(
+      createReleasedEvent(
         "submitCompetitionEntry",
         { challengeId: documentChallenge.id, teamName: "Limit Team", csvText: documentChallenge.sampleSubmissionCsv },
         partner,
@@ -306,13 +337,72 @@ test("staff-only competition endpoints reject ordinary members", () => {
   }
 });
 
+test("unreleased Claw Member Bounty actions are rejected at the server boundary", () => {
+  const stagedMember = { ...partner, canEnterBounties: false };
+  const participantActions = [
+    ["joinCompetitionChallenge", { challengeId: documentChallenge.id, teamName: "Staged" }],
+    ["submitCompetitionEntry", { challengeId: documentChallenge.id, teamName: "Staged", csvText: documentCsv() }],
+    ["selectCompetitionSubmission", { challengeId: documentChallenge.id, teamId: "team_lingopilot", submissionId: "seed_sub_lingopilot" }],
+    ["requestCompetitionOpportunity", { submissionId: "seed_sub_lingopilot", intent: "pilot" }]
+  ];
+
+  for (const [action, payload] of participantActions) {
+    assert.throws(
+      () => createCompetitionEvent(action, payload, stagedMember, []),
+      (error) => error.status === 423 && /Sponsor Brief/.test(error.message),
+      `${action} should remain locked until release`
+    );
+  }
+});
+
+test("staff retain Bounty authoring and validation while participant release is staged", () => {
+  const event = createCompetitionEvent(
+    "saveCompetitionChallenge",
+    { title: "Approved sponsor intake", status: "draft", visibility: "private" },
+    { ...staff, canEnterBounties: true },
+    []
+  );
+  assert.equal(event.type, "competition_challenge_saved");
+  assert.equal(event.challenge.status, "draft");
+  assert.equal(event.challenge.visibility, "private");
+});
+
+test("feature flag alone never releases demo seed challenges", () => {
+  const snapshot = buildCompetitionSnapshot([], partner, "2026-06-10T00:00:00.000Z");
+  assert.equal(snapshot.releaseState, "preparing");
+  assert.deepEqual(snapshot.challenges, []);
+  assert.equal(snapshot.metrics.openChallenges, 0);
+});
+
+test("only a persisted published Sponsor Brief with explicit challenge approval releases participants", () => {
+  const snapshot = releasedSnapshot();
+  assert.equal(snapshot.releaseState, "open");
+  assert.equal(snapshot.challenges.length, 1);
+  assert.equal(snapshot.challenges[0].id, documentChallenge.id);
+
+  const unapprovedBrief = buildCompetitionSnapshot(releasedEvents(), partner, "2026-06-10T00:00:00.000Z", {
+    bountyRequests: [{ id: APPROVED_BRIEF_ID, status: "design" }]
+  });
+  assert.equal(unapprovedBrief.releaseState, "preparing");
+  assert.deepEqual(unapprovedBrief.challenges, []);
+});
+
+test("staff preview retains staged challenge data without reporting participant release", () => {
+  const snapshot = buildCompetitionSnapshot([], staff, "2026-06-10T00:00:00.000Z");
+  assert.equal(snapshot.releaseState, "preparing");
+  assert.equal(snapshot.previewMode, true);
+  assert.ok(snapshot.challenges.length >= 1);
+  assert.ok(snapshot.metrics.challenges >= 1);
+});
+
 test("converted B2B accounts cannot inherit legacy member competition ownership", () => {
-  const requested = createCompetitionEvent(
+  const requested = createReleasedEvent(
     "requestCompetitionOpportunity",
     { submissionId: "seed_sub_lingopilot", intent: "pilot" },
     partner,
     [],
-    "2026-07-26T04:00:00.000Z"
+    "2026-07-26T04:00:00.000Z",
+    challenge
   );
   const convertedPartner = {
     ...partner,
@@ -320,7 +410,7 @@ test("converted B2B accounts cannot inherit legacy member competition ownership"
     canRequestConnections: true
   };
 
-  const snapshot = buildCompetitionSnapshot([requested], convertedPartner, "2026-07-26T04:01:00.000Z");
+  const snapshot = buildCompetitionSnapshot(releasedEvents([requested], challenge), convertedPartner, "2026-07-26T04:01:00.000Z", APPROVED_BRIEF_CONTEXT);
   assert.deepEqual(snapshot.teams, []);
   assert.deepEqual(snapshot.submissions, []);
   assert.deepEqual(snapshot.validationReports, []);
@@ -349,27 +439,27 @@ test("pairwise BT calculation is deterministic", () => {
 
 test("leaderboard reveal exposes private scores and final rank", () => {
   const reveal = createCompetitionEvent("revealCompetitionPrivateLeaderboard", { challengeId: challenge.id }, staff, []);
-  const snapshot = buildCompetitionSnapshot([reveal], partner, "2026-06-10T00:00:00.000Z");
+  const snapshot = releasedSnapshot([reveal], partner, "2026-06-10T00:00:00.000Z", challenge);
   const row = snapshot.leaderboards.find((item) => item.challengeId === challenge.id).rows[0];
   assert.equal(Object.hasOwn(row, "privateScore"), true);
   assert.equal(Object.hasOwn(row, "finalRank"), true);
 });
 
 test("bounties expose sponsor, evaluation, data policy, and opportunity details", () => {
-  const snapshot = buildCompetitionSnapshot([], partner, "2026-07-26T00:00:00.000Z");
+  const snapshot = releasedSnapshot([], partner, "2026-07-26T00:00:00.000Z");
   const bounty = snapshot.challenges.find((item) => item.id === documentChallenge.id);
 
   assert.equal(bounty.sponsor, "SparkClaw Program");
   assert.equal(bounty.evaluationCriteria.length, 5);
   assert.match(bounty.dataPolicy, /합성/);
   assert.match(bounty.opportunity, /PoC/);
-  assert.equal(snapshot.metrics.openChallenges, 2);
+  assert.equal(snapshot.metrics.openChallenges, 1);
   assert.equal(bounty.metricConfig.fields.every((field) => !Object.hasOwn(field, "labelColumn")), true);
-  assert.equal(snapshot.challenges.length, 4);
+  assert.equal(snapshot.challenges.length, 1);
 });
 
 test("validated owners request opportunities and staff advances them to pilot", () => {
-  const requested = createCompetitionEvent(
+  const requested = createReleasedEvent(
     "requestCompetitionOpportunity",
     {
       submissionId: "seed_sub_lingopilot",
@@ -378,9 +468,10 @@ test("validated owners request opportunities and staff advances them to pilot", 
     },
     partner,
     [],
-    "2026-07-26T01:00:00.000Z"
+    "2026-07-26T01:00:00.000Z",
+    challenge
   );
-  const memberSnapshot = buildCompetitionSnapshot([requested], partner, "2026-07-26T01:01:00.000Z");
+  const memberSnapshot = releasedSnapshot([requested], partner, "2026-07-26T01:01:00.000Z", challenge);
   assert.equal(memberSnapshot.opportunities.length, 1);
   assert.equal(memberSnapshot.opportunities[0].status, "requested");
   assert.equal(Object.hasOwn(memberSnapshot.opportunities[0], "requesterEmail"), false);
@@ -397,40 +488,44 @@ test("validated owners request opportunities and staff advances them to pilot", 
     [requested],
     "2026-07-26T02:00:00.000Z"
   );
-  const staffSnapshot = buildCompetitionSnapshot([requested, updated], staff, "2026-07-26T02:01:00.000Z");
+  const staffSnapshot = buildCompetitionSnapshot(releasedEvents([requested, updated], challenge), staff, "2026-07-26T02:01:00.000Z", APPROVED_BRIEF_CONTEXT);
   assert.equal(staffSnapshot.opportunities[0].status, "pilot");
   assert.equal(staffSnapshot.opportunities[0].requesterEmail, partner.email);
   assert.equal(staffSnapshot.metrics.activePilots, 1);
 });
 
 test("opportunity requests reject other teams and active duplicates", () => {
-  const other = { id: "other", email: "other@example.com", role: "member", canScore: false, canAdmin: false };
+  const other = { id: "other", email: "other@example.com", role: "member", canScore: false, canAdmin: false, canEnterBounties: true };
   assert.throws(
     () =>
-      createCompetitionEvent(
+      createReleasedEvent(
         "requestCompetitionOpportunity",
         { submissionId: "seed_sub_lingopilot", intent: "poc_review" },
         other,
-        []
+        [],
+        "2026-06-10T00:00:00.000Z",
+        challenge
       ),
     /only request opportunities for your own submission/i
   );
 
-  const requested = createCompetitionEvent(
+  const requested = createReleasedEvent(
     "requestCompetitionOpportunity",
     { submissionId: "seed_sub_lingopilot", intent: "poc_review" },
     partner,
     [],
-    "2026-07-26T03:00:00.000Z"
+    "2026-07-26T03:00:00.000Z",
+    challenge
   );
   assert.throws(
     () =>
-      createCompetitionEvent(
+      createReleasedEvent(
         "requestCompetitionOpportunity",
         { submissionId: "seed_sub_lingopilot", intent: "credits" },
         partner,
         [requested],
-        "2026-07-26T03:01:00.000Z"
+        "2026-07-26T03:01:00.000Z",
+        challenge
       ),
     /already exists/
   );

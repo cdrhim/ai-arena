@@ -17,6 +17,13 @@ const STAFF_ACTIONS = new Set([
   "updateCompetitionOpportunity"
 ]);
 
+const PARTICIPANT_ACTIONS = new Set([
+  "joinCompetitionChallenge",
+  "submitCompetitionEntry",
+  "selectCompetitionSubmission",
+  "requestCompetitionOpportunity"
+]);
+
 export function isCompetitionAction(action) {
   return [
     "saveCompetitionChallenge",
@@ -34,17 +41,17 @@ export function isCompetitionAction(action) {
   ].includes(action);
 }
 
-export function buildCompetitionSnapshot(events = [], viewer = publicViewer(), now = new Date().toISOString()) {
+export function buildCompetitionSnapshot(events = [], viewer = publicViewer(), now = new Date().toISOString(), context = {}) {
   const state = clone(COMPETITION_SEED);
   state.solutions = clone(DEMO_SOLUTIONS);
   for (const event of events) applyCompetitionEvent(state, event);
   restoreSeedSubmissions(state);
   const leaderboards = computeLeaderboards(state);
-  const sanitized = sanitizeCompetitionState(state, leaderboards, viewer, now);
+  const sanitized = sanitizeCompetitionState(state, leaderboards, viewer, now, context);
   return sanitized;
 }
 
-export function createCompetitionEvent(action, payload, viewer, events = [], now = new Date().toISOString()) {
+export function createCompetitionEvent(action, payload, viewer, events = [], now = new Date().toISOString(), context = {}) {
   if (STAFF_ACTIONS.has(action) && !viewer?.canScore) {
     const error = new Error("Only SparkLabs staff can manage competition validation.");
     error.status = 403;
@@ -59,6 +66,10 @@ export function createCompetitionEvent(action, payload, viewer, events = [], now
   state.solutions = clone(DEMO_SOLUTIONS);
   for (const event of events) applyCompetitionEvent(state, event);
   restoreSeedSubmissions(state);
+
+  if (PARTICIPANT_ACTIONS.has(action) && !viewer?.canScore && canUseMemberOwnership(viewer)) {
+    assertParticipantBountyReleased(action, payload, viewer, state, context);
+  }
 
   if (action === "saveCompetitionChallenge") return challengeSavedEvent(payload, viewer, state, now);
   if (action === "uploadCompetitionSolution") return solutionUploadedEvent(payload, viewer, state, now);
@@ -224,7 +235,7 @@ function selectedSubmissionsForRanking(challenge, submissions) {
   return selected.filter(Boolean);
 }
 
-function sanitizeCompetitionState(state, leaderboards, viewer, now) {
+function sanitizeCompetitionState(state, leaderboards, viewer, now, context = {}) {
   const staff = Boolean(viewer?.canScore);
   const publicOrJoinedChallenges = state.challenges.filter((challenge) => staff || challenge.visibility === "public" || isTeamMemberForChallenge(state, challenge.id, viewer));
   const visibleSubmissions = state.submissions
@@ -239,14 +250,32 @@ function sanitizeCompetitionState(state, leaderboards, viewer, now) {
   const visibleLeaderboards = leaderboards
     .filter((leaderboard) => publicOrJoinedChallenges.some((challenge) => challenge.id === leaderboard.challengeId))
     .map((leaderboard) => sanitizeLeaderboard(leaderboard, staff));
+  const approvedBriefIds = approvedSponsorBriefIds(context?.bountyRequests);
+  const releasableChallengeIds = new Set(
+    state.challenges
+      .filter((challenge) => challengeLinkedToApprovedBrief(challenge, approvedBriefIds))
+      .map((challenge) => challenge.id)
+  );
+  const participantReleased = bountyFeatureEnabled(viewer) && releasableChallengeIds.size > 0;
+  const releasedChallenges = publicOrJoinedChallenges.filter((challenge) => releasableChallengeIds.has(challenge.id));
+  const releasedChallengeIds = new Set(releasedChallenges.map((challenge) => challenge.id));
+  const releasedSubmissions = visibleSubmissions.filter((submission) => releasedChallengeIds.has(submission.challengeId));
+  const releasedReports = visibleReports.filter((report) => releasedSubmissions.some((submission) => submission.id === report.submissionId));
+  const releasedLeaderboards = visibleLeaderboards.filter((leaderboard) => releasedChallengeIds.has(leaderboard.challengeId));
 
   return {
     generatedAt: now,
-    challenges: publicOrJoinedChallenges.map((challenge) => sanitizeChallenge(challenge, staff)),
-    teams: state.teams.filter((team) => staff || ownsTeam(team, viewer)),
-    submissions: visibleSubmissions,
-    validationReports: visibleReports,
-    leaderboards: visibleLeaderboards,
+    releaseState: participantReleased ? "open" : "preparing",
+    previewMode: staff && !participantReleased,
+    challenges: staff
+      ? publicOrJoinedChallenges.map((challenge) => sanitizeChallenge(challenge, staff))
+      : participantReleased
+        ? releasedChallenges.map((challenge) => sanitizeChallenge(challenge, staff))
+        : [],
+    teams: staff ? state.teams : participantReleased ? state.teams.filter((team) => ownsTeam(team, viewer)) : [],
+    submissions: staff ? visibleSubmissions : participantReleased ? releasedSubmissions : [],
+    validationReports: staff ? visibleReports : participantReleased ? releasedReports : [],
+    leaderboards: staff ? visibleLeaderboards : participantReleased ? releasedLeaderboards : [],
     validationQueue: staff
       ? state.submissions
           .filter((submission) => ["uploaded", "queued", "validating", "schema_failed", "scored", "selected_for_private"].includes(submission.status))
@@ -254,22 +283,80 @@ function sanitizeCompetitionState(state, leaderboards, viewer, now) {
       : [],
     pairwiseVotes: staff ? state.pairwiseVotes.map((vote) => ({ ...vote })) : [],
     reviews: staff ? state.reviews.map((review) => ({ ...review })) : [],
-    opportunities: state.opportunities
+    opportunities: staff ? state.opportunities.map((opportunity) => sanitizeOpportunity(opportunity, staff)) : participantReleased ? state.opportunities
+      .filter((opportunity) => releasedChallengeIds.has(opportunity.challengeId))
       .filter((opportunity) => staff || (canUseMemberOwnership(viewer) && (opportunity.requesterUserId === viewer?.id || opportunity.requesterEmail === viewer?.email)))
-      .map((opportunity) => sanitizeOpportunity(opportunity, staff)),
+      .map((opportunity) => sanitizeOpportunity(opportunity, staff)) : [],
     auditLogs: staff ? state.auditLogs.slice(0, 100).map((log) => ({ ...log })) : [],
-    metrics: {
-      challenges: publicOrJoinedChallenges.length,
-      openChallenges: publicOrJoinedChallenges.filter((challenge) => challenge.status === "open").length,
-      challengeSubmissions: state.submissions.length,
-      validatedSubmissions: state.submissions.filter((submission) =>
-        ["scored", "selected_for_private"].includes(submission.status)
-      ).length,
-      validationQueue: state.submissions.filter((submission) => ["queued", "validating", "schema_failed"].includes(submission.status)).length,
-      privateRevealed: state.challenges.filter((challenge) => challenge.privateRevealedAt).length,
-      opportunityRequests: state.opportunities.length,
-      activePilots: state.opportunities.filter((opportunity) => opportunity.status === "pilot").length
-    }
+    metrics: competitionMetrics(
+      state,
+      staff ? new Set(publicOrJoinedChallenges.map((challenge) => challenge.id)) : participantReleased ? releasedChallengeIds : new Set()
+    )
+  };
+}
+
+function bountyFeatureEnabled(viewer) {
+  return viewer?.canEnterBounties === true;
+}
+
+function approvedSponsorBriefIds(bountyRequests = []) {
+  return new Set(
+    (Array.isArray(bountyRequests) ? bountyRequests : [])
+      .filter((request) => ["published", "evaluating", "pilot", "production"].includes(String(request?.status || "")))
+      .map((request) => String(request?.id || "").trim())
+      .filter(Boolean)
+  );
+}
+
+function challengeLinkedToApprovedBrief(challenge, approvedBriefIds) {
+  return Boolean(
+    ["open", "private_revealed"].includes(challenge?.status) &&
+    challenge?.visibility === "public" &&
+    challenge?.sponsorBriefId &&
+    validIsoDate(challenge?.releaseApprovedAt) &&
+    approvedBriefIds.has(String(challenge.sponsorBriefId))
+  );
+}
+
+function assertParticipantBountyReleased(action, payload, viewer, state, context) {
+  if (!bountyFeatureEnabled(viewer)) throwBountyPreparing();
+  const challenge = participantActionChallenge(action, payload, state);
+  if (!challengeLinkedToApprovedBrief(challenge, approvedSponsorBriefIds(context?.bountyRequests))) {
+    throwBountyPreparing();
+  }
+}
+
+function participantActionChallenge(action, payload, state) {
+  if (action === "requestCompetitionOpportunity") {
+    const submission = requiredSubmission(state, payload?.submissionId);
+    return requiredChallenge(state, submission.challengeId);
+  }
+  return requiredChallenge(state, payload?.challengeId);
+}
+
+function throwBountyPreparing() {
+  const error = new Error("실제 기업 Sponsor Brief와 평가 정책이 승인된 뒤 Bounty 참가가 열립니다.");
+  error.status = 423;
+  throw error;
+}
+
+function validIsoDate(value) {
+  return typeof value === "string" && value.trim() !== "" && Number.isFinite(Date.parse(value));
+}
+
+function competitionMetrics(state, challengeIds) {
+  const submissions = state.submissions.filter((submission) => challengeIds.has(submission.challengeId));
+  const challenges = state.challenges.filter((challenge) => challengeIds.has(challenge.id));
+  const opportunities = state.opportunities.filter((opportunity) => challengeIds.has(opportunity.challengeId));
+  return {
+    challenges: challenges.length,
+    openChallenges: challenges.filter((challenge) => challenge.status === "open").length,
+    challengeSubmissions: submissions.length,
+    validatedSubmissions: submissions.filter((submission) => ["scored", "selected_for_private"].includes(submission.status)).length,
+    validationQueue: submissions.filter((submission) => ["queued", "validating", "schema_failed"].includes(submission.status)).length,
+    privateRevealed: challenges.filter((challenge) => challenge.privateRevealedAt).length,
+    opportunityRequests: opportunities.length,
+    activePilots: opportunities.filter((opportunity) => opportunity.status === "pilot").length
   };
 }
 
@@ -283,6 +370,8 @@ function sanitizeChallenge(challenge, staff) {
     sponsor: challenge.sponsor || "",
     prize: challenge.prize || "",
     opportunity: challenge.opportunity || "",
+    sponsorBriefId: challenge.sponsorBriefId || null,
+    releaseApprovedAt: challenge.releaseApprovedAt || null,
     targetTeams: challenge.targetTeams || [],
     evaluationCriteria: challenge.evaluationCriteria || [],
     dataPolicy: challenge.dataPolicy || "",
@@ -450,6 +539,10 @@ function challengeSavedEvent(payload, viewer, state, now) {
     sponsor: limitedString(payload.sponsor, 200) || existing?.sponsor || "",
     prize: limitedString(payload.prize, 300) || existing?.prize || "",
     opportunity: limitedString(payload.opportunity, 1000) || existing?.opportunity || "",
+    sponsorBriefId: limitedString(payload.sponsorBriefId, 100) || existing?.sponsorBriefId || null,
+    releaseApprovedAt: validIsoDate(payload.releaseApprovedAt)
+      ? new Date(payload.releaseApprovedAt).toISOString()
+      : existing?.releaseApprovedAt || null,
     targetTeams: normalizeList(payload.targetTeams).length ? normalizeList(payload.targetTeams) : existing?.targetTeams || [],
     evaluationCriteria: normalizeList(payload.evaluationCriteria).length
       ? normalizeList(payload.evaluationCriteria)

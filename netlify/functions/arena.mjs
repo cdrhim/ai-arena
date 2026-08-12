@@ -31,7 +31,15 @@ export default async function arena(req) {
     const submissionsBefore = await loadArenaSubmissions();
 
     if (isCompetitionAction(body.action)) {
-      const event = createCompetitionEvent(body.action, body.payload || {}, auth.viewer, competitionEventsBefore);
+      const currentArenaSnapshot = buildArenaSnapshot(eventsBefore, new Date().toISOString(), submissionsBefore);
+      const event = createCompetitionEvent(
+        body.action,
+        body.payload || {},
+        auth.viewer,
+        competitionEventsBefore,
+        new Date().toISOString(),
+        { bountyRequests: currentArenaSnapshot.bountyRequests || [] }
+      );
       const competitionEvents = await appendCompetitionEvent(event);
       const snapshot = snapshotForViewer(eventsBefore, auth.viewer, submissionsBefore, competitionEvents);
       await recordScArenaActivitySafely({
@@ -132,7 +140,9 @@ function snapshotForViewer(events, viewer, submissions = [], competitionEvents =
         },
     reviewQueue: reviewQueueForViewer(snapshot.submissions || [], viewer),
     humanValidationQueue: humanValidationQueueForViewer(snapshot.submissions || [], viewer),
-    competition: buildCompetitionSnapshot(competitionEvents, viewer),
+    competition: buildCompetitionSnapshot(competitionEvents, viewer, new Date().toISOString(), {
+      bountyRequests: snapshot.bountyRequests || []
+    }),
     viewer
   };
 }

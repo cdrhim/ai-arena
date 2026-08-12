@@ -20,6 +20,7 @@ test("arena auth config reads Supabase and SparkLabs role settings", () => {
   assert.equal(config.supabaseUrl, "https://example.supabase.co");
   assert.deepEqual(config.adminDomains, ["sparklabs.co.kr", "example.com"]);
   assert.deepEqual(config.adminEmails, ["admin@sparklabs.co.kr"]);
+  assert.equal(config.features.bounties, false);
 });
 
 test("public arena auth config exposes only client-safe settings", () => {
@@ -53,6 +54,8 @@ test("SparkLabs users can score and partner users cannot", () => {
   assert.equal(b2bPartner.canRequestConnections, true);
   assert.equal(member.role, "member");
   assert.equal(member.canSubmitProducts, true);
+  assert.equal(member.canEnterBounties, false);
+  assert.equal(staff.canEnterBounties, true);
   assert.doesNotThrow(() => authorizeArenaAction("submitBenchmark", staff));
   assert.throws(() => authorizeArenaAction("submitBenchmark", b2bPartner), /Only SparkLabs users/);
   assert.throws(
@@ -67,6 +70,18 @@ test("SparkLabs users can score and partner users cannot", () => {
   assert.doesNotThrow(() => authorizeArenaAction("saveSubmissionDraft", member));
   assert.doesNotThrow(() => authorizeArenaAction("requestConnection", b2bPartner));
   assert.throws(() => authorizeArenaAction("requestConnection", member), /Only B2B partners/);
+});
+
+test("Bounty participant release is an explicit feature flag", () => {
+  const config = arenaAuthConfig({
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_ANON_KEY: "anon",
+    SPARKLABS_ARENA_MEMBER_EMAILS: "founder@example.com",
+    SPARKCLAW_ENABLE_BOUNTIES: "true"
+  });
+  const member = viewerFromUser({ id: "u_release", email: "founder@example.com" }, config);
+  assert.equal(config.features.bounties, true);
+  assert.equal(member.canEnterBounties, true);
 });
 
 test("trusted Supabase app metadata can mark a user as a B2B partner", () => {

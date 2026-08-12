@@ -1,3 +1,5 @@
+import { loadArenaEvents } from "../lib/arena-store.mjs";
+import { buildArenaSnapshot } from "../lib/arena-core.mjs";
 import { loadCompetitionEvents } from "../lib/competition/competition-store.mjs";
 import { buildCompetitionSnapshot } from "../lib/competition/competition-core.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
@@ -13,9 +15,12 @@ export default async function arenaCompetition(req) {
       return json({ error: "Bounty Board is available to approved Arena accounts." }, 403);
     }
 
-    const events = await loadCompetitionEvents();
+    const [events, arenaEvents] = await Promise.all([loadCompetitionEvents(), loadArenaEvents()]);
+    const arenaSnapshot = buildArenaSnapshot(arenaEvents);
     return json({
-      competition: buildCompetitionSnapshot(events, auth.viewer),
+      competition: buildCompetitionSnapshot(events, auth.viewer, new Date().toISOString(), {
+        bountyRequests: arenaSnapshot.bountyRequests || []
+      }),
       viewer: auth.viewer
     });
   } catch (error) {

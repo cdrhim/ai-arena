@@ -113,6 +113,49 @@ test("converted B2B accounts cannot inherit legacy member tech-stack ownership",
   assert.deepEqual(visible.products[0].links, [{ type: "website", url: "https://example.com" }]);
 });
 
+test("direct Arena API cannot bypass the staged Claw Member Bounty release gate", async () => {
+  const previous = captureEnv([
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SECRET_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_SERVICE_KEY",
+    "SPARKCLAW_ENABLE_BOUNTIES"
+  ]);
+  const originalFetch = global.fetch;
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_ANON_KEY = "anon";
+  process.env.SPARKCLAW_ENABLE_BOUNTIES = "false";
+  delete process.env.SUPABASE_SECRET_KEY;
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  delete process.env.SUPABASE_SERVICE_KEY;
+
+  global.fetch = async (url) => {
+    if (String(url).includes("/auth/v1/user")) {
+      return Response.json({ id: "staged_member", email: "member@example.com", app_metadata: { role: "member" } });
+    }
+    if (String(url).includes("/rest/v1/arena_submissions")) return Response.json([]);
+    return originalFetch(url);
+  };
+
+  try {
+    const response = await arena(new Request("https://example.test/api/arena", {
+      method: "POST",
+      headers: { Authorization: "Bearer member-token", "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "joinCompetitionChallenge",
+        payload: { challengeId: "document-workflow-agent-pilot", teamName: "Direct bypass" }
+      })
+    }));
+    const payload = await response.json();
+    assert.equal(response.status, 423);
+    assert.match(payload.error, /Sponsor Brief/);
+  } finally {
+    global.fetch = originalFetch;
+    restoreEnv(previous);
+  }
+});
+
 function captureEnv(keys) {
   return Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 }

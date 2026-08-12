@@ -43,27 +43,31 @@ export function communityPromptProfile(context = {}) {
 function founderPrompts(profile) {
   const productContext = profile.summary || `${profile.organizationName}의 제품·서비스`;
   const audienceContext = profile.sector ? `${profile.sector} 고객` : "핵심 고객";
+  const delegatedWork = delegatedWorkExamples(profile);
   return [
     prompt(
-      "ai-experience",
-      "우리 제품의 AI 활용 경험",
-      `${profile.organizationName}의 실제 적용과 한계`,
-      `${profile.organizationName}에서 시도한 AI 또는 자동화 도구:\n\n적용한 제품·업무:\n${productContext}\n\n실제로 확인한 효과:\n\n예상과 달랐던 한계:\n\n커뮤니티에 묻고 싶은 점:`,
-      "제품명보다 어떤 업무에 적용했고 무엇이 달라졌는지부터 적어보세요. 수치나 실제 사용자 반응이 있으면 함께 써주세요."
+      "preot-finance-ops",
+      "회계·재무 운영, 다들 어떻게 하나요?",
+      `${profile.organizationName}의 월 마감·자금 관리 경험을 묻기`,
+      `${profile.organizationName}의 현재 단계에서 가장 궁금한 회계·재무 운영:\n\n현재 직접 처리하거나 외부에 맡기는 업무:\n\n월 마감·세무·자금 흐름에서 반복되는 어려움:\n\n지금 사용 중인 도구 또는 대행 방식:\n\n효과가 있었거나 피하고 싶은 방법:\n\n비슷한 단계의 팀에게 묻고 싶은 질문:`,
+      "프리 OT에서 여러 창업팀이 회계·재무 운영 방식을 서로 듣고 싶다고 했습니다. 업체명이나 계약 금액 같은 비공개 정보 대신 팀의 단계, 맡기는 범위, 선택 기준을 적어주세요.",
+      "PRE-OT 공통 수요 · 운영진 질문"
     ),
     prompt(
-      "shipped",
-      "최근 출시·실험 공유",
-      `${profile.organizationName}의 결과물에 피드백 받기`,
-      `${profile.organizationName}이 최근 출시하거나 실험한 것:\n\n대상 사용자와 해결하려는 문제:\n${productContext}\n\n이번 버전에서 달라진 점:\n\n현재까지 확인한 반응 또는 데이터:\n\n커뮤니티에서 확인하고 싶은 점:\n\n데모·링크 (선택):`,
-      "완성된 홍보문보다 이번에 무엇을 바꿨고 어떤 피드백이 필요한지를 구체적으로 적어보세요."
+      "preot-go-to-market",
+      "개발팀의 마케팅, 어디서 시작했나요?",
+      `${audienceContext}을 만난 채널과 시행착오 공유`,
+      `${profile.organizationName}의 제품·서비스 맥락:\n${productContext}\n\n지금 만나려는 고객:\n${audienceContext}\n\n직접 해본 마케팅·세일즈 채널:\n\n시간 또는 비용 대비 반응이 있었던 시도:\n\n내부에서 하기 어렵거나 외부 도움이 필요한 부분:\n\n비슷한 고객을 만나는 팀에게 묻고 싶은 질문:`,
+      "프리 OT에서 개발 중심 팀들이 마케팅과 고객 획득 경험을 나누고 싶다고 했습니다. 성과 홍보보다 실제 채널, 투입한 노력, 배운 점을 중심으로 적어주세요.",
+      "PRE-OT 공통 수요 · 운영진 질문"
     ),
     prompt(
-      "first-customers",
-      "첫 고객을 만든 방법",
-      `${audienceContext}을 만난 과정을 공유`,
-      `${profile.organizationName}이 처음 정의한 핵심 고객:\n${audienceContext}\n\n처음 고객을 만난 경로:\n\n대화를 계약·실험으로 바꾼 계기:\n\n효과가 있었던 메시지 또는 제안:\n\n다시 한다면 바꿀 점:\n\n다른 창업자에게 묻고 싶은 점:`,
-      "성공 결과만 쓰기보다 첫 접점, 전환 계기, 반복 가능한 방법을 순서대로 적어보세요."
+      "preot-nondev-outsourcing",
+      "비개발 업무, 어디까지 외주로 맡기나요?",
+      `${delegatedWork}의 위탁 기준과 노하우 묻기`,
+      `${profile.organizationName}에서 외주·위탁을 고민하는 비개발 업무:\n${delegatedWork}\n\n내부에서 직접 하기 어려운 이유:\n\n파트너 또는 프리랜서를 고를 때 보는 기준:\n\n업무 범위·품질·커뮤니케이션을 관리하는 방식:\n\n직접 해보며 배운 점 또는 아직 막힌 점:\n\n비슷한 팀에게 추천받거나 묻고 싶은 것:`,
+      "프리 OT에서 비개발 업무를 어떤 기준으로 외주·위탁하는지 궁금하다는 수요가 확인됐습니다. 특정 업체를 홍보하기보다 맡긴 범위, 검수 기준, 실패를 줄인 방법을 공유해 주세요.",
+      "PRE-OT 공통 수요 · 운영진 질문"
     )
   ];
 }
@@ -122,8 +126,29 @@ function staffPrompts(profile) {
   ];
 }
 
-function prompt(id, label, hint, template, guide) {
-  return { id, label, hint, template, guide };
+function prompt(id, label, hint, template, guide, origin = "프로필 기반 운영진 가이드") {
+  return { id, label, hint, template, guide, origin };
+}
+
+function delegatedWorkExamples(profile) {
+  const haystack = `${profile.sector} ${profile.summary}`.toLowerCase();
+  if (includesAny(haystack, ["health", "medical", "bio", "의료", "헬스", "바이오"])) {
+    return "인허가·보험·의료기관 영업·콘텐츠 검수";
+  }
+  if (includesAny(haystack, ["fashion", "commerce", "retail", "food", "패션", "커머스", "리테일", "푸드"])) {
+    return "콘텐츠 제작·물류·고객지원·해외 운영";
+  }
+  if (includesAny(haystack, ["manufact", "robot", "hardware", "mobility", "제조", "로봇", "하드웨어", "모빌리티"])) {
+    return "인증·조달·현장 운영·기술 문서";
+  }
+  if (includesAny(haystack, ["saas", "software", "agent", "ai", "adtech", "소프트웨어", "에이전트"])) {
+    return "콘텐츠·B2B 세일즈 운영·고객지원·채용";
+  }
+  return "법무·채용·마케팅·고객지원·운영";
+}
+
+function includesAny(value, needles) {
+  return needles.some((needle) => value.includes(needle));
 }
 
 function partnerPriorities(partner) {

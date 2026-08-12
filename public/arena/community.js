@@ -1,7 +1,7 @@
 import { brandSafeDisplayText, escapeHtml } from "./sanitize.js";
 import { finishProcessStatus, setProcessStatus, startProcessStatus } from "./progress-status.js";
 import { audienceScopeLabel, audienceScopeOptionsForRole } from "./audience-scope.js";
-import { personalizedCommunityPrompts } from "./community-prompts.js";
+import { communityPromptProfile, personalizedCommunityPrompts } from "./community-prompts.js?v=ai-arena-20260812-meeting-next-steps";
 import { communityHighlightItems, communityHighlightsForViewer } from "./featured-news.js";
 import { communityLiveCopy } from "./community-live.js";
 
@@ -94,6 +94,8 @@ const els = {
   memberPerkRequestForm: document.querySelector("#memberPerkRequestForm"),
   memberPerkRequestInput: document.querySelector("#memberPerkRequestInput"),
   memberPerkRequestStatus: document.querySelector("#memberPerkRequestStatus"),
+  promptKicker: document.querySelector("#communityPromptKicker"),
+  promptTitle: document.querySelector("#communityPromptTitle"),
   promptList: document.querySelector("#communityPromptList"),
   promptContext: document.querySelector("#communityPromptContext"),
   promptGuide: document.querySelector("#communityPromptGuide"),
@@ -979,17 +981,41 @@ async function voteThread(threadId) {
 }
 
 function renderConversationPrompts() {
+  const profile = communityPromptProfile(context);
   activeCommunityPrompts = personalizedCommunityPrompts(context);
   const organizationName = communityPromptOrganizationName();
-  if (els.promptContext) els.promptContext.textContent = `${organizationName} 프로필 기준`;
+  const preOtGuided = activeCommunityPrompts.some((prompt) => prompt.origin?.includes("PRE-OT"));
+  const railCopy = communityPromptRailCopy(profile.kind);
+  if (els.promptKicker) els.promptKicker.textContent = railCopy.kicker;
+  if (els.promptTitle) els.promptTitle.textContent = railCopy.title;
+  if (els.promptContext) {
+    els.promptContext.textContent = profile.kind === "partner"
+      ? `${organizationName} 파트너 프로필 맞춤 · 협업 수요와 제공 가치를 구체화하도록 구성한 작성 가이드입니다. 아직 게시된 글이 아닙니다.`
+      : profile.kind === "staff"
+        ? `${organizationName} 운영 계정 맞춤 · 회원 간 수요와 연결 신호를 확인하기 위한 작성 가이드입니다. 아직 게시된 글이 아닙니다.`
+        : preOtGuided
+          ? `${organizationName} 프로필 맞춤 · 프리 OT에서 확인한 공통 수요를 운영진 질문으로 정리했습니다. 아직 게시된 글이 아닙니다.`
+          : `${organizationName} 프로필 맞춤 작성 가이드입니다. 아직 게시된 글이 아닙니다.`;
+  }
   if (!els.promptList) return;
   els.promptList.innerHTML = activeCommunityPrompts.map((prompt) => `
     <button type="button" data-community-prompt="${escapeHtml(prompt.id)}" aria-label="${escapeHtml(prompt.label)} 작성 가이드 열기">
+      <small>${escapeHtml(prompt.origin || "운영진 작성 가이드")}</small>
       <strong>${escapeHtml(prompt.label)}</strong>
       <span>${escapeHtml(prompt.hint)}</span>
       <i aria-hidden="true">→</i>
     </button>
   `).join("");
+}
+
+function communityPromptRailCopy(kind) {
+  if (kind === "partner") {
+    return { kicker: "PARTNER CONVERSATION STARTERS", title: "협업 수요를 구체화할 질문" };
+  }
+  if (kind === "staff") {
+    return { kicker: "COMMUNITY OPERATIONS", title: "운영진이 대화를 여는 질문" };
+  }
+  return { kicker: "PRE-OT NETWORKING NEEDS", title: "먼저 꺼내볼 운영 질문" };
 }
 
 function communityPromptOrganizationName() {

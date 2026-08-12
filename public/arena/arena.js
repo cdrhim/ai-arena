@@ -280,6 +280,7 @@ const els = {
   applicantExportStatus: document.querySelector("#applicantExportStatus"),
   dataTimestamp: document.querySelector("#dataTimestamp"),
   arenaMetricOpen: document.querySelector("#arenaMetricOpen"),
+  arenaReleaseBadge: document.querySelector("#arenaReleaseBadge"),
   arenaMetricSubmissions: document.querySelector("#arenaMetricSubmissions"),
   arenaMetricQueue: document.querySelector("#arenaMetricQueue"),
   arenaMetricPilots: document.querySelector("#arenaMetricPilots"),
@@ -1925,10 +1926,15 @@ function renderOverviewBenefits() {
 function renderArena() {
   if (!arenaData) return;
   const metrics = arenaData.metrics || {};
+  const bountyReleased = arenaData.releaseState === "open";
   els.arenaMetricOpen.textContent = formatNumber(metrics.openChallenges);
   els.arenaMetricSubmissions.textContent = formatNumber(metrics.validatedSubmissions);
   els.arenaMetricQueue.textContent = formatNumber(metrics.validationQueue);
   els.arenaMetricPilots.textContent = formatNumber(metrics.activePilots);
+  if (els.arenaReleaseBadge) {
+    els.arenaReleaseBadge.classList.toggle("is-preparing", !bountyReleased);
+    els.arenaReleaseBadge.innerHTML = `<i></i> ${bountyReleased ? "BOUNTY BOARD LIVE" : "BOUNTY 준비 중"}`;
+  }
   renderBountyRolePaths();
   renderArenaBounties();
   renderArenaMyStatus();
@@ -1945,6 +1951,7 @@ function renderBountyRolePaths() {
   const validator = role === "human_validator";
   const audience = staff || validator ? "operator" : sponsor ? "sponsor" : "builder";
   const organizationName = String(hub?.viewer?.organization || "").trim();
+  const released = arenaData?.releaseState === "open";
   els.bountyRolePaths.querySelectorAll("[data-bounty-audience]").forEach((card) => {
     const current = card.dataset.bountyAudience === audience;
     card.classList.toggle("is-current", current);
@@ -1956,6 +1963,15 @@ function renderBountyRolePaths() {
   });
   els.bountyRolePaths.querySelectorAll("[data-bounty-staff-action]").forEach((button) => {
     button.hidden = !staff;
+  });
+  els.bountyRolePaths.querySelectorAll("[data-bounty-builder-action]").forEach((button) => {
+    button.disabled = !released;
+    button.textContent = released ? "Open Bounty 보기 →" : "실과제 공개 준비 중";
+  });
+  els.bountyRolePaths.querySelectorAll("[data-bounty-builder-copy]").forEach((copy) => {
+    copy.textContent = released
+      ? "평가 기준과 데이터 정책을 확인하고 결과를 제출한 뒤, 공개·비공개 검증과 전문가 피드백을 받습니다."
+      : "실제 기업 과제, 평가 기준과 데이터 정책을 확정하고 있습니다. 공개 전에는 참가 신청이나 결과 제출을 받지 않습니다.";
   });
   if (els.bountyRoleBadge) {
     els.bountyRoleBadge.textContent = staff
@@ -1973,12 +1989,26 @@ function renderBountyRolePaths() {
         ? "배정된 제출물의 근거와 재현성을 검토하고, 운영진의 최종 검증 판단을 지원합니다."
         : sponsor
           ? "기업 문제를 먼저 구조화하고, 공개 과제와 검증 결과를 확인한 뒤 Pilot 단계까지 추적합니다."
-          : "접수 중인 과제의 평가 기준을 확인하고 결과를 제출한 뒤 검증·피드백·기회 전환을 추적합니다.";
+          : released
+            ? "접수 중인 과제의 평가 기준을 확인하고 결과를 제출한 뒤 검증·피드백·기회 전환을 추적합니다."
+            : "현재 Bounty는 실제 기업 과제 확정 전 준비 단계입니다. 공개되면 평가 기준과 데이터 정책을 먼저 확인할 수 있습니다.";
   }
 }
 
 function renderArenaBounties() {
   if (!arenaData) return;
+  if (arenaData.releaseState !== "open" && !hub?.viewer?.canScore) {
+    els.arenaBountyGrid.innerHTML = `
+      <div class="arena-empty-card bounty-release-gate">
+        <span class="section-kicker">RELEASE GATE</span>
+        <h3>실제 기업 Bounty를 준비하고 있습니다.</h3>
+        <p>문제 책임자, 성공 기준, 데이터·보안 정책과 후속 Pilot 조건이 확정된 과제만 공개합니다.</p>
+        <small>기업 파트너의 Brief 접수와 SparkLabs 운영 검토는 계속 진행됩니다.</small>
+      </div>`;
+    if (els.arenaBountyDetail) els.arenaBountyDetail.hidden = true;
+    selectedArenaChallengeId = "";
+    return;
+  }
   const challenges = (arenaData.challenges || []).filter(
     (challenge) => arenaBountyFilter === "all" || challenge.status === arenaBountyFilter
   );
