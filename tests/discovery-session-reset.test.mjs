@@ -33,3 +33,15 @@ test("a stale discovery response cannot repopulate results after session reset",
   assert.match(discovery, /catch \(error\) \{\s*if \(requestId !== discoveryRequestId\) return/);
   assert.match(discovery, /finally \{\s*if \(requestId === discoveryRequestId\) setDiscoveryPending\(false\)/);
 });
+
+test("entering Community clears the Spark AI query, progress, and recommendations before returning to Discover", () => {
+  const pageListener = functionSlice(community, 'window.addEventListener("spark-arena:page"', 'window.addEventListener("spark-arena:discovery-reset"');
+  const reset = functionSlice(community, "function resetAgenticDiscovery", "function renderAgenticResults");
+
+  assert.match(pageListener, /event\.detail\?\.page === "community"[\s\S]*?resetAgenticDiscovery\(\)[\s\S]*?loadForum\(\)/);
+  assert.match(reset, /els\.discoveryQuery\.value = ""/);
+  assert.match(reset, /delete els\.discoveryQuery\.dataset\.profileSeeded/);
+  assert.match(reset, /setProcessStatus\(els\.discoveryStatus\)/);
+  assert.match(reset, /els\.discoveryResults\.hidden = true/);
+  assert.match(reset, /els\.discoveryResults\.replaceChildren\(\)/);
+});

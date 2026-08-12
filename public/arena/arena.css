@@ -10156,23 +10156,19 @@ body.is-claw-member #overviewPage > .metric-grid {
 }
 
 body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card {
-  grid-column: 1 / -1;
-  min-height: 156px;
-  padding-right: calc(62% + 24px);
+  min-width: 0;
 }
 
 body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card .metric-fit-tooltip {
-  top: 14px;
-  bottom: 14px;
-  left: 38%;
-  max-height: none;
+  top: 16px;
+  right: auto;
+  bottom: auto;
+  left: clamp(180px, 38%, 250px);
+  width: min(430px, calc(100vw - 42px));
+  max-height: min(440px, 70vh);
 }
 
 @media (max-width: 900px) {
-  body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card {
-    padding-right: 24px;
-  }
-
   body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card .metric-fit-tooltip {
     top: calc(100% - 4px);
     right: 10px;

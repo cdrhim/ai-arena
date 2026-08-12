@@ -147,7 +147,10 @@ window.addEventListener("spark-arena:data", (event) => {
 });
 
 window.addEventListener("spark-arena:page", (event) => {
-  if (event.detail?.page === "community") loadForum();
+  if (event.detail?.page === "community") {
+    resetAgenticDiscovery();
+    loadForum();
+  }
 });
 
 window.addEventListener("spark-arena:discovery-reset", resetAgenticDiscovery);
@@ -326,6 +329,10 @@ function resetAgenticDiscovery() {
   discoveryRequestId += 1;
   setDiscoveryPending(false);
   setProcessStatus(els.discoveryStatus);
+  if (els.discoveryQuery) {
+    els.discoveryQuery.value = "";
+    delete els.discoveryQuery.dataset.profileSeeded;
+  }
   if (els.discoveryResults) {
     els.discoveryResults.hidden = true;
     els.discoveryResults.replaceChildren();

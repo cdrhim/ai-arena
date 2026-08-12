@@ -70,12 +70,13 @@ test("collaboration-fit decoration stays clipped while its tooltip can escape th
   assert.doesNotMatch(css, /\.metric-card::after\s*\{[\s\S]*?right:\s*-32px/);
 });
 
-test("collaboration-fit details use the open right side without covering the member metric", () => {
+test("collaboration-fit details begin inside the right metric card and may extend beyond it", () => {
   assert.match(css, /\.metric-fit-tooltip\s*\{[\s\S]*?top:\s*16px;[\s\S]*?left:\s*calc\(100% - 58px\);/);
   assert.match(css, /\.metric-fit-tooltip\s*\{[\s\S]*?transform:\s*translate3d\(var\(--fit-tooltip-enter-x\), 0, 0\) scale\(0\.965\);/);
   assert.match(css, /body\.is-claw-member \.collaboration-fit-card \.metric-fit-tooltip\s*\{[\s\S]*?right:\s*16px;[\s\S]*?left:\s*clamp\(210px, 38%, 300px\);[\s\S]*?width:\s*auto;/);
-  assert.match(css, /body\.is-claw-member #overviewPage > \.metric-grid > \.collaboration-fit-card\s*\{[\s\S]*?grid-column:\s*1 \/ -1;[\s\S]*?padding-right:\s*calc\(62% \+ 24px\);/);
-  assert.match(css, /body\.is-claw-member #overviewPage > \.metric-grid > \.collaboration-fit-card \.metric-fit-tooltip\s*\{[\s\S]*?left:\s*38%;[\s\S]*?max-height:\s*none;/);
+  assert.match(css, /body\.is-claw-member #overviewPage > \.metric-grid > \.collaboration-fit-card\s*\{[\s\S]*?min-width:\s*0;/);
+  assert.doesNotMatch(css, /body\.is-claw-member #overviewPage > \.metric-grid > \.collaboration-fit-card\s*\{[\s\S]*?grid-column:\s*1 \/ -1/);
+  assert.match(css, /body\.is-claw-member #overviewPage > \.metric-grid > \.collaboration-fit-card \.metric-fit-tooltip\s*\{[\s\S]*?right:\s*auto;[\s\S]*?left:\s*clamp\(180px, 38%, 250px\);[\s\S]*?width:\s*min\(430px, calc\(100vw - 42px\)\);/);
   assert.match(css, /@media \(max-width: 900px\)[\s\S]*?body\.is-claw-member #overviewPage > \.metric-grid > \.collaboration-fit-card \.metric-fit-tooltip\s*\{[\s\S]*?top:\s*calc\(100% - 4px\);[\s\S]*?left:\s*10px;/);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.collaboration-fit-card \.metric-fit-tooltip,[\s\S]*?top:\s*calc\(100% - 4px\);[\s\S]*?right:\s*10px;[\s\S]*?left:\s*10px;/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.metric-fit-tooltip\s*\{\s*transition:\s*none !important;/);
