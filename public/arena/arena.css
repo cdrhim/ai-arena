@@ -2226,10 +2226,11 @@ textarea:focus {
 }
 
 body.is-claw-member .collaboration-fit-card .metric-fit-tooltip {
-  --fit-tooltip-enter-x: 18px;
-  right: calc(100% - 58px);
-  left: auto;
-  transform-origin: calc(100% - 24px) 30px;
+  --fit-tooltip-enter-x: 14px;
+  right: 16px;
+  left: clamp(210px, 38%, 300px);
+  width: auto;
+  transform-origin: right 30px;
 }
 
 @media (max-width: 900px) {
@@ -10152,6 +10153,35 @@ body.is-public-brief-view .public-brief-public-mount .public-brief-form {
 /* Discover: consistent, restrained depth feedback for the page's key surfaces. */
 body.is-claw-member #overviewPage > .metric-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card {
+  grid-column: 1 / -1;
+  min-height: 156px;
+  padding-right: calc(62% + 24px);
+}
+
+body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card .metric-fit-tooltip {
+  top: 14px;
+  bottom: 14px;
+  left: 38%;
+  max-height: none;
+}
+
+@media (max-width: 900px) {
+  body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card {
+    padding-right: 24px;
+  }
+
+  body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card .metric-fit-tooltip {
+    top: calc(100% - 4px);
+    right: 10px;
+    bottom: auto;
+    left: 10px;
+    width: auto;
+    max-height: min(440px, 70vh);
+    transform-origin: top center;
+  }
 }
 
 #overviewPage > .partner-profile-card,
