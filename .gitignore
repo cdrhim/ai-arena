@@ -1,0 +1,13 @@
+node_modules/
+__pycache__/
+*.pyc
+.netlify/
+.pnpm-store/
+.tmp/
+.env
+*.log
+private/
+output/
+outputs/
+netlify/data/sparkclaw-applicants/*.csv
+netlify/data/sparkclaw-applicants/*.xlsx

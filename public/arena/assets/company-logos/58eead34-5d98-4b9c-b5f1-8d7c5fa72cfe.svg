@@ -1,0 +1,11 @@
+<svg width="720" height="180" viewBox="0 0 720 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="28" cy="66" r="8" fill="#1A2F5D"/>
+  <circle cx="28" cy="98" r="8" fill="#1A2F5D"/>
+  <path d="M36 66H54" stroke="#1A2F5D" stroke-width="8" stroke-linecap="round"/>
+  <path d="M36 98H54" stroke="#1A2F5D" stroke-width="8" stroke-linecap="round"/>
+  <text x="48" y="142" fill="#1A2F5D" font-family="Verdana, Arial, sans-serif" font-size="136" font-weight="700">R</text>
+  <path d="M156 56L193 82L156 108V56Z" fill="#F37021"/>
+  <path d="M117 103L145 146" stroke="#F37021" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="230" y="88" fill="#1A2F5D" font-family="Noto Sans KR, sans-serif" font-size="74" font-weight="800" letter-spacing="-0.05em">Reppl.ai</text>
+  <text x="233" y="140" fill="#72809A" font-family="Noto Sans KR, sans-serif" font-size="34" font-weight="700" letter-spacing="-0.04em">리플레이</text>
+</svg>

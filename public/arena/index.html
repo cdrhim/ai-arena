@@ -1,0 +1,1350 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1465e8">
+  <meta name="description" content="SparkLabs AI Arena — discover verified AI companies, submit a business brief, and connect through a trusted network.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="SparkLabs AI Arena">
+  <meta property="og:description" content="Where AI companies meet — curated discovery, evidence-based introductions, founder community, events, and verified perks.">
+  <meta property="og:url" content="https://sparkclaw-arena.netlify.app/">
+  <meta property="og:image" content="https://sparkclaw-arena.netlify.app/og-ai-arena-v3.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="SparkLabs AI Arena">
+  <meta name="twitter:description" content="Where AI companies meet · Community · Events · Perks · Partners">
+  <meta name="twitter:image" content="https://sparkclaw-arena.netlify.app/og-ai-arena-v3.png">
+  <link rel="canonical" href="https://sparkclaw-arena.netlify.app/">
+  <link rel="shortcut icon" href="/favicon.ico?v=ai-arena-20260811">
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png?v=ai-arena-20260811">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=ai-arena-20260811">
+  <title>SparkLabs AI Arena</title>
+  <link rel="stylesheet" href="/arena/arena.css?v=ai-arena-20260812-fit-flyout-right">
+  <link rel="stylesheet" href="/arena/market.css?v=ai-arena-20260812-fit-flyout-right">
+</head>
+<body class="is-booting">
+  <div id="bootScreen" class="boot-screen" aria-live="polite">
+    <img src="/arena/assets/sparkclaw-logo-blue.png" alt="">
+    <span>AI Arena 로그인을 준비하는 중입니다</span>
+  </div>
+
+  <header class="app-header">
+    <button id="homeButton" class="brand" type="button" aria-label="SparkLabs·SparkClaw AI Arena 홈">
+      <span class="brand-mark"><img src="/arena/assets/sparkclaw-logo-blue.png" alt=""></span>
+      <span class="brand-copy">
+        <strong class="brand-name-cycle" aria-hidden="true"><span class="brand-name-prefix">Spark</span><span class="brand-name-suffix"><span class="brand-name-labs">Labs</span><span class="brand-name-claw">Claw</span></span></strong>
+        <span class="sr-only">SparkLabs와 SparkClaw</span>
+        <small>AI ARENA</small>
+      </span>
+    </button>
+
+    <nav id="primaryNav" class="primary-nav" aria-label="SparkLabs AI Arena 메뉴" hidden>
+      <div class="nav-menu nav-menu-discover" data-nav-menu>
+        <button class="nav-link is-active" data-page="overview" type="button" aria-haspopup="true" aria-expanded="false">Discover</button>
+        <div class="nav-dropdown nav-dropdown-wide" role="menu" aria-label="Discover 하위 메뉴">
+          <button class="nav-dropdown-link" data-nav-page="overview" role="menuitem" type="button"><strong>Discover Home</strong><small>추천과 네트워크 요약</small></button>
+          <button class="nav-dropdown-link" data-nav-page="teams" role="menuitem" type="button"><strong>Company Directory</strong><small>전체 참가기업 탐색</small></button>
+          <button class="nav-dropdown-link" data-nav-page="discover" role="menuitem" type="button"><strong>Task-driven Search</strong><small>업무·문제 기반 기업 검색</small></button>
+          <button class="nav-dropdown-link" data-nav-page="passports" role="menuitem" type="button"><strong>Tech Passports</strong><small>공개 기술 프로필 검토</small></button>
+          <button class="nav-dropdown-link" data-nav-page="compare" role="menuitem" type="button"><strong>Compare</strong><small>선택 기업 나란히 비교</small></button>
+          <button class="nav-dropdown-link" data-nav-page="partnerships" data-nav-roles="b2b_partner,sparklabs,admin" role="menuitem" type="button"><strong>Partnerships</strong><small>검토와 파트너 연결 요청</small></button>
+        </div>
+      </div>
+      <div class="nav-menu" data-nav-menu>
+        <button class="nav-link" data-page="community" data-founder-only data-feature="forum" type="button" aria-haspopup="true" aria-expanded="false">Community</button>
+        <div class="nav-dropdown" role="menu" aria-label="Community 하위 메뉴">
+          <button class="nav-dropdown-link" data-nav-page="community" role="menuitem" type="button"><strong>Community Home</strong><small>회원·파트너 커뮤니티</small></button>
+          <button class="nav-dropdown-link" data-nav-page="community" data-nav-target="communityComposer" role="menuitem" type="button"><strong>Start a Conversation</strong><small>질문과 경험 공유하기</small></button>
+          <button class="nav-dropdown-link" data-nav-page="community" data-nav-target="communityFeedSection" role="menuitem" type="button"><strong>Community Feed</strong><small>글·댓글·피드백 확인</small></button>
+        </div>
+      </div>
+      <div class="nav-menu nav-menu-bounty" data-nav-menu>
+        <button class="nav-link" data-page="arena" type="button" aria-haspopup="true" aria-expanded="false">Bounty</button>
+        <div class="nav-dropdown nav-dropdown-wide" role="menu" aria-label="Bounty 하위 메뉴">
+          <button class="nav-dropdown-link" data-nav-page="arena" role="menuitem" type="button"><strong>Bounty Home</strong><small>과제·검증·기회 전체 흐름</small></button>
+          <button class="nav-dropdown-link" data-nav-page="arena" data-nav-target="arenaBountyBoard" role="menuitem" type="button"><strong>Open Bounties</strong><small>접수 중인 실전 과제 확인</small></button>
+          <button class="nav-dropdown-link" data-nav-page="arena" data-nav-target="arenaMyStatusPanel" role="menuitem" type="button"><strong>My Bounty Run</strong><small>제출·검증·기회 진행 현황</small></button>
+          <button class="nav-dropdown-link" data-nav-page="partnerships" data-nav-target="bountyBriefPanel" data-nav-roles="b2b_partner,sparklabs,admin" role="menuitem" type="button"><strong>Sponsor a Bounty</strong><small>기업 문제와 성공 기준 등록</small></button>
+          <button class="nav-dropdown-link" data-nav-page="partnerships" data-nav-target="partnershipPipelinePanel" data-nav-roles="b2b_partner,sparklabs,admin" role="menuitem" type="button"><strong>Bounty Pipeline</strong><small>Brief에서 Pilot까지 추적</small></button>
+          <button class="nav-dropdown-link" data-nav-page="arena" data-nav-target="arenaStaffPanel" data-permission="canViewOperations" role="menuitem" type="button"><strong>Operations</strong><small>설계·평가·기회 전환 관리</small></button>
+        </div>
+      </div>
+      <div class="nav-menu" data-nav-menu>
+        <button class="nav-link" data-page="calendar" data-nav-roles="b2b_partner,human_validator,sparklabs,admin" type="button" aria-haspopup="true" aria-expanded="false">Events &amp; Perks</button>
+        <div class="nav-dropdown" role="menu" aria-label="Events and Perks 하위 메뉴">
+          <button class="nav-dropdown-link" data-nav-page="calendar" role="menuitem" type="button"><strong>Events</strong><small>전체 일정과 RSVP</small></button>
+          <button class="nav-dropdown-link" data-nav-page="benefits" role="menuitem" type="button"><strong>Verified Perks</strong><small>확인된 혜택과 신청 조건</small></button>
+        </div>
+      </div>
+      <div class="nav-menu nav-menu-end" data-nav-menu>
+        <button class="nav-link" data-page="workspace" data-member-only type="button" aria-haspopup="true" aria-expanded="false">My Log</button>
+        <div class="nav-dropdown" role="menu" aria-label="My Log 하위 메뉴">
+          <button class="nav-dropdown-link" data-nav-page="workspace" data-nav-target="myLogTimeline" role="menuitem" type="button"><strong>Activity Timeline</strong><small>모든 활동을 최신순으로</small></button>
+          <button class="nav-dropdown-link" data-nav-page="workspace" data-nav-target="myLogMatches" role="menuitem" type="button"><strong>Match Requests</strong><small>보낸 요청과 답변 상태</small></button>
+          <button class="nav-dropdown-link" data-nav-page="workspace" data-nav-target="myLogCommunity" role="menuitem" type="button"><strong>Community</strong><small>작성 글·댓글·받은 반응</small></button>
+          <button class="nav-dropdown-link" data-nav-page="workspace" data-nav-target="myLogBounties" role="menuitem" type="button"><strong>Bounty Progress</strong><small>신청·제출 진행 단계</small></button>
+          <button class="nav-dropdown-link" data-nav-page="operations" data-permission="canViewOperations" role="menuitem" type="button"><strong>Program Operations</strong><small>팀 활동과 운영 현황</small></button>
+          <button class="nav-dropdown-link" data-nav-page="database" data-permission="canViewRawDatabase" role="menuitem" type="button"><strong>Raw Database</strong><small>운영진 전용 원본 조회</small></button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="header-actions">
+      <div id="publicBriefLanguageSwitch" class="public-brief-language-switch" role="group" aria-label="페이지 언어" hidden>
+        <button type="button" data-public-brief-language="ko" aria-pressed="true">한국어</button>
+        <button type="button" data-public-brief-language="en" aria-pressed="false">EN</button>
+      </div>
+      <button id="memberAccessButton" class="member-access-button" type="button" hidden>회원 로그인</button>
+      <button id="refreshButton" class="icon-button" type="button" aria-label="최신 데이터 새로고침" title="최신 데이터 새로고침" hidden>
+        <span aria-hidden="true">↻</span>
+      </button>
+      <div id="accountMenu" class="account-menu" hidden>
+        <span id="accountInitial" class="account-avatar">S</span>
+        <span class="account-copy">
+          <strong id="accountName">로그인됨</strong>
+          <small id="accountRole">멤버</small>
+        </span>
+        <button id="logoutButton" class="text-button" type="button">로그아웃</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="loginGate" class="member-access-layer" role="dialog" aria-modal="true" aria-labelledby="memberAccessTitle" aria-describedby="memberAccessDescription" data-auth-required hidden>
+      <button class="member-access-backdrop" data-close-member-access type="button" tabindex="-1" aria-label="로그인 창 닫기"></button>
+      <div class="member-access-shell">
+        <button id="memberAccessClose" class="member-access-close" type="button" aria-label="로그인 창 닫기">×</button>
+        <div class="login-story">
+          <div class="login-visual-system" aria-hidden="true">
+            <span class="login-visual-orbit login-visual-orbit-a"></span>
+            <span class="login-visual-orbit login-visual-orbit-b"></span>
+            <span class="login-visual-node login-visual-node-a"></span>
+            <span class="login-visual-node login-visual-node-b"></span>
+            <span class="login-visual-node login-visual-node-c"></span>
+            <span class="login-visual-core"><img src="/arena/assets/sparkclaw-logo-blue.png" alt=""></span>
+          </div>
+          <span class="eyebrow login-network-status"><i aria-hidden="true"></i>승인된 회원 네트워크</span>
+          <h1 data-public-brief-login-title>로그인하고 발견하세요.<br>안전하게 협업하세요.</h1>
+          <p data-public-brief-login-description>기업 탐색, Community, Bounty와 My Log는 승인된 Arena 회원만 이용할 수 있습니다.</p>
+          <div class="login-community-preview" aria-label="회원 전용 기능">
+            <span>회원 기업 탐색</span><span>일정·검증된 혜택</span><span>비공개 업무 공간</span>
+          </div>
+          <div class="login-access-route" aria-label="AI Arena 회원 경험">
+            <span><b>01</b>발견</span><i aria-hidden="true"></i><span><b>02</b>검증</span><i aria-hidden="true"></i><span><b>03</b>연결</span>
+          </div>
+        </div>
+
+        <form id="loginForm" class="login-card" aria-describedby="authStatus">
+          <div class="login-card-status"><i aria-hidden="true"></i><span>SECURE MEMBER ACCESS</span></div>
+          <div>
+            <span class="eyebrow" data-public-brief-login-eyebrow>회원 로그인</span>
+            <h2 id="memberAccessTitle">AI Arena 회원 로그인</h2>
+            <p id="memberAccessDescription">Claw 멤버, 승인된 Arena 멤버, 기업 파트너와 SparkLabs 운영진을 위한 접근입니다.</p>
+          </div>
+          <label>
+            <span data-public-brief-login-email>이메일</span>
+            <input name="email" type="email" autocomplete="email" placeholder="name@example.com" required>
+          </label>
+          <label>
+            <span data-public-brief-login-password>비밀번호</span>
+            <input name="password" type="password" autocomplete="current-password" placeholder="비밀번호 입력" required>
+          </label>
+          <button class="primary-button" type="submit" data-public-brief-login-submit>로그인</button>
+          <div class="login-card-trust" aria-label="접근 원칙"><span>권한 기반 접근</span><span>Double opt-in</span></div>
+          <p id="authStatus" class="form-status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="publicBriefGate" class="public-brief-gate" aria-label="공개 AI 파트너 요청" hidden>
+      <div id="publicBriefPublicMount" class="public-brief-public-mount"></div>
+    </section>
+
+    <div id="programApp" class="program-app" hidden>
+      <div id="globalProcessStatus" class="form-status global-process-status" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+      <section id="overviewPage" class="page is-active" data-page-panel="overview">
+        <div class="program-hero">
+          <div class="hero-cloud-field" aria-hidden="true">
+            <i class="hero-cloud hero-cloud-one"></i>
+            <i class="hero-cloud hero-cloud-two"></i>
+            <i class="hero-cloud hero-cloud-three"></i>
+          </div>
+          <div class="program-hero-copy">
+            <div class="hero-status-line">
+              <span id="cohortBadge" class="eyebrow">SPARKLABS AI ARENA</span>
+              <span class="hero-live-status" role="status" aria-live="polite">
+                <i></i>
+                <span>현재 Arena 데이터</span>
+                <time id="heroLiveTime">조회 시각 확인 중</time>
+              </span>
+            </div>
+            <h1>Where AI companies<br>meet.</h1>
+            <p>해결하려는 문제를 설명하고, 공개에 동의한 AI 기업을 발견한 뒤 SparkLabs의 검토를 거쳐 연결하세요.</p>
+            <div class="hero-actions">
+              <button class="primary-button compact" data-go-page="teams" type="button">Explore Companies</button>
+              <button class="secondary-button compact" data-scroll-target="publicBriefSection" type="button">Submit a Brief</button>
+              <button class="secondary-button compact" data-open-member-access type="button">Member access</button>
+            </div>
+          </div>
+          <div class="hero-visual">
+            <aside id="featuredSpotlight" class="featured-spotlight" aria-labelledby="featuredCompaniesTitle">
+              <div class="featured-spotlight-head">
+                <div>
+                  <span class="featured-spotlight-kicker"><i aria-hidden="true"></i> 4 PICKS EDITORIAL SPOTLIGHT</span>
+                  <h2 id="featuredCompaniesTitle">Highlighted Companies</h2>
+                </div>
+              </div>
+              <div id="overviewEvents" class="featured-spotlight-cluster">
+                <p class="featured-spotlight-loading">최근 공개 실적을 정리하고 있습니다.</p>
+              </div>
+              <div class="featured-spotlight-footer">
+                <span id="featuredCompaniesUpdated">OPERATIONS REVIEW</span>
+                <button class="featured-spotlight-all" data-go-page="teams" type="button">전체 기업 →</button>
+              </div>
+            </aside>
+            <div class="hero-orbit" aria-hidden="true">
+              <div class="hero-network-core"><i></i><span>SPARK</span></div>
+              <span class="hero-cloud-tag hero-cloud-tag-one" data-hero-cloud-tag>AI Agents</span>
+              <span class="hero-cloud-tag hero-cloud-tag-two" data-hero-cloud-tag>Data Intelligence</span>
+              <span class="hero-cloud-tag hero-cloud-tag-three" data-hero-cloud-tag>근거 검증</span>
+              <span class="hero-cloud-tag hero-cloud-tag-four" data-hero-cloud-tag>Founder Commons</span>
+              <div class="orbit-card orbit-card-main">
+                <span><i class="orbit-live-dot"></i> CURATED NETWORK</span>
+                <strong id="heroTeamCount">—</strong>
+                <small>program teams</small>
+              </div>
+              <div class="orbit-card orbit-card-top"><strong id="heroSectorCount">—</strong><small>task areas</small></div>
+              <div class="orbit-card orbit-card-bottom"><strong id="heroBenefitCount">—</strong><small id="heroBenefitLabel">active benefits</small></div>
+            </div>
+          </div>
+        </div>
+
+        <section id="partnerProfileCard" class="partner-profile-card" aria-labelledby="partnerProfileTitle" hidden></section>
+
+        <section id="agenticDiscoverySection" class="agentic-discovery" aria-labelledby="agenticDiscoveryTitle">
+          <div class="agentic-discovery-copy">
+            <span class="agent-pulse"><i></i> SPARK AI 기업 탐색</span>
+            <h2 id="agenticDiscoveryTitle">어떤 AI 회사를 찾고 계신가요?</h2>
+            <p id="agenticDiscoveryDescription">카테고리 필터부터 고르지 않아도 됩니다. 해결하려는 비즈니스 문제와 필요한 조건을 자연어로 설명하세요.</p>
+          </div>
+          <form id="agenticDiscoveryForm" class="agentic-discovery-form">
+            <label class="sr-only" for="agenticDiscoveryQuery">찾고 싶은 AI 회사 설명</label>
+            <textarea id="agenticDiscoveryQuery" name="query" rows="3" maxlength="1200" placeholder="예: 한국어 고객센터 문의를 자동화할 수 있고 엔터프라이즈 보안 요구를 이해하는 AI 회사를 찾고 있어요." required></textarea>
+            <div class="agentic-discovery-actions">
+              <div class="agent-prompt-chips" aria-label="검색 예시">
+                <button type="button" data-agent-prompt="제조 현장의 비전 검사 문제를 해결할 AI 회사를 찾아줘">제조 비전</button>
+                <button type="button" data-agent-prompt="한국어 문서 업무를 자동화할 B2B SaaS 파트너를 찾아줘">문서 자동화</button>
+                <button type="button" data-agent-prompt="개발자 도구와 AI 인프라 분야의 초기 회사를 찾아줘">개발자 도구</button>
+              </div>
+              <button id="agenticDiscoverySubmit" class="primary-button compact" type="submit" data-idle-label="Spark AI에게 묻기 →">Spark AI에게 묻기 →</button>
+            </div>
+            <p id="agenticDiscoveryStatus" class="form-status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+          </form>
+          <div id="agenticDiscoveryResults" class="agentic-results" hidden></div>
+        </section>
+
+        <section class="metric-grid" aria-label="AI Arena 핵심 지표">
+          <article id="curatedCompaniesCard" class="metric-card accent-blue curated-companies-card" tabindex="0" role="link" data-market-page="teams" aria-label="Curated Companies 전체 목록을 Company Directory에서 보기">
+            <span>Curated Companies</span>
+            <strong id="metricTeams">—</strong>
+            <small id="metricTeamStatus">팀 정보 동기화 중</small>
+            <div id="curatedCompanyStack" class="curated-company-stack" aria-hidden="true"></div>
+          </article>
+          <article id="collaborationFitCard" class="metric-card accent-green collaboration-fit-card" tabindex="0" aria-describedby="metricProfilesTooltip">
+            <span>협업 적합 기업</span>
+            <strong id="metricProfiles">0</strong>
+            <small>현재 계정 프로필 기준</small>
+            <div id="metricProfilesTooltip" class="metric-fit-tooltip" role="tooltip">기업 프로필을 연결하면 협업 적합도를 계산합니다.</div>
+          </article>
+          <article class="metric-card accent-violet" data-hide-from-claw-member>
+            <span>Active Perks</span>
+            <strong id="metricBenefits">—</strong>
+            <small>현재 제공 중</small>
+          </article>
+          <article class="metric-card accent-orange" data-hide-from-claw-member>
+            <span>Community Events</span>
+            <strong id="metricEvents">—</strong>
+            <small id="metricUpcoming">예정 일정 확인 중</small>
+          </article>
+        </section>
+
+        <div class="overview-grid">
+          <section class="panel notice-panel">
+            <div class="panel-head">
+              <div>
+                <span class="section-kicker">WHAT'S NEW</span>
+                <h2>Arena 소식</h2>
+              </div>
+              <span id="noticeUpdated" class="subtle-chip">UPDATE</span>
+            </div>
+            <div id="weeklyNotice" class="notice-content">
+              <p class="empty-copy">최신 프로그램 안내를 불러오는 중입니다.</p>
+            </div>
+          </section>
+
+          <section class="panel sector-panel">
+            <div class="panel-head">
+              <div>
+                <span class="section-kicker">COMMUNITY MAP</span>
+                <h2>해결 Task Map</h2>
+              </div>
+              <button class="text-link" data-go-page="teams" type="button">팀 전체보기 →</button>
+            </div>
+            <div id="sectorChart" class="sector-chart"></div>
+          </section>
+        </div>
+
+        <section class="panel" data-hide-from-claw-member>
+          <div class="panel-head">
+            <div>
+              <span class="section-kicker">FEATURED PERKS</span>
+              <h2>멤버를 위한 새로운 혜택</h2>
+            </div>
+            <button class="text-link" data-go-page="benefits" type="button">베네핏 전체보기 →</button>
+          </div>
+          <div id="overviewBenefits" class="benefit-strip"></div>
+        </section>
+
+        <section class="community-news-grid">
+          <article class="panel arena-news-panel">
+            <div class="panel-head"><div><span class="section-kicker">ARENA UPDATES</span><h2>Arena 소식</h2></div><button class="text-link" data-go-page="community" type="button">커뮤니티 보기 →</button></div>
+            <div id="featuredNews" class="featured-news-list"></div>
+          </article>
+          <article class="panel partner-callout">
+            <div class="partner-callout-provider" data-hide-from-claw-member>
+              <span class="section-kicker">OUR PARTNERS</span>
+              <h2>Build a perk founders will actually use.</h2>
+              <p>개발자와 AI 창업팀이 실제로 쓰는 제품, 크레딧, 교육 세션을 Arena 멤버에게 소개하세요.</p>
+              <div id="partnerLogoRail" class="partner-logo-rail" aria-label="파트너 예시"></div>
+              <button class="secondary-button compact" data-go-page="partnerships" type="button">Feature a perk</button>
+            </div>
+            <form id="memberPerkRequestForm" class="member-perk-request" data-show-for-claw-member hidden aria-describedby="memberPerkRequestHelp memberPerkRequestStatus">
+              <span class="section-kicker">원하는 혜택 제안</span>
+              <h2>우리 팀에 필요한 혜택을 적어주세요.</h2>
+              <p id="memberPerkRequestHelp">원하는 제품·크레딧·클라우드·채용·교육 지원을 적어주시면, Community에서 수요를 함께 다듬고 파트너 발굴에 반영할 수 있습니다.</p>
+              <label for="memberPerkRequestInput">어떤 혜택이 필요하신가요?</label>
+              <textarea id="memberPerkRequestInput" name="perkRequest" rows="4" maxlength="600" placeholder="예: 고객지원 AI 도구 Pro 계정과 초기 도입 컨설팅" required></textarea>
+              <div class="member-perk-request-actions">
+                <button class="secondary-button compact" type="submit">요청 초안 만들기 →</button>
+                <small>초안으로 이동하며 게시 전 내용과 공개 범위를 수정할 수 있습니다.</small>
+              </div>
+              <p id="memberPerkRequestStatus" class="member-perk-request-status" role="status" aria-live="polite" hidden></p>
+            </form>
+          </article>
+        </section>
+
+        <div id="publicBriefAuthenticatedMount" class="public-brief-authenticated-mount">
+          <section id="publicBriefSection" class="public-brief-section" aria-labelledby="publicBriefTitle">
+          <div class="public-brief-copy">
+            <span id="publicBriefKicker" class="section-kicker brief-kicker"><i aria-hidden="true"></i>에이전틱 탐색 · 사람의 최종 검증</span>
+            <h2 id="publicBriefTitle">찾는 기술·<br>해결할 문제부터 알려주세요</h2>
+            <p id="publicBriefDescription">문제 책임자와 성공 기준이 명확할수록 더 나은 후보를 찾을 수 있습니다. SparkLabs가 Brief를 검토한 뒤 적합한 다음 단계를 안내합니다.</p>
+            <div class="brief-agent-map" aria-hidden="true">
+              <div class="brief-agent-map-head">
+                <span id="briefAgentStatus"><i></i>SPARK 에이전트 준비됨</span>
+                <small>문제 입력부터 후보 연결까지</small>
+              </div>
+              <div class="brief-agent-canvas">
+                <span class="brief-agent-link brief-agent-link-a"></span>
+                <span class="brief-agent-link brief-agent-link-b"></span>
+                <span class="brief-agent-link brief-agent-link-c"></span>
+                <span class="brief-agent-link brief-agent-link-d"></span>
+                <div class="brief-agent-core">
+                  <span></span>
+                  <img src="/arena/assets/sparkclaw-logo-blue.png" alt="">
+                  <strong>SPARK</strong>
+                  <small>오케스트레이터</small>
+                </div>
+                <div class="brief-agent-node brief-agent-node-a"><b>01</b><span>문제<strong>구조화</strong></span></div>
+                <div class="brief-agent-node brief-agent-node-b"><b>02</b><span>후보<strong>탐색</strong></span></div>
+                <div class="brief-agent-node brief-agent-node-c"><b>03</b><span>근거<strong>검증</strong></span></div>
+                <div class="brief-agent-node brief-agent-node-d"><b>04</b><span>양측<strong>연결</strong></span></div>
+              </div>
+              <div class="brief-agent-telemetry"><span>제약조건 반영</span><span>공개 근거 확인</span><span>연락처 보호</span></div>
+            </div>
+            <ol class="brief-process" aria-label="Brief 처리 과정">
+              <li><strong>01</strong><span><b data-brief-step-title>문제와 제약 검토</b><small data-brief-step-description>목표·데이터·보안 조건을 구조화</small></span><em data-brief-step-status>정의</em></li>
+              <li><strong>02</strong><span><b data-brief-step-title>근거 기반 후보 선별</b><small data-brief-step-description>역량과 적용 사례를 교차 확인</small></span><em data-brief-step-status>검증</em></li>
+              <li><strong>03</strong><span><b data-brief-step-title>대상 스타트업 동의 후 소개</b><small data-brief-step-description>My Log에서 승인 뒤 SparkLabs가 안전하게 연결</small></span><em data-brief-step-status>연결</em></li>
+            </ol>
+            <p class="public-brief-member-login" data-public-brief-login>AI Arena 회원이신가요? <button class="text-link" data-open-member-access type="button">회원 로그인 →</button></p>
+          </div>
+          <form id="publicBriefForm" class="public-brief-form" aria-describedby="publicBriefPrivacy publicBriefStatus">
+            <div class="public-brief-form-head">
+              <div><span id="publicBriefFormKicker">에이전트 입력</span><strong id="publicBriefFormTitle">탐색 Brief 작성</strong></div>
+              <span id="publicBriefSecureLabel" class="public-brief-secure"><i aria-hidden="true"></i>보안 접수</span>
+            </div>
+            <div class="field-row">
+              <label><span>조직명</span><input name="organization" maxlength="160" autocomplete="organization" required></label>
+              <label><span>웹사이트 <small>선택</small></span><input name="website" type="url" maxlength="400" placeholder="https://"></label>
+            </div>
+            <div class="field-row">
+              <label><span>담당자 이름</span><input name="contactName" maxlength="120" autocomplete="name" required></label>
+              <label><span>업무 이메일</span><input name="email" type="email" maxlength="240" autocomplete="email" required></label>
+            </div>
+            <label><span>해결하려는 문제</span><textarea name="problem" rows="4" maxlength="2000" placeholder="현재 업무 흐름, 반복되는 병목과 영향을 구체적으로 적어주세요." required></textarea></label>
+            <label><span>성공 기준</span><textarea name="successMetric" rows="2" maxlength="800" placeholder="예: 처리시간 50% 단축, 정확도 95% 이상" required></textarea></label>
+            <div class="field-row">
+              <label><span>데이터·보안·연동 제약</span><input name="constraints" maxlength="1200" placeholder="예: 온프레미스, 개인정보, SAP 연동"></label>
+              <label><span>의사결정 시점</span><input name="deadline" type="date"></label>
+            </div>
+            <div class="field-row">
+              <label><span>예산 범위</span><select name="budgetRange"><option value="">논의 필요</option><option value="under_10m">1천만원 미만</option><option value="10m_30m">1천만–3천만원</option><option value="30m_100m">3천만–1억원</option><option value="over_100m">1억원 이상</option></select></label>
+              <label><span>구매·법무 경로</span><input name="procurementPath" maxlength="800" placeholder="예: PoC 후 구매위원회 검토"></label>
+            </div>
+            <label class="brief-consent"><input name="consent" type="checkbox" required><span id="publicBriefConsentText">Brief 검토와 회신을 위해 입력 정보를 SparkLabs가 처리하는 데 동의합니다.</span></label>
+            <label class="brief-honeypot" aria-hidden="true"><span>회사 URL</span><input name="companyUrl" tabindex="-1" autocomplete="off"></label>
+            <p id="publicBriefPrivacy" class="brief-privacy">입력 정보는 후보 탐색과 회신 목적으로만 사용하며, 접수일로부터 90일 후 보관 필요성을 재검토합니다. 소스코드, API 키, 고객 원문이나 영업비밀은 입력하지 마세요.</p>
+            <button id="publicBriefSubmitButton" class="primary-button" type="submit">SparkLabs 검토 요청</button>
+            <p id="publicBriefStatus" class="form-status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+          </form>
+          </section>
+        </div>
+      </section>
+
+      <section id="arenaPage" class="page" data-page-panel="arena" hidden>
+        <div class="page-title-row arena-page-title">
+          <div>
+            <span class="section-kicker">PROBLEM → PROOF → PILOT</span>
+            <h1>Bounty</h1>
+            <p>기업의 실제 문제를 검증 가능한 과제로 설계하고, 실행 결과를 재현 가능한 평가와 Pilot 기회로 연결합니다.</p>
+          </div>
+          <span class="arena-live-badge"><i></i> BOUNTY BOARD LIVE</span>
+        </div>
+
+        <section class="arena-banner">
+          <div>
+            <span class="eyebrow">OUTCOME-DRIVEN BOUNTIES</span>
+            <h2>프로필이 아니라<br>실행 결과로 증명하세요.</h2>
+            <p>공개·비공개 테스트, 전문가 비교 평가, 감사 가능한 검증 로그를 하나의 흐름으로 연결했습니다.</p>
+          </div>
+          <div class="arena-principles">
+            <article><strong>01</strong><span>실제 문제</span><small>명확한 데이터와 성공 기준</small></article>
+            <article><strong>02</strong><span>신뢰 평가</span><small>Machine + Human validation</small></article>
+            <article><strong>03</strong><span>실제 기회</span><small>PoC · 투자 · 크레딧 연결</small></article>
+          </div>
+        </section>
+
+        <section class="arena-metric-grid" aria-label="AI Arena 지표">
+          <article><span>Open Bounties</span><strong id="arenaMetricOpen">—</strong><small>현재 제출 가능</small></article>
+          <article><span>Validated Submissions</span><strong id="arenaMetricSubmissions">—</strong><small>재현 가능한 결과</small></article>
+          <article><span>Review Queue</span><strong id="arenaMetricQueue">—</strong><small>전문가 검토 대기</small></article>
+          <article><span>Active Pilots</span><strong id="arenaMetricPilots">—</strong><small>기회 전환 중</small></article>
+        </section>
+
+        <section id="bountyRolePaths" class="panel bounty-role-paths" aria-labelledby="bountyRolePathsTitle">
+          <div class="bounty-role-paths-head">
+            <div>
+              <span class="section-kicker">ONE BOUNTY · THREE PATHS</span>
+              <h2 id="bountyRolePathsTitle">내 역할에서 시작하세요.</h2>
+              <p id="bountyRoleSummary">문제를 등록하는 기업, 결과로 증명하는 참가팀, 검증과 기회를 연결하는 운영진이 같은 흐름에서 협업합니다.</p>
+            </div>
+            <span id="bountyRoleBadge" class="trust-badge small">BOUNTY HUB</span>
+          </div>
+          <div class="bounty-role-grid">
+            <article data-bounty-audience="sponsor">
+              <span>01 · DESIGN</span>
+              <h3>기업 파트너</h3>
+              <p>해결할 문제, 성공 KPI, 데이터와 보안 제약, 후속 Pilot 조건을 Bounty Brief로 구조화합니다.</p>
+              <button class="secondary-button compact" data-go-page="partnerships" data-go-target="bountyBriefPanel" data-bounty-partner-action type="button">Bounty Brief 등록 →</button>
+            </article>
+            <article data-bounty-audience="builder">
+              <span>02 · SOLVE</span>
+              <h3>SparkClaw 참가팀</h3>
+              <p>평가 기준과 데이터 정책을 확인하고 결과를 제출한 뒤, 공개·비공개 검증과 전문가 피드백을 받습니다.</p>
+              <button class="secondary-button compact" data-go-page="arena" data-go-target="arenaBountyBoard" type="button">Open Bounty 보기 →</button>
+            </article>
+            <article data-bounty-audience="operator">
+              <span>03 · VALIDATE</span>
+              <h3>SparkLabs 운영진</h3>
+              <p>기업 Brief를 과제로 설계하고 제출·평가·검증 큐를 관리하며, 검증 결과를 Pilot과 기회로 전환합니다.</p>
+              <button class="secondary-button compact" data-go-page="arena" data-go-target="arenaStaffPanel" data-bounty-staff-action type="button">운영 Control Room →</button>
+            </article>
+          </div>
+        </section>
+
+        <section id="arenaHowItWorks" class="panel arena-flow-panel">
+          <div class="panel-head">
+            <div>
+              <span class="section-kicker">HOW IT WORKS</span>
+              <h2>결과가 기회가 되는 5단계</h2>
+            </div>
+          </div>
+          <div class="arena-flow">
+            <article><b>1</b><strong>Bounty</strong><span>실제 문제와 평가 기준 확인</span></article>
+            <i>→</i>
+            <article><b>2</b><strong>Submit</strong><span>표준 형식으로 결과 제출</span></article>
+            <i>→</i>
+            <article><b>3</b><strong>Machine</strong><span>스키마·공개/비공개 자동 검증</span></article>
+            <i>→</i>
+            <article><b>4</b><strong>Human</strong><span>전문가 비교 평가와 피드백</span></article>
+            <i>→</i>
+            <article><b>5</b><strong>Opportunity</strong><span>PoC·투자·혜택 연결 요청</span></article>
+          </div>
+        </section>
+
+        <div class="arena-workspace">
+          <div class="arena-main-column">
+            <section id="arenaBountyBoard">
+              <div class="section-title-row">
+                <div>
+                  <span class="section-kicker">BOUNTY BOARD</span>
+                  <h2>검증할 문제</h2>
+                </div>
+                <div class="arena-filter-pills">
+                  <button class="is-active" data-arena-filter="all" type="button">전체</button>
+                  <button data-arena-filter="open" type="button">접수 중</button>
+                  <button data-arena-filter="draft" type="button">준비 중</button>
+                </div>
+              </div>
+              <div id="arenaBountyGrid" class="arena-bounty-grid"></div>
+            </section>
+
+            <section id="arenaBountyDetail" class="arena-detail panel" hidden>
+              <div id="arenaDetailHero" class="arena-detail-hero"></div>
+              <nav id="arenaDetailTabs" class="arena-detail-tabs" aria-label="Bounty 상세 메뉴">
+                <button class="is-active" data-arena-tab="overview" type="button">Overview</button>
+                <button data-arena-tab="submit" type="button">Submit</button>
+                <button data-arena-tab="leaderboard" type="button">Leaderboard</button>
+              </nav>
+              <div id="arenaOverviewContent" class="arena-tab-panel is-active" data-arena-tab-panel="overview"></div>
+              <div id="arenaSubmitContent" class="arena-tab-panel" data-arena-tab-panel="submit" hidden></div>
+              <div id="arenaLeaderboardContent" class="arena-tab-panel" data-arena-tab-panel="leaderboard" hidden></div>
+            </section>
+          </div>
+
+          <aside class="arena-side-column">
+            <section id="arenaMyStatusPanel" class="panel arena-side-panel">
+              <div class="panel-head">
+                <div>
+                  <span class="section-kicker">MY RUN</span>
+                  <h2>내 Arena 현황</h2>
+                </div>
+              </div>
+              <div id="arenaMyStatus" class="arena-my-status"></div>
+            </section>
+
+            <section class="panel arena-side-panel opportunity-panel">
+              <div class="panel-head">
+                <div>
+                  <span class="section-kicker">OPPORTUNITY LAYER</span>
+                  <h2>다음 기회</h2>
+                </div>
+              </div>
+              <div id="arenaOpportunityList" class="arena-opportunity-list"></div>
+            </section>
+          </aside>
+        </div>
+
+        <section id="arenaStaffPanel" class="panel arena-staff-panel" hidden>
+          <div class="panel-head">
+            <div>
+              <span class="section-kicker">STAFF CONTROL ROOM</span>
+              <h2>Bounty 운영과 검증</h2>
+            </div>
+            <span class="read-only-badge arena-write-badge">AUDITED ACTIONS</span>
+          </div>
+
+          <div class="arena-staff-grid">
+            <form id="arenaCreateBountyForm" class="arena-staff-form">
+              <h3>새 Bounty 만들기</h3>
+              <div class="field-row">
+                <label><span>제목</span><input name="title" maxlength="160" required></label>
+                <label><span>Sponsor</span><input name="sponsor" maxlength="200" placeholder="기업·기관명"></label>
+              </div>
+              <label><span>한 줄 설명</span><input name="shortDescription" maxlength="300" required></label>
+              <label><span>기회</span><input name="opportunity" maxlength="1000" placeholder="PoC, 투자, 크레딧 등"></label>
+              <div class="field-row">
+                <label>
+                  <span>평가 방식</span>
+                  <select name="evaluationMode">
+                    <option value="hybrid">자동 + 전문가</option>
+                    <option value="automatic">자동 평가</option>
+                    <option value="staff_recorded">전문가 기록</option>
+                  </select>
+                </label>
+                <label>
+                  <span>상태</span>
+                  <select name="status">
+                    <option value="draft">준비 중</option>
+                    <option value="open">접수 중</option>
+                  </select>
+                </label>
+              </div>
+              <label><span>평가 기준 (쉼표 구분)</span><input name="evaluationCriteria" placeholder="정확도, 속도, 안전성"></label>
+              <button class="primary-button compact" type="submit">Bounty 저장</button>
+              <p id="arenaStaffFormStatus" class="form-status" aria-live="polite"></p>
+            </form>
+
+            <div>
+              <h3>Validation Queue</h3>
+              <div id="arenaValidationQueue" class="arena-staff-list"></div>
+            </div>
+
+            <div>
+              <h3>Opportunity Queue</h3>
+              <div id="arenaOpportunityQueue" class="arena-staff-list"></div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="discoverPage" class="page market-page" data-page-panel="discover" hidden>
+        <div class="market-page-head">
+          <div>
+            <span id="marketDiscoveryKicker" class="section-kicker">TASK-DRIVEN COMPANY SEARCH</span>
+            <h1 id="marketDiscoveryTitle">해결할 Task에서 기업을 찾으세요.</h1>
+            <p id="marketDiscoveryDescription">회사명보다 먼저 해결할 업무를 입력하고, Task 근거와 기술·검증 정보를 함께 비교합니다.</p>
+          </div>
+          <div class="market-head-actions">
+            <button class="secondary-button compact" data-go-page="compare" type="button">선택 팀 비교</button>
+            <button class="primary-button compact" data-go-page="partnerships" data-nav-roles="b2b_partner,sparklabs,admin" type="button">파트너 연결 요청</button>
+          </div>
+        </div>
+
+        <div class="market-filter-bar">
+          <label class="market-search">
+            <span class="sr-only">해결 Task 또는 기업 검색</span>
+            <input id="marketTeamSearch" type="search" placeholder="예: 계약서 검토, 품질 검사, 고객 상담, 수요 예측">
+          </label>
+          <label id="marketCategoryFilterField">
+            <span class="sr-only">산업</span>
+            <select id="marketCategoryFilter"><option value="">모든 산업</option></select>
+          </label>
+          <label id="marketStageFilterField">
+            <span class="sr-only">단계</span>
+            <select id="marketStageFilter"><option value="">모든 단계</option></select>
+          </label>
+          <label id="marketStackFilterField">
+            <span class="sr-only">해결 Task</span>
+            <select id="marketStackFilter"><option value="">모든 해결 Task</option></select>
+          </label>
+          <label id="marketEvidenceFilterField">
+            <span class="sr-only">검증 상태</span>
+            <select id="marketEvidenceFilter">
+              <option value="">모든 검증 상태</option>
+              <option value="verified">검증 신호 있음</option>
+              <option value="passport">Tech Passport 공개</option>
+              <option value="repository">Repository 정보 있음</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="compareTray" class="compare-tray" hidden>
+          <div><strong>비교할 팀</strong><span id="compareTrayCopy">최대 3개 팀을 선택하세요.</span></div>
+          <div id="compareTrayTeams" class="compare-tray-teams"></div>
+          <button class="primary-button compact" data-go-page="compare" type="button">비교 열기</button>
+        </div>
+        <div id="marketTeamGrid" class="market-team-grid"></div>
+        <div id="marketTeamEmpty" class="market-empty" hidden>조건에 맞는 팀이 없습니다. 필터를 바꿔보세요.</div>
+      </section>
+
+      <section id="passportsPage" class="page market-page" data-page-panel="passports" hidden>
+        <div class="market-page-head">
+          <div>
+            <span class="section-kicker">VERIFIED TECH PASSPORTS</span>
+            <h1>기술을 설명하는 문서가 아니라<br>검증 가능한 증거 묶음.</h1>
+            <p>아키텍처, Stack, 배포, 보안, 평가 결과를 공개 단계별로 관리합니다. 코드 줄 수는 참고 정보이며 점수에 반영하지 않습니다.</p>
+          </div>
+          <span class="trust-badge">RAW CODE NOT STORED</span>
+        </div>
+
+        <section class="disclosure-ladder" aria-label="정보 공개 단계">
+          <article><b>01</b><strong>Public</strong><span>제품·Use Case·고수준 Stack</span></article>
+          <article><b>02</b><strong>Arena Members</strong><span>고수준 아키텍처·협업 수요</span></article>
+          <article><b>03</b><strong>Approved Partner</strong><span>배포·보안·성능 근거</span></article>
+          <article><b>04</b><strong>Secure Diligence</strong><span>NDA·기간 제한 Evidence Room</span></article>
+        </section>
+
+        <div class="passport-layout">
+          <div>
+            <div class="section-title-row">
+              <div><span class="section-kicker">PASSPORT DIRECTORY</span><h2>공개된 기술 프로필</h2></div>
+              <span id="passportCount" class="count-badge">—</span>
+            </div>
+            <div id="passportGrid" class="passport-grid"></div>
+          </div>
+
+          <aside id="passportEditorPanel" class="panel passport-editor-panel">
+            <div class="panel-head">
+              <div><span class="section-kicker">MY TECH PASSPORT</span><h2>기술 증거 등록</h2></div>
+              <span id="passportReadiness" class="subtle-chip">0% ready</span>
+            </div>
+            <p id="passportEditorIntro" class="passport-editor-intro">승인된 팀 계정은 기술 프로필을 저장하고 SparkLabs 검토를 요청할 수 있습니다.</p>
+            <form id="passportForm" class="passport-form">
+              <input name="id" type="hidden">
+              <div class="field-row">
+                <label><span>제품·팀 이름</span><input name="name" maxlength="120" required></label>
+                <label><span>분야</span><input name="category" maxlength="80" placeholder="Developer / AI Infrastructure" required></label>
+              </div>
+              <label><span>한 줄 설명</span><input name="tagline" maxlength="60" placeholder="무엇을 누구에게 제공하는지" required></label>
+              <label><span>제품 설명</span><textarea name="shortDescription" maxlength="500" rows="3" required></textarea></label>
+              <div class="field-row">
+                <label><span>Website</span><input name="website" type="url" placeholder="https://"></label>
+                <label><span>GitHub</span><input name="github" type="url" placeholder="https://github.com/..."></label>
+              </div>
+              <div class="field-row">
+                <label><span>언어·Runtime</span><input name="stack" placeholder="TypeScript, Python, Node.js"></label>
+                <label><span>Framework</span><input name="frameworks" placeholder="Next.js, FastAPI, LangChain"></label>
+              </div>
+              <div class="field-row">
+                <label><span>AI·Model</span><input name="modalities" placeholder="OpenAI, Claude, Llama, RAG"></label>
+                <label><span>Data·Storage</span><input name="dataSources" placeholder="PostgreSQL, Redis, pgvector"></label>
+              </div>
+              <div class="field-row">
+                <label><span>Cloud·Infra</span><input name="providers" placeholder="AWS, Docker, Kubernetes"></label>
+                <label><span>Stack 공개 범위</span><select name="stackVisibility"><option value="arena_members">Arena Members</option><option value="approved_partner">Approved Partner</option><option value="public">Public</option></select></label>
+              </div>
+              <label><span>아키텍처·Data Flow</span><textarea name="architecture" rows="4" placeholder="Context → 주요 서비스 → 데이터 저장 → 모델 호출 → Human handoff"></textarea></label>
+              <label><span>배포 환경</span><textarea name="deployment" rows="2" placeholder="Cloud, region, tenant isolation, CI/CD"></textarea></label>
+              <label><span>API·Integration</span><textarea name="apiDetails" rows="2" placeholder="API 방식, 인증, 주요 연동"></textarea></label>
+              <div class="field-row">
+                <label><span>Privacy</span><textarea name="privacy" rows="3"></textarea></label>
+                <label><span>제약·한계</span><textarea name="limitations" rows="3"></textarea></label>
+              </div>
+              <label><span>평가 근거</span><textarea name="evaluationClaims" rows="3" placeholder="평가셋, 성공률, Latency, 비용과 측정 조건"></textarea></label>
+              <div class="field-row">
+                <label><span>담당자 이름</span><input name="memberName" maxlength="120"></label>
+                <label><span>역할</span><input name="memberRole" maxlength="120" placeholder="CEO / CTO"></label>
+              </div>
+              <div class="passport-form-actions">
+                <button id="passportSaveButton" class="secondary-button compact" type="button">Draft 저장</button>
+                <button id="passportSubmitButton" class="primary-button compact" type="submit">검토 요청</button>
+              </div>
+              <p id="passportFormStatus" class="form-status" aria-live="polite"></p>
+            </form>
+          </aside>
+        </div>
+      </section>
+
+      <section id="comparePage" class="page market-page" data-page-panel="compare" hidden>
+        <div class="market-page-head">
+          <div>
+            <span class="section-kicker">EVIDENCE-BASED COMPARISON</span>
+            <h1>같은 질문으로 팀을 비교합니다.</h1>
+            <p>총점 하나로 줄 세우지 않고 제품 적합성, 기술 증거, 배포 준비도, Bounty 성과를 독립적으로 비교합니다.</p>
+          </div>
+          <button class="secondary-button compact" data-go-page="discover" type="button">팀 다시 선택</button>
+        </div>
+        <section class="panel compare-controls">
+          <label><span>Team A</span><select id="compareTeamA"></select></label>
+          <label><span>Team B</span><select id="compareTeamB"></select></label>
+          <label><span>Team C</span><select id="compareTeamC"><option value="">선택 안 함</option></select></label>
+          <button id="runCompareButton" class="primary-button compact compare-agent-button" type="button" aria-describedby="compareAgentNote">
+            <span class="compare-agent-button-mark" aria-hidden="true"><img src="/arena/assets/sparkclaw-logo-blue.png" alt=""></span>
+            <span class="compare-agent-button-copy"><strong>Spark AI 비교 분석</strong><small>Agentic comparison engine</small></span>
+          </button>
+          <p id="compareAgentNote" class="compare-agent-note"><strong><i aria-hidden="true"></i> AGENTIC AI</strong><span>선택한 기업의 공개 프로필·역량 키워드·AI 적용 근거를 교차 분석해 핵심 차이를 계산합니다.</span></p>
+        </section>
+        <section id="similarTeamPanel" class="panel similar-team-panel" hidden aria-labelledby="similarTeamTitle">
+          <div class="similar-team-head">
+            <div>
+              <span class="section-kicker">TEAMS LIKE MINE</span>
+              <h2 id="similarTeamTitle">나와 비슷한 팀부터 살펴보세요.</h2>
+              <p id="similarTeamDescription">본인 팀의 공개 프로필과 공통 산업·문제·AI 역량이 많은 팀을 계산합니다.</p>
+            </div>
+            <button id="similarTeamRefreshButton" class="secondary-button compact" type="button">추천 다시 계산</button>
+          </div>
+          <div id="similarTeamList" class="similar-team-list" aria-live="polite"></div>
+          <p id="similarTeamStatus" class="similar-team-status"></p>
+        </section>
+        <div id="comparisonResult" class="comparison-result"></div>
+      </section>
+
+      <section id="partnershipsPage" class="page market-page" data-page-panel="partnerships" hidden>
+        <div class="market-page-head partnership-page-head">
+          <div>
+            <span class="section-kicker">DEMAND → BOUNTY → PILOT</span>
+            <h1>원하는 결과를 설명하면<br>검증 가능한 Bounty가 됩니다.</h1>
+            <p>기업의 문제, 성공 기준, 데이터와 제약을 구조화하고 적합한 팀을 검증한 뒤 Pilot까지 이어갑니다.</p>
+          </div>
+          <div class="market-pipeline-mini" aria-label="파트너십 단계">
+            <span>Interest</span><i>→</i><span>Matched</span><i>→</i><span>NDA</span><i>→</i><span>Pilot</span><i>→</i><span>Production</span>
+          </div>
+        </div>
+
+        <div class="partnership-grid">
+          <section id="bountyBriefPanel" class="panel partnership-action-panel partnership-action-panel-bounty">
+            <div class="panel-head"><div><span class="section-kicker">BOUNTY BRIEF</span><h2>기업 문제 등록</h2></div><span class="trust-badge small">B2B</span></div>
+            <form id="bountyBriefForm" class="market-form">
+              <label><span>문제 제목</span><input name="problemTitle" maxlength="160" placeholder="예: 한국어 계약서 검토 시간을 80% 줄이기" required></label>
+              <label><span>현재 문제</span><textarea name="problem" rows="4" maxlength="1600" required></textarea></label>
+              <label><span>현재 Workflow</span><textarea name="currentWorkflow" rows="3" maxlength="1200"></textarea></label>
+              <label><span>성공 KPI</span><textarea name="targetKpi" rows="2" maxlength="500" placeholder="정확도, 처리시간, 비용 등" required></textarea></label>
+              <div class="field-row">
+                <label><span>보유 데이터</span><input name="dataAvailability" maxlength="800"></label>
+                <label><span>보안·Integration 제약</span><input name="constraints" maxlength="1000"></label>
+              </div>
+              <div class="field-row">
+                <label><span>Bounty 예산</span><input name="budget" maxlength="200"></label>
+                <label><span>후속 Pilot 예산</span><input name="pilotBudget" maxlength="200"></label>
+              </div>
+              <div class="field-row">
+                <label><span>희망 마감</span><input name="deadline" type="date"></label>
+                <label><span>공개 범위</span><select name="visibility"><option value="public">Public · SparkClaw 산업 파트너 포함</option><option value="arena_members">Private · 부트캠프 멤버 + SparkLabs</option></select></label>
+              </div>
+              <label><span>담당자 이름</span><input name="contactName" maxlength="120" required></label>
+              <button class="primary-button compact" type="submit">Scope Workshop 요청</button>
+              <p id="bountyBriefStatus" class="form-status" aria-live="polite"></p>
+            </form>
+          </section>
+
+          <section id="connectionPanel" class="panel partnership-action-panel partnership-action-panel-introduction">
+            <div class="panel-head"><div><span class="section-kicker">REQUEST INTRODUCTION</span><h2>팀 연결 요청</h2></div></div>
+            <form id="connectionForm" class="market-form">
+              <label><span>연결할 팀</span><select name="startupId" id="connectionTeamSelect" required></select></label>
+              <label><span>목적</span><select name="intent"><option>Corporate pilot</option><option>Technical diligence</option><option>API integration</option><option>Strategic partnership</option><option>Investment review</option></select></label>
+              <label><span>담당자 이름</span><input name="name" maxlength="120" required></label>
+              <label><span>메시지</span><textarea name="message" rows="5" maxlength="800" placeholder="검토하려는 문제와 희망하는 다음 단계를 알려주세요."></textarea></label>
+              <button class="secondary-button compact" type="submit">SparkLabs를 통해 연결 요청</button>
+              <p id="connectionStatus" class="form-status" aria-live="polite"></p>
+            </form>
+            <div class="secure-note"><strong>Controlled introduction</strong><span>팀 이메일은 공개하지 않습니다. 상대 팀이 요청을 확인하고 수락한 뒤 연락이 연결됩니다.</span></div>
+          </section>
+        </div>
+
+        <section id="partnershipPipelinePanel" class="panel pipeline-panel">
+          <div class="panel-head"><div><span class="section-kicker">MY PARTNERSHIP PIPELINE</span><h2>진행 중인 요청</h2></div><span id="pipelineCount" class="count-badge">0</span></div>
+          <div id="partnershipPipeline" class="partnership-pipeline"></div>
+        </section>
+      </section>
+
+      <section id="communityPage" class="page community-page" data-page-panel="community" hidden>
+        <div class="community-page-head">
+          <div>
+            <span class="section-kicker">THE ROOM BETWEEN EVENTS</span>
+            <h1>Build in public.<br>Never build alone.</h1>
+            <p>질문, 출시 소식, 제품 피드백과 파트너 경험을 나누는 AI 창업자 커뮤니티입니다.</p>
+          </div>
+          <div id="communityLiveCard" class="community-live-card is-loading" role="status" aria-live="polite" aria-atomic="true">
+            <div class="community-live-status"><i aria-hidden="true"></i><span>COMMUNITY NOW</span></div>
+            <strong id="communityLiveTitle">최신 대화를 불러오는 중입니다</strong>
+            <span id="communityLiveMeta" class="community-live-meta">창업팀·기업 파트너·SparkLabs의 활동을 확인하고 있습니다.</span>
+            <div class="community-live-flow" aria-hidden="true"><b>질문</b><em>→</em><b>피드백</b><em>→</em><b>연결</b></div>
+          </div>
+        </div>
+
+        <section id="communityAnnouncementBoard" class="community-announcement-board panel" aria-labelledby="communityAnnouncementTitle" hidden>
+          <div class="panel-head">
+            <div><span class="section-kicker">AI ARENA NOTICE</span><h2 id="communityAnnouncementTitle">운영진 공지</h2></div>
+            <span id="communityAnnouncementCount" class="subtle-chip">0</span>
+          </div>
+          <div id="communityAnnouncementList" class="community-announcement-list"></div>
+        </section>
+
+        <div class="community-layout">
+          <aside class="panel community-sidebar">
+            <span class="section-kicker">CHANNELS</span>
+            <div id="communityCategories" class="community-categories"></div>
+            <div class="community-guideline">
+              <strong>Good signal only</strong>
+              <p>구체적인 맥락과 직접 경험을 공유하세요. 고객 원문, API 키, 비공개 계약 정보는 올리지 마세요.</p>
+            </div>
+          </aside>
+
+          <div class="community-feed-column">
+            <section id="communityComposer" class="panel community-composer">
+              <div class="panel-head"><div><span class="section-kicker">START A CONVERSATION</span><h2>먼저 내용을 작성해 주세요</h2></div></div>
+              <form id="communityThreadForm" class="market-form">
+                <input id="communityThreadLinkedLabel" name="linkedLabel" type="hidden" value="">
+                <div id="communityAnnouncementTools" class="community-announcement-tools" hidden>
+                  <div><span class="section-kicker">SPARKLABS OPERATOR</span><strong>AI Arena 공식 공지를 작성할 수 있습니다.</strong><p>한 번 게시하면 Community 상단과 Discover의 Arena 소식에 함께 반영됩니다.</p></div>
+                  <button id="communityAnnouncementMode" class="secondary-button compact" type="button">공지 작성 시작</button>
+                </div>
+                <div id="communityPromptGuide" class="community-prompt-guide" role="status" aria-live="polite" hidden>
+                  <span>PROFILE-GUIDED DRAFT</span>
+                  <strong id="communityPromptGuideTitle"></strong>
+                  <p id="communityPromptGuideCopy"></p>
+                </div>
+                <label class="community-body-first"><span>내용</span><textarea id="communityThreadBody" name="bodyMarkdown" rows="7" maxlength="6000" placeholder="지금 나누고 싶은 문제, 직접 해본 것, 필요한 도움이나 공유할 경험을 자유롭게 적어주세요." required></textarea></label>
+                <div class="community-ai-disclosure">
+                  <strong>다음 단계에서 Spark AI가 게시 설정을 제안합니다.</strong>
+                  <span>작성 내용은 제목·채널·공개 범위 제안에만 사용됩니다. API 키, 고객 원문 데이터, 비공개 계약 내용은 입력하지 마세요.</span>
+                </div>
+                <button id="communityAnalyzeDraft" class="primary-button compact community-analyze-button" type="button"><span aria-hidden="true">✦</span> Spark AI로 게시 설정 만들기</button>
+                <p id="communityThreadStatus" class="form-status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+                <section id="communityDraftMetadata" class="community-draft-metadata" aria-labelledby="communityDraftMetadataTitle" hidden>
+                  <div class="community-draft-head"><div><span class="section-kicker">AI SUGGESTION</span><h3 id="communityDraftMetadataTitle">게시 설정을 확인해 주세요</h3></div><span>수정 가능</span></div>
+                  <label><span>제목</span><input id="communityThreadTitle" name="title" maxlength="120" placeholder="Spark AI가 본문을 바탕으로 제목을 제안합니다." required></label>
+                  <div class="field-row">
+                    <label><span>채널</span><select id="communityThreadCategory" name="categorySlug" required></select></label>
+                    <label><span>공개 범위</span><select id="communityThreadVisibility" name="visibility" required><option value="public">Public · SparkClaw 산업 파트너 포함</option></select></label>
+                  </div>
+                  <div class="community-audience-scope-note" aria-label="공개 범위 안내">
+                    <span><b>Public</b> SparkClaw 부트캠프 멤버, SparkLabs, 승인된 산업 파트너</span>
+                    <span><b>Private</b> SparkClaw 부트캠프 멤버와 SparkLabs만</span>
+                  </div>
+                  <p id="communityDraftReason" class="community-draft-reason"></p>
+                </section>
+                <button id="communityThreadSubmit" class="primary-button compact community-thread-submit" type="submit" disabled>Community에 게시하기</button>
+              </form>
+            </section>
+
+            <section id="communityFeedSection" class="community-feed-head">
+              <div><span class="section-kicker">COMMUNITY FEED</span><h2>Founder conversations</h2></div>
+              <div class="community-sort-pills"><button class="is-active" data-community-sort="hot" type="button">Hot</button><button data-community-sort="new" type="button">New</button><button data-community-sort="top" type="button">Top</button></div>
+            </section>
+            <div id="communityThreadList" class="community-thread-list"></div>
+          </div>
+
+          <aside class="community-right-rail">
+            <section class="panel">
+              <span class="section-kicker">맞춤 글쓰기 가이드</span>
+              <p id="communityPromptContext" class="conversation-prompt-context">로그인한 회사 프로필 기준</p>
+              <div id="communityPromptList" class="conversation-prompts">
+                <button type="button" data-community-prompt="ai-experience"><strong>우리 제품의 AI 활용 경험</strong><span>실제 적용과 한계 공유</span><i aria-hidden="true">→</i></button>
+                <button type="button" data-community-prompt="shipped"><strong>최근 출시·실험 공유</strong><span>결과물에 피드백 받기</span><i aria-hidden="true">→</i></button>
+                <button type="button" data-community-prompt="first-customers"><strong>첫 고객을 만든 방법</strong><span>고객을 만난 과정 공유</span><i aria-hidden="true">→</i></button>
+              </div>
+            </section>
+            <section class="panel community-offline-card">
+              <span class="section-kicker">OFFLINE → ONLINE</span>
+              <h2>Meet here.<br>Continue in person.</h2>
+              <p>교육, 코칭, 기업 네트워킹과 파트너 세션은 Events에서 확인하세요.</p>
+              <button class="text-link" data-go-page="calendar" type="button">Upcoming events →</button>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section id="workspacePage" class="page market-page" data-page-panel="workspace" hidden>
+        <div class="market-page-head">
+          <div>
+            <span class="section-kicker">MY ACTIVITY · PRIVATE TO YOU</span>
+            <h1 id="workspaceTitle">My Log</h1>
+            <p id="workspaceSubtitle">매치 요청, Community 활동과 Bounty 진행 상태를 내 계정 기준으로 한곳에서 확인합니다.</p>
+          </div>
+          <span id="workspaceRoleBadge" class="trust-badge">MEMBER</span>
+        </div>
+        <section id="workspaceMetrics" class="workspace-metrics"></section>
+        <nav id="staffUtilityNav" class="staff-utility-nav panel" aria-label="SparkLabs 운영 도구" hidden>
+          <div><span class="section-kicker">STAFF TOOLS</span><strong>운영 정보는 권한이 있는 관리자에게만 표시됩니다.</strong></div>
+          <div>
+            <button class="secondary-button compact" data-go-page="operations" type="button">운영 현황</button>
+            <button class="secondary-button compact" data-go-page="database" type="button">원본 DB</button>
+          </div>
+        </nav>
+        <div class="workspace-grid">
+          <section class="panel">
+            <div class="panel-head"><div><span class="section-kicker">NEXT ACTIONS</span><h2>지금 할 일</h2></div></div>
+            <div id="workspaceActions" class="workspace-actions"></div>
+          </section>
+          <section class="panel workspace-activity-panel">
+            <div class="panel-head"><div><span class="section-kicker">RECENT ACTIVITY</span><h2>내 진행 현황</h2></div><span class="workspace-log-live"><i aria-hidden="true"></i>LIVE LOG</span></div>
+            <div id="workspaceActivity" class="workspace-activity"></div>
+          </section>
+        </div>
+        <section id="myLogTimeline" class="panel my-log-timeline-panel" aria-labelledby="myLogTimelineTitle">
+          <div class="panel-head my-log-timeline-head">
+            <div>
+              <span class="section-kicker">ACTIVITY TIMELINE · NEWEST FIRST</span>
+              <h2 id="myLogTimelineTitle">전체 활동 로그</h2>
+              <p>현재 계정의 매치 요청, Community 활동과 Bounty 진행 기록을 최신순으로 확인합니다.</p>
+            </div>
+            <span id="myLogTimelineCount" class="trust-badge small">0건</span>
+          </div>
+          <div id="myLogTimelineFilters" class="my-log-timeline-filters" role="group" aria-label="활동 로그 필터">
+            <button class="is-active" data-my-log-timeline-filter="all" type="button" aria-pressed="true">전체</button>
+            <button data-my-log-timeline-filter="discover" type="button" aria-pressed="false">Discover</button>
+            <button data-my-log-timeline-filter="community" type="button" aria-pressed="false">Community</button>
+            <button data-my-log-timeline-filter="bounty" type="button" aria-pressed="false">Bounty</button>
+          </div>
+          <div id="myLogTimelineList" class="my-log-timeline-list" aria-live="polite"></div>
+          <div class="my-log-timeline-pagination">
+            <button id="myLogLoadMoreButton" class="secondary-button compact" type="button" hidden>이전 기록 더 불러오기</button>
+            <span id="myLogLoadMoreStatus" role="status" aria-live="polite"></span>
+          </div>
+        </section>
+        <section class="my-log-grid" aria-label="내 활동 상세 기록">
+          <article id="myLogMatches" class="panel my-log-panel">
+            <div class="panel-head"><div><span class="section-kicker">DISCOVER</span><h2>매치 요청</h2></div><button class="text-link" data-market-page="discover" type="button">기업 탐색 →</button></div>
+            <p class="my-log-panel-copy">내가 보낸 협업 검토와 소개 요청의 현재 답변 상태입니다.</p>
+            <div id="myLogMatchList" class="my-log-list"></div>
+          </article>
+          <article id="myLogCommunity" class="panel my-log-panel">
+            <div class="panel-head"><div><span class="section-kicker">COMMUNITY</span><h2>글·댓글·받은 반응</h2></div><button class="text-link" data-market-page="community" type="button">Community →</button></div>
+            <p class="my-log-panel-copy">내가 남긴 글과 댓글, 내 글에 새로 달린 댓글과 좋아요를 모아봅니다.</p>
+            <div id="myLogCommunityList" class="my-log-list"></div>
+          </article>
+          <article id="myLogBounties" class="panel my-log-panel">
+            <div class="panel-head"><div><span class="section-kicker">BOUNTY</span><h2>신청 진행 상태</h2></div><button class="text-link" data-market-page="arena" type="button">Bounty →</button></div>
+            <p class="my-log-panel-copy">참가·제출·검증·기회 연결까지 내 Bounty 진행 단계를 확인합니다.</p>
+            <div id="myLogBountyList" class="my-log-list"></div>
+          </article>
+        </section>
+        <section id="staffMarketQueue" class="panel staff-market-queue" hidden>
+          <div class="panel-head"><div><span class="section-kicker">ARENA OPS</span><h2>검토·파트너십 Queue</h2></div><span class="trust-badge small">STAFF ONLY</span></div>
+          <div id="staffMarketQueueContent"></div>
+        </section>
+      </section>
+
+      <section id="teamsPage" class="page" data-page-panel="teams" hidden>
+        <div class="page-title-row">
+          <div>
+            <span id="companyDirectoryKicker" class="section-kicker">PUBLIC COMPANY DIRECTORY</span>
+            <h1 id="companyDirectoryTitle">검수된 AI 회사 탐색</h1>
+            <p id="companyDirectoryDescription">회사에서 공개에 동의하고 SparkLabs가 안전 필드를 확인한 프로필만 표시합니다. 비공개 연락처와 운영 정보는 노출하지 않습니다.</p>
+          </div>
+          <div class="directory-head-meta"><span id="companyDirectoryBadge" class="public-safe-badge">OPT-IN SAFE</span><span id="teamResultCount" class="count-badge">—개 회사</span></div>
+        </div>
+
+        <div class="filter-bar">
+          <label class="search-field">
+            <span class="sr-only">팀 검색</span>
+            <span aria-hidden="true">⌕</span>
+            <input id="teamSearch" type="search" placeholder="회사명, 서비스, 해결 Task 검색">
+          </label>
+          <label>
+            <span class="sr-only">산업 선택</span>
+            <select id="sectorFilter">
+              <option value="">전체 산업</option>
+            </select>
+          </label>
+          <label data-private-filter>
+            <span class="sr-only">법인 여부</span>
+            <select id="incorporatedFilter">
+              <option value="">전체 형태</option>
+              <option value="yes">법인 설립</option>
+              <option value="no">미설립·미입력</option>
+            </select>
+          </label>
+          <label>
+            <span class="sr-only">정렬</span>
+            <select id="teamSort">
+              <option value="name">이름순</option>
+              <option value="sector">산업순</option>
+              <option value="activity" data-private-filter-option>활동 많은 순</option>
+            </select>
+          </label>
+          <button id="resetTeamFilters" class="secondary-button compact" type="button">초기화</button>
+        </div>
+
+        <div id="teamGrid" class="team-grid"></div>
+        <div id="teamEmpty" class="empty-state" hidden>
+          <strong>조건에 맞는 팀이 없습니다.</strong>
+          <span>검색어나 필터를 바꿔보세요.</span>
+        </div>
+      </section>
+
+      <section id="calendarPage" class="page" data-page-panel="calendar" hidden>
+        <div class="page-title-row">
+          <div>
+            <span class="section-kicker">EVENTS &amp; VERIFIED PERKS</span>
+            <h1>만나고, 배우고, 바로 활용하세요.</h1>
+            <p>공개 행사와 제공 조건이 확인된 파트너 혜택을 한곳에서 확인합니다.</p>
+          </div>
+          <button class="secondary-button compact" data-go-page="benefits" type="button">Verified Perks 전체보기 →</button>
+        </div>
+
+        <section id="eventRecommendationPlanner" class="event-agent-planner" aria-labelledby="eventRecommendationTitle">
+          <div class="event-agent-copy">
+            <div class="event-agent-brand">
+              <span class="event-agent-logo" aria-hidden="true">
+                <img src="/arena/assets/sparkclaw-logo-blue.png" alt="">
+              </span>
+              <div>
+                <span class="section-kicker">AGENTIC EVENT PLANNER</span>
+                <span class="event-agent-provider">Spark AI · 현재 Arena 데이터</span>
+              </div>
+            </div>
+            <h2 id="eventRecommendationTitle">지금 활용할 이벤트를 계산합니다.</h2>
+            <p id="eventRecommendationDescription">현재 파트너 프로필과 우선 과제, 예정 일정, 검증된 혜택을 교차해 실행 순서를 정리합니다.</p>
+          </div>
+          <button id="eventRecommendationButton" class="primary-button event-agent-button" type="button">
+            <span class="event-agent-button-mark" aria-hidden="true">
+              <img src="/arena/assets/sparkclaw-logo-blue.png" alt="">
+            </span>
+            <span>
+              <strong>Agentic 추천 계산</strong>
+              <small>누를 때마다 현재 데이터로 재계산</small>
+            </span>
+            <span class="event-agent-button-arrow" aria-hidden="true">→</span>
+          </button>
+          <p id="eventRecommendationStatus" class="form-status event-agent-status" role="status" aria-live="polite" hidden></p>
+          <div id="eventRecommendationResults" class="event-agent-results" aria-live="polite" hidden></div>
+        </section>
+
+        <div class="calendar-layout">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <span class="section-kicker">EVENTS</span>
+                <h2>전체 일정</h2>
+              </div>
+              <span id="eventCount" class="subtle-chip">—건</span>
+            </div>
+            <div id="eventTimeline" class="event-timeline"></div>
+          </section>
+
+          <aside class="panel mentor-panel event-perk-panel">
+            <div class="panel-head">
+              <div>
+                <span class="section-kicker">VERIFIED PERKS</span>
+                <h2>지금 활용할 수 있는 혜택</h2>
+              </div>
+            </div>
+            <div id="eventPerkPreview" class="event-perk-preview"></div>
+            <div id="mentorList" class="mentor-list" hidden></div>
+            <button class="text-link" data-go-page="benefits" type="button">자격과 신청 조건 확인 →</button>
+          </aside>
+        </div>
+      </section>
+
+      <section id="benefitsPage" class="page" data-page-panel="benefits" hidden>
+        <div class="page-title-row">
+          <div>
+            <span class="section-kicker">EVENTS &amp; VERIFIED PERKS / PERKS</span>
+            <h1 id="benefitPageTitle">검증된 팀 성장 혜택</h1>
+            <p id="benefitPageDescription">로그인한 팀 상태와 제공 조건을 비교해 활용 가능한 혜택을 분류합니다.</p>
+          </div>
+          <div class="benefit-page-controls">
+            <button class="text-link" data-go-page="calendar" type="button">← Events</button>
+            <label id="benefitQualificationFilterLabel" hidden>
+              <span class="sr-only">대상 자격</span>
+              <select id="benefitQualificationFilter">
+                <option value="">전체 자격</option>
+                <option value="discoverer">Discoverer</option>
+                <option value="validator">Validator</option>
+                <option value="scaler">Scaler</option>
+              </select>
+            </label>
+            <label>
+              <span class="sr-only">혜택 카테고리</span>
+              <select id="benefitCategoryFilter">
+                <option value="">전체 카테고리</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div id="benefitEligibilitySummary" class="benefit-eligibility-summary" aria-live="polite"></div>
+        <div id="benefitGrid" class="benefit-grid"></div>
+
+        <section id="benefitOperationsPanel" class="panel benefit-operations-panel" hidden>
+          <div class="panel-head">
+            <div><span class="section-kicker">STAFF BENEFIT OPS</span><h2>베네핏 신청·노출 관리</h2></div>
+            <span class="trust-badge small">STAFF ONLY</span>
+          </div>
+          <div class="benefit-ops-grid">
+            <form id="benefitConfigForm" class="market-form">
+              <h3>신청 경로와 대상 설정</h3>
+              <label><span>베네핏</span><select id="benefitConfigSelect" name="benefitId" required></select></label>
+              <div class="field-row">
+                <label><span>확인 상태</span><select name="verificationStatus"><option value="confirmed">확인 완료</option><option value="pending">확인 중</option><option value="paused">일시 중지</option></select></label>
+                <label><span>노출 범위</span><select name="visibility"><option value="all_members">전체 팀</option><option value="selected_teams">선택 팀만</option><option value="paused">비노출</option></select></label>
+              </div>
+              <label><span>선택 팀 ID</span><input name="selectedTeamIds" placeholder="쉼표로 구분 · 선택 팀 전용일 때만"></label>
+              <label><span>혜택 가치</span><input name="value" maxlength="500"></label>
+              <label><span>자격 조건</span><textarea name="eligibility" rows="4" placeholder="한 줄에 한 조건"></textarea></label>
+              <label><span>신청 안내</span><textarea name="applicationInstructions" rows="4"></textarea></label>
+              <label><span>외부 신청 URL</span><input name="applicationUrl" type="url" placeholder="https:// · 비워두면 운영진 안내 방식"></label>
+              <button class="primary-button compact" type="submit">운영 설정 저장</button>
+              <p id="benefitConfigStatus" class="form-status" aria-live="polite"></p>
+            </form>
+            <div>
+              <h3>신청 Queue</h3>
+              <div id="benefitApplicationQueue" class="program-action-queue"></div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="operationsPage" class="page" data-page-panel="operations" hidden>
+        <div class="page-title-row">
+          <div>
+            <span class="section-kicker">STAFF OPERATIONS</span>
+            <h1>운영 데이터 현황</h1>
+            <p>원본을 수정하지 않고 테이블 입력량과 팀별 활동 상태를 점검합니다.</p>
+          </div>
+          <span class="read-only-badge">READ ONLY</span>
+        </div>
+
+        <div class="operations-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <span class="section-kicker">PROFILE HEALTH</span>
+                <h2>팀 프로필 완성도</h2>
+              </div>
+            </div>
+            <div id="profileHealth" class="health-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <span class="section-kicker">TABLE VOLUME</span>
+                <h2>테이블별 데이터 수</h2>
+              </div>
+            </div>
+            <div id="tableCounts" class="table-count-grid"></div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <span class="section-kicker">TEAM ACTIVITY</span>
+              <h2>팀별 실행 기록</h2>
+            </div>
+            <label class="compact-search">
+              <span class="sr-only">운영 테이블 팀 검색</span>
+              <input id="operationSearch" type="search" placeholder="팀 검색">
+            </label>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>팀</th>
+                  <th>멘토링</th>
+                  <th>가설</th>
+                  <th>인터뷰</th>
+                  <th>PMF 응답</th>
+                  <th>행사 등록</th>
+                  <th>혜택 신청</th>
+                </tr>
+              </thead>
+              <tbody id="teamActivityBody"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="section-kicker">RSVP QUEUE</span><h2>행사 신청 현황</h2></div>
+          </div>
+          <div id="eventRegistrationQueue" class="program-action-queue"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="section-kicker">WEEKLY REPORT QUEUE</span><h2>주간 리포트 검토</h2></div>
+          </div>
+          <div id="weeklyReportQueue" class="program-action-queue"></div>
+        </section>
+      </section>
+
+      <section id="databasePage" class="page" data-page-panel="database" hidden>
+        <div class="page-title-row">
+          <div>
+            <span class="section-kicker">RAW DATABASE</span>
+            <h1>프로그램 원본 DB 조회</h1>
+            <p>스태프 전용 읽기 화면입니다. 이 페이지에서는 추가·수정·삭제가 불가능합니다.</p>
+          </div>
+          <span class="read-only-badge">READ ONLY</span>
+        </div>
+
+        <section class="panel applicant-export-panel">
+          <div class="applicant-export-copy">
+            <span class="section-kicker">SPARKCLAW APPLICANT EXPORT</span>
+            <h2>전체 지원자 목록 다운로드</h2>
+            <p>공식 Spark Claw 관리자 지원자 목록의 staff 전용 스냅샷입니다. 이메일 등 개인정보가 포함되어 외부 공유가 제한됩니다.</p>
+            <div class="applicant-export-stats" aria-label="지원자 내보내기 요약">
+              <span><strong id="applicantExportApplicationCount">—</strong> 전체 신청</span>
+              <span><strong id="applicantExportUniqueCount">—</strong> 유니크 팀</span>
+              <span><strong id="applicantExportDuplicateCount">—</strong> 중복 신청</span>
+            </div>
+          </div>
+          <div class="applicant-export-actions">
+            <button class="primary-button compact" type="button" data-applicant-export-format="xlsx">Excel 다운로드</button>
+            <button class="secondary-button compact" type="button" data-applicant-export-format="csv">CSV 다운로드</button>
+            <span id="applicantExportStatus" class="form-status" role="status" aria-live="polite" aria-atomic="true">파일 정보를 불러오는 중입니다.</span>
+          </div>
+        </section>
+
+        <section class="panel database-panel">
+          <div class="database-toolbar">
+            <label>
+              <span>테이블</span>
+              <select id="databaseTableSelect">
+                <option value="">테이블 선택</option>
+              </select>
+            </label>
+            <label>
+              <span>행 수</span>
+              <select id="databaseLimitSelect">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+            <button id="databaseLoadButton" class="primary-button compact" type="button">조회</button>
+            <span id="databaseStatus" class="form-status" role="status" aria-live="polite" aria-atomic="true">스키마를 불러오는 중입니다.</span>
+          </div>
+          <div id="databaseSummary" class="database-summary"></div>
+          <div class="table-wrap raw-table-wrap">
+            <table id="databaseTable" class="data-table raw-data-table"></table>
+          </div>
+        </section>
+      </section>
+
+      <footer class="app-footer">
+        <span>SparkLabs · <strong>AI Arena — Where AI companies meet.</strong></span>
+        <span id="dataTimestamp">동기화 시간 확인 중</span>
+      </footer>
+    </div>
+  </main>
+
+  <dialog id="teamDialog" class="team-dialog">
+    <div class="dialog-shell">
+      <button id="teamDialogClose" class="dialog-close" type="button" aria-label="팀 상세 닫기">×</button>
+      <div id="teamDialogContent"></div>
+    </div>
+  </dialog>
+
+  <dialog id="collaborationReviewDialog" class="team-dialog collaboration-review-dialog" aria-labelledby="collaborationReviewDialogTitle">
+    <div class="dialog-shell collaboration-review-dialog-shell">
+      <button id="collaborationReviewDialogClose" class="dialog-close" type="button" aria-label="협업 검토 요청 닫기">×</button>
+      <form id="collaborationReviewForm" class="collaboration-review-form">
+        <span class="section-kicker">MEMBER-TO-MEMBER REVIEW</span>
+        <h2 id="collaborationReviewDialogTitle">협업 검토 요청</h2>
+        <p><strong id="collaborationReviewTargetName">대상 기업</strong>의 My Log로 요청을 보냅니다.</p>
+        <input name="targetTeamId" type="hidden">
+        <label>
+          <span>함께 검토하고 싶은 이유</span>
+          <textarea name="purpose" rows="5" minlength="10" maxlength="800" placeholder="예: 서로의 API를 결합해 공동 고객 PoC를 검증할 수 있을지 논의하고 싶습니다." required></textarea>
+        </label>
+        <p class="data-minimization-note">고객 원문, 계약 정보, API 키와 비공개 영업정보는 적지 마세요. 상대 팀과 SparkLabs 운영진에게 요청 내용이 표시됩니다.</p>
+        <button class="primary-button" type="submit">상대 팀 My Log로 요청 보내기</button>
+        <p id="collaborationReviewFormStatus" class="form-status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+      </form>
+    </div>
+  </dialog>
+
+  <dialog id="communityThreadDialog" class="community-thread-dialog" aria-labelledby="communityThreadDialogTitle">
+    <div class="community-thread-dialog-shell">
+      <button id="communityThreadDialogClose" class="dialog-close" type="button" aria-label="대화 상세 닫기">×</button>
+      <section id="communityThreadDetail" class="community-thread-detail"></section>
+      <section class="community-comment-panel" aria-labelledby="communityCommentHeading">
+        <div class="community-comment-head">
+          <div>
+            <span class="section-kicker">FOUNDER RESPONSES</span>
+            <h3 id="communityCommentHeading">댓글 <span id="communityCommentCount">0</span>개</h3>
+          </div>
+          <span class="community-comment-policy">승인된 Arena 회원만 작성할 수 있습니다.</span>
+        </div>
+        <ol id="communityCommentList" class="community-comment-list" aria-label="댓글 목록"></ol>
+        <div id="communityReplyContext" class="community-reply-context" hidden>
+          <span id="communityReplyLabel"></span>
+          <button id="communityReplyCancel" type="button">답글 취소</button>
+        </div>
+        <form id="communityCommentForm" class="community-comment-form">
+          <input name="threadId" type="hidden">
+          <input name="parentCommentId" type="hidden">
+          <label for="communityCommentBody">댓글</label>
+          <textarea id="communityCommentBody" name="bodyMarkdown" rows="4" maxlength="20000" placeholder="직접 경험, 구체적인 제안 또는 다음 단계를 남겨주세요." required></textarea>
+          <div class="community-comment-actions">
+            <small>고객 원문, API 키, 연락처와 비공개 계약 정보는 적지 마세요.</small>
+            <button class="primary-button compact" type="submit">댓글 등록</button>
+          </div>
+          <p id="communityCommentStatus" class="form-status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+        </form>
+        <p id="communityCommentUnavailable" class="community-comment-unavailable" hidden></p>
+      </section>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script type="module" src="/arena/arena.js?v=ai-arena-20260812-fit-flyout-right"></script>
+  <script type="module" src="/arena/market.js?v=ai-arena-20260812-fit-flyout-right"></script>
+  <script type="module" src="/arena/community.js?v=ai-arena-20260812-fit-flyout-right"></script>
+</body>
+</html>

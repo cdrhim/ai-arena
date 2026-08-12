@@ -1,0 +1,13 @@
+{
+  "source": "Spark Claw Admin /admin/applications?status=all",
+  "generatedAt": "2026-07-29T22:09:39.474Z",
+  "applicationCount": 631,
+  "uniqueTeamCount": 628,
+  "duplicateApplicationCount": 3,
+  "pii": true,
+  "access": "sparklabs_staff_only",
+  "files": {
+    "xlsx": "SparkClaw_full_applicant_list_20260730.xlsx",
+    "csv": "SparkClaw_full_applicant_list_20260730.csv"
+  }
+}

@@ -1,0 +1,430 @@
+export const YOUNGONE_EXTERNAL_PARTNER_PROFILE = {
+  "id": "youngone-corporation",
+  "accountEmails": [
+    "test@gmail.com"
+  ],
+  "organizationName": "영원무역",
+  "organizationNameEn": "Youngone Corporation",
+  "logoUrl": "/arena/assets/partner-logos/youngone.png",
+  "parentOrganizationName": "영원무역홀딩스",
+  "profileLabel": "전략적 기업 파트너 · 기업 LP/CVC 연계",
+  "entityType": "corporate_cvc",
+  "classifications": [
+    "strategic_enterprise_partner",
+    "pilot_customer",
+    "corporate_lp",
+    "cvc_affiliated"
+  ],
+  "legalEntities": [
+    {
+      "name": "(주)영원무역",
+      "nameEn": "Youngone Corporation",
+      "role": "글로벌 OEM 제조·SCOTT 사업 운영회사"
+    },
+    {
+      "name": "(주)영원무역홀딩스",
+      "nameEn": "Youngone Holdings Co., Ltd.",
+      "role": "그룹 지주회사"
+    },
+    {
+      "name": "YOH CVC PTE. LTD.",
+      "nameEn": "YOH CVC PTE. LTD.",
+      "role": "싱가포르 소재 CVC 운용 연계 법인"
+    }
+  ],
+  "focusCategories": [
+    "제조 DX/AX",
+    "AI·공장 자동화",
+    "에너지·탄소 관리",
+    "산업·OT 보안",
+    "순환 섬유·친환경 소재",
+    "공급망 추적·ESG",
+    "AI 품질검사·3D 가상 샘플",
+    "수요·재고 최적화"
+  ],
+  "targetStages": [],
+  "preferredRegions": [
+    "글로벌",
+    "한국",
+    "아시아 생산 거점"
+  ],
+  "thesis": "영원무역의 글로벌 생산기지와 수직계열화 역량을 기반으로, 제조 DX/AX·친환경 소재·에너지·공급망 기술을 실제 공장에 검증하고 글로벌로 확장할 전략적 파트너를 발굴합니다.",
+  "defaultDiscoveryPrompt": "글로벌 의류 공장의 MES·ERP와 연동해 생산성·품질·에너지 효율을 개선하고 해외 생산기지로 확산할 수 있는 AI·자동화 스타트업을 찾습니다.",
+  "priorities": [
+    {
+      "rank": 1,
+      "id": "manufacturing-dx-ax",
+      "title": "글로벌 공장 제조 DX/AX",
+      "score": 100,
+      "confidence": "높음",
+      "hypothesis": "MES·ERP·설비 데이터를 연결해 생산성과 납기 대응력을 높이고 여러 해외 공장에 재사용할 수 있는 솔루션 수요가 가장 클 가능성이 높습니다.",
+      "startupCapabilities": [
+        "MES·ERP·SAP 연동",
+        "생산계획·공정 최적화",
+        "IT/OT 데이터 통합",
+        "다국가 공장 확산"
+      ],
+      "validationQuestions": [
+        "첫 실증 공장과 대상 공정은 어디인가?",
+        "기존 MES·ERP·SAP의 연결 범위와 데이터 반출 제한은 무엇인가?",
+        "성공 지표를 생산성·불량률·납기 중 무엇으로 정의할 것인가?"
+      ],
+      "evidenceIds": [
+        "youngone-job-2026-05",
+        "youngone-job-2026-06",
+        "youngone-business-2025"
+      ]
+    },
+    {
+      "rank": 2,
+      "id": "factory-energy-carbon",
+      "title": "공장 에너지·탄소 FEMS",
+      "score": 95,
+      "confidence": "높음",
+      "hypothesis": "태양광 확대와 2030 감축 목표를 달성하려면 공장별 에너지 가시화, FEMS 최적화와 감축 검증 자동화가 필요할 가능성이 높습니다.",
+      "startupCapabilities": [
+        "FEMS",
+        "에너지 예측·최적화",
+        "탄소 데이터 검증",
+        "ISO 50001 지원"
+      ],
+      "validationQuestions": [
+        "우선 연결할 공장·설비 계측 데이터는 무엇인가?",
+        "에너지 비용과 배출량 중 우선 KPI는 무엇인가?"
+      ],
+      "evidenceIds": [
+        "youngone-sustainability-2025"
+      ]
+    },
+    {
+      "rank": 3,
+      "id": "information-ot-security",
+      "title": "정보·OT 보안 로드맵",
+      "score": 93,
+      "confidence": "높음",
+      "hypothesis": "글로벌 사업장과 제조 설비를 함께 보호하기 위해 DLP·EDR·이메일 보안·다크웹 모니터링을 통합 운영할 파트너 수요가 예상됩니다.",
+      "startupCapabilities": [
+        "DLP·EDR",
+        "OT 자산 식별",
+        "이메일 보안",
+        "다크웹 위협 인텔리전스"
+      ],
+      "validationQuestions": [
+        "2026~2028 보안 과제 중 외부 솔루션 검토 범위는 어디까지인가?",
+        "본사와 해외 공장의 보안 운영 책임은 어떻게 구분되는가?"
+      ],
+      "evidenceIds": [
+        "youngone-sustainability-2025",
+        "youngone-job-2025-03"
+      ]
+    },
+    {
+      "rank": 4,
+      "id": "circular-textile-materials",
+      "title": "순환 섬유·친환경 소재",
+      "score": 90,
+      "confidence": "높음",
+      "hypothesis": "T2T 재활용과 바이오 기반 소재를 상용 제품 및 글로벌 고객 공급망으로 확장할 기술·소재 스타트업이 전략적 투자·실증 후보가 될 수 있습니다.",
+      "startupCapabilities": [
+        "섬유-섬유 재활용",
+        "바이오 나일론",
+        "천연·바이오 충전재",
+        "열·기계식 재활용"
+      ],
+      "validationQuestions": [
+        "현재 가장 시급한 섬유 종류와 물성 기준은 무엇인가?",
+        "투자와 구매·공동개발 중 선호 협업 방식은 무엇인가?"
+      ],
+      "evidenceIds": [
+        "youngone-sustainability-2025",
+        "youngone-cvc-portfolio",
+        "youngone-business-2025"
+      ]
+    },
+    {
+      "rank": 5,
+      "id": "supply-chain-traceability",
+      "title": "공급망 추적·DPP·ESG 규제 대응",
+      "score": 88,
+      "confidence": "중간",
+      "hypothesis": "인증 소재와 다국가 공급망 데이터를 연결해 원료 추적성, 인권·화학물질 관리와 고객 보고를 자동화할 필요가 커질 가능성이 높습니다.",
+      "startupCapabilities": [
+        "원료 추적성",
+        "디지털 제품 여권",
+        "공급업체 ESG 데이터",
+        "인증·규제 보고 자동화"
+      ],
+      "validationQuestions": [
+        "추적성 단절이 가장 큰 원료·공정·협력사는 어디인가?",
+        "고객사 요구와 규제 중 우선 대응 항목은 무엇인가?"
+      ],
+      "evidenceIds": [
+        "youngone-sustainability-2024",
+        "youngone-sustainability-2025"
+      ]
+    },
+    {
+      "rank": 6,
+      "id": "ai-quality-3d-sampling",
+      "title": "AI 품질검사·3D 가상 샘플",
+      "score": 84,
+      "confidence": "중간",
+      "hypothesis": "인라인 검사와 3D 가상 샘플을 AI로 고도화하면 불량·샘플 리드타임과 소재 낭비를 동시에 줄일 실증 기회가 있습니다.",
+      "startupCapabilities": [
+        "컴퓨터 비전 검사",
+        "결함 원인 분석",
+        "3D 의류 시뮬레이션",
+        "가상 샘플 협업"
+      ],
+      "validationQuestions": [
+        "불량 이미지와 품질 판정 데이터는 어느 수준으로 축적되어 있는가?",
+        "V-Stitcher 등 기존 도구와의 연동 요건은 무엇인가?"
+      ],
+      "evidenceIds": [
+        "youngone-oem-apparel",
+        "youngone-job-2025-03"
+      ]
+    },
+    {
+      "rank": 7,
+      "id": "scott-demand-inventory",
+      "title": "SCOTT 수요·재고·SKU 최적화",
+      "score": 80,
+      "confidence": "중간",
+      "hypothesis": "SCOTT 사업의 수요 둔화와 재고·할인 부담을 줄이기 위해 국가·채널별 수요 예측, 재고 배분과 SKU 합리화 기술이 필요할 수 있습니다.",
+      "startupCapabilities": [
+        "수요 예측",
+        "재고 배분",
+        "가격·프로모션 최적화",
+        "SKU 포트폴리오 분석"
+      ],
+      "validationQuestions": [
+        "대상 국가·채널과 예측 단위는 무엇인가?",
+        "재고·가격 데이터에 접근 가능한 사업 주체는 어디인가?"
+      ],
+      "evidenceIds": [
+        "youngone-business-2025"
+      ]
+    },
+    {
+      "rank": 8,
+      "id": "frontline-safety-training",
+      "title": "다국어 현장 안전·교육·변화관리",
+      "score": 74,
+      "confidence": "중간",
+      "hypothesis": "여러 국가의 생산 현장에 DX/AX를 확산하려면 다국어 작업 표준, 안전 교육과 현장 도입 지원 기술이 보완 과제가 될 수 있습니다.",
+      "startupCapabilities": [
+        "다국어 작업 지원",
+        "현장 안전 교육",
+        "디지털 작업 표준",
+        "변화관리 분석"
+      ],
+      "validationQuestions": [
+        "우선 지원할 언어와 작업자 유형은 무엇인가?",
+        "안전·생산 교육의 현재 전달 방식과 성과 지표는 무엇인가?"
+      ],
+      "evidenceIds": [
+        "youngone-job-2025-03",
+        "youngone-job-2026-05"
+      ]
+    }
+  ],
+  "discoveryPrompts": [
+    {
+      "label": "제조 DX/AX",
+      "prompt": "글로벌 의류 공장의 MES·ERP와 연동해 생산성·품질·에너지 효율을 개선하고 해외 생산기지로 확산할 수 있는 AI·자동화 스타트업을 찾아줘"
+    },
+    {
+      "label": "에너지·탄소",
+      "prompt": "해외 제조 공장의 FEMS와 설비 데이터를 활용해 에너지 비용과 탄소배출을 줄이고 ISO 50001 운영을 지원할 스타트업을 찾아줘"
+    },
+    {
+      "label": "순환 섬유",
+      "prompt": "섬유-섬유 재활용, 바이오 기반 소재 또는 공급망 추적 기술을 실제 의류 제품에 공동개발·실증할 수 있는 스타트업을 찾아줘"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "youngone-business-2025",
+      "sourceType": "사업보고서",
+      "title": "영원무역 2025 사업보고서",
+      "publisher": "영원무역·한국거래소 KIND",
+      "publishedAt": "2026-03-19",
+      "accessedAt": "2026-08-07",
+      "url": "https://kind.krx.co.kr/external/2026/03/19/001944/20260319008070/11011.htm",
+      "claims": [
+        "연결대상 종속회사 67개",
+        "매출 구성 OEM 68%, SCOTT 28%, 기타 4%",
+        "2025년 매출 4조 636억원, 영업이익 5,144억원",
+        "SCOTT 수요 둔화·재고·SKU 합리화 과제와 섬유 연구개발 현황"
+      ]
+    },
+    {
+      "id": "youngone-sustainability-2025",
+      "sourceType": "지속가능경영보고서",
+      "title": "Youngone Sustainability Report 2025",
+      "publisher": "영원무역",
+      "publishedAt": "2026-07-01",
+      "accessedAt": "2026-08-07",
+      "url": "https://www.youngone.co.kr/board/download/277/",
+      "claims": [
+        "FEMS와 ISO 50001 추진",
+        "2026년 태양광 71MWp 예상, 2030년 100MWp 목표",
+        "2030년 글로벌 온실가스 40% 감축 목표",
+        "T2T 재활용·Bio Nylon 56 등 순환·바이오 소재 개발",
+        "2026~2028년 MAM·DLP·EDR·이메일 보안·다크웹 모니터링 로드맵"
+      ]
+    },
+    {
+      "id": "youngone-job-2026-05",
+      "sourceType": "채용공고",
+      "title": "2026년 5월 경력사원 채용",
+      "publisher": "영원무역",
+      "publishedAt": "2026-05-04",
+      "accessedAt": "2026-08-07",
+      "url": "https://www.youngone.co.kr/recruit/jobopening/78",
+      "claims": [
+        "생산 자동화와 DX/AX 마스터플랜",
+        "MES·ERP 데이터 연계 및 지능화",
+        "AI·빅데이터와 IT/OT·현장 협업",
+        "외부 솔루션 파트너 선정과 PMO"
+      ]
+    },
+    {
+      "id": "youngone-job-2026-06",
+      "sourceType": "채용공고",
+      "title": "2026년 6월 경력사원 채용",
+      "publisher": "영원무역",
+      "publishedAt": "2026-06-02",
+      "accessedAt": "2026-08-07",
+      "url": "https://www.youngone.co.kr/recruit/jobopening/79",
+      "claims": [
+        "DX/AX·SAP·데이터 역량 수요 재확인",
+        "섬유 자동화와 연구개발 직무 수요"
+      ]
+    },
+    {
+      "id": "youngone-job-2025-03",
+      "sourceType": "채용공고",
+      "title": "2025년 3월 경력사원 채용",
+      "publisher": "영원무역",
+      "publishedAt": "2025-03-04",
+      "accessedAt": "2026-08-07",
+      "url": "https://www.youngone.co.kr/recruit/jobopening/64",
+      "claims": [
+        "V-Stitcher 기반 3D 가상 샘플 역량 수요",
+        "안전 시스템과 정보보안 직무 수요"
+      ]
+    },
+    {
+      "id": "youngone-cvc-portfolio",
+      "sourceType": "공식 CVC 포트폴리오",
+      "title": "Youngone CVC Portfolio",
+      "publisher": "Youngone Corporation",
+      "publishedAt": null,
+      "accessedAt": "2026-08-07",
+      "url": "https://youngonecorporation.com/about-us/cvc-portfolio/",
+      "claims": [
+        "글로벌 스타트업 투자",
+        "친환경 소재·자동화 기술·혁신 브랜드를 주요 테마로 제시",
+        "Circ·Infinite Fiber·SRTX·Colorifix 등 포트폴리오 공개"
+      ]
+    },
+    {
+      "id": "youngone-governance-fund2",
+      "sourceType": "공식 지배구조 공시",
+      "title": "영원무역 이사회 주요 활동",
+      "publisher": "영원무역",
+      "publishedAt": "2025-06-20",
+      "accessedAt": "2026-08-07",
+      "url": "https://www.youngone.co.kr/esg/governance/youngone",
+      "claims": [
+        "YOH CVC Fund 2 출자 승인"
+      ]
+    },
+    {
+      "id": "youngone-holdings-business-2025",
+      "sourceType": "사업보고서",
+      "title": "영원무역홀딩스 2025 사업보고서",
+      "publisher": "영원무역홀딩스·한국거래소 KIND",
+      "publishedAt": "2026-03-19",
+      "accessedAt": "2026-08-07",
+      "url": "https://kind.krx.co.kr/external/2026/03/19/001882/20260319007765/11011.htm",
+      "claims": [
+        "영원무역의 YOH CVC Fund 1 투자액 450억원",
+        "영원무역홀딩스의 YOH CVC Fund 1 투자액 400억원",
+        "YOH CVC 관련 법인·펀드 관계"
+      ]
+    },
+    {
+      "id": "youngone-sustainability-2024",
+      "sourceType": "지속가능경영보고서",
+      "title": "Youngone Sustainability Report 2024",
+      "publisher": "영원무역",
+      "publishedAt": "2025-06-30",
+      "accessedAt": "2026-08-07",
+      "url": "https://www.youngone.co.kr/board/download/211/",
+      "claims": [
+        "공급망 추적성 보완 필요",
+        "인권·화학물질·인증 소재 관련 관리 과제"
+      ]
+    },
+    {
+      "id": "youngone-oem-apparel",
+      "sourceType": "공식 사업 소개",
+      "title": "OEM 의류 사업",
+      "publisher": "영원무역",
+      "publishedAt": null,
+      "accessedAt": "2026-08-07",
+      "url": "https://www.youngone.co.kr/business/oem/cloth",
+      "claims": [
+        "3D 기술·모듈형 생산·인라인 검사 활용"
+      ]
+    }
+  ],
+  "unknowns": [
+    {
+      "field": "annualPilotBudget",
+      "status": "unknown",
+      "question": "스타트업 실증에 배정 가능한 연간 예산과 건별 상한은 얼마인가?",
+      "reason": "공식 공개 자료에서 확인되지 않음"
+    },
+    {
+      "field": "investmentCheckSize",
+      "status": "unknown",
+      "question": "YOH CVC의 건별 투자 규모와 후속 투자 정책은 무엇인가?",
+      "reason": "펀드 출자액은 확인되지만 개별 투자 규모는 비공개"
+    },
+    {
+      "field": "targetStages",
+      "status": "unknown",
+      "question": "선호 투자 단계와 최소 상용화 수준은 무엇인가?",
+      "reason": "공식 포트폴리오 페이지에 단계 기준이 명시되지 않음"
+    },
+    {
+      "field": "activeRfp",
+      "status": "unknown",
+      "question": "현재 외부 스타트업에 공개 가능한 RFP와 마감 일정이 있는가?",
+      "reason": "채용공고의 파트너 선정 업무가 현재 진행 중인 RFP를 의미하지는 않음"
+    },
+    {
+      "field": "pilotOwner",
+      "status": "unknown",
+      "question": "제조 DX/AX·에너지·보안·소재 각 과제의 내부 의사결정자와 실증 담당자는 누구인가?",
+      "reason": "조직별 실명 책임자와 구매 절차는 공개되지 않음"
+    },
+    {
+      "field": "dataSecurityConstraints",
+      "status": "unknown",
+      "question": "공장 데이터의 국외 이전·클라우드 사용·보안 심사 조건은 무엇인가?",
+      "reason": "정확한 시스템 구조와 데이터 반출 정책은 공개되지 않음"
+    }
+  ],
+  "evidenceNote": "공식 공개 자료를 바탕으로 만든 리서치 가설입니다. 채용 수요는 현재 RFP·예산 승인을 의미하지 않으며, 투자 단계·건별 투자 규모·실증 담당자와 데이터 조건은 영원무역 내부 확인이 필요합니다.",
+  "visibility": "restricted_partner_profile",
+  "sourcePolicy": "official_sources_only",
+  "researchAsOf": "2026-08-07",
+  "nextReviewDate": "2026-11-07"
+};
+
+export default YOUNGONE_EXTERNAL_PARTNER_PROFILE;

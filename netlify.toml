@@ -1,0 +1,121 @@
+[build]
+command = "pnpm test"
+publish = "public"
+functions = "netlify/functions"
+
+[functions]
+node_bundler = "esbuild"
+
+[[redirects]]
+from = "/api/arena"
+to = "/.netlify/functions/arena"
+status = 200
+
+[[redirects]]
+from = "/api/arena-competition"
+to = "/.netlify/functions/arena-competition"
+status = 200
+
+[[redirects]]
+from = "/api/arena-auth"
+to = "/.netlify/functions/arena-auth"
+status = 200
+
+[[redirects]]
+from = "/api/arena-public"
+to = "/.netlify/functions/arena-public"
+status = 200
+
+[[redirects]]
+from = "/api/b2b-match"
+to = "/.netlify/functions/b2b-match"
+status = 200
+
+[[redirects]]
+from = "/api/compare-summary"
+to = "/.netlify/functions/compare-summary"
+status = 200
+
+[[redirects]]
+from = "/api/event-recommendations"
+to = "/.netlify/functions/event-recommendations"
+status = 200
+
+[[redirects]]
+from = "/api/external-partners"
+to = "/.netlify/functions/external-partners"
+status = 200
+
+[[redirects]]
+from = "/api/forum"
+to = "/.netlify/functions/forum"
+status = 200
+
+[[redirects]]
+from = "/api/forum-draft-analysis"
+to = "/.netlify/functions/forum-draft-analysis"
+status = 200
+
+[[redirects]]
+from = "/api/community-highlights"
+to = "/.netlify/functions/community-highlights"
+status = 200
+
+[[redirects]]
+from = "/api/arena-announcements"
+to = "/.netlify/functions/arena-announcements"
+status = 200
+
+[[redirects]]
+from = "/api/featured-keywords"
+to = "/.netlify/functions/featured-keywords"
+status = 200
+
+[[redirects]]
+from = "/api/collaboration-fit-reasons"
+to = "/.netlify/functions/collaboration-fit-reasons"
+status = 200
+
+[[redirects]]
+from = "/api/similar-team-recommendations"
+to = "/.netlify/functions/similar-team-recommendations"
+status = 200
+
+[[redirects]]
+from = "/api/program-database"
+to = "/.netlify/functions/program-database"
+status = 200
+
+[[redirects]]
+from = "/api/sparkclaw-applicants-export"
+to = "/.netlify/functions/sparkclaw-applicants-export"
+status = 200
+
+[[redirects]]
+from = "/api/program-hub"
+to = "/.netlify/functions/program-hub"
+status = 200
+
+[[redirects]]
+from = "/api/my-log"
+to = "/.netlify/functions/my-log"
+status = 200
+
+[functions."sparkclaw-applicants-export"]
+included_files = ["netlify/data/sparkclaw-applicants/**"]
+
+[[redirects]]
+from = "/"
+to = "/arena/index.html"
+status = 200
+force = true
+
+[[redirects]]
+from = "/arena"
+to = "/arena/index.html"
+status = 200
+
+[[redirects]]
+from = "/arena/*"
+to = "/arena/index.html"
+status = 200
