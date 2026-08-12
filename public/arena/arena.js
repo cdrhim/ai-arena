@@ -1455,6 +1455,7 @@ function setMetricCardCopy(items) {
 
 function renderCollaborationFitTooltip(metrics = {}) {
   if (!els.collaborationFitCard || !els.metricProfilesTooltip) return;
+  els.collaborationFitCard.removeAttribute("title");
   const companies = (Array.isArray(metrics.collaborationFitCompanies) ? metrics.collaborationFitCompanies : [])
     .filter((company) => company?.name && Number.isFinite(Number(company.score)));
   const count = Number.isFinite(Number(metrics.collaborationFitCount)) ? Number(metrics.collaborationFitCount) : 0;
@@ -1473,7 +1474,6 @@ function renderCollaborationFitTooltip(metrics = {}) {
           ? "현재 저장된 회사·서비스 키워드 기준으로 적합 기업이 없습니다."
           : "기업 프로필이 연결되지 않은 운영 계정입니다.";
     els.metricProfilesTooltip.innerHTML = `<strong>${escapeHtml(heading)}</strong><p>${escapeHtml(message)}</p>`;
-    els.collaborationFitCard.title = message;
     els.collaborationFitCard.setAttribute("aria-label", `${heading}. ${message}`);
     return;
   }
@@ -1504,7 +1504,6 @@ function renderCollaborationFitTooltip(metrics = {}) {
       }).join("")}
     </ol>
   `;
-  els.collaborationFitCard.title = companySummary.slice(0, 1500);
   els.collaborationFitCard.setAttribute("aria-label", `협업 적합 기업 ${formatNumber(count)}개. ${companySummary}`.slice(0, 1800));
 }
 

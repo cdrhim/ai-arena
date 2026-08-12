@@ -40,6 +40,8 @@ test("collaboration-fit card renders zero instead of a dash and lists company na
   assert.doesNotMatch(js, /역량 일치/);
   assert.doesNotMatch(js, /키워드 일치/);
   assert.match(js, /fit-company-copy/);
+  assert.match(js, /els\.collaborationFitCard\.removeAttribute\("title"\)/);
+  assert.doesNotMatch(js, /els\.collaborationFitCard\.title\s*=/);
   assert.match(css, /\.metric-fit-tooltip \.fit-company-copy small/);
   assert.match(css, /\.collaboration-fit-card:hover \.metric-fit-tooltip/);
   assert.match(css, /\.collaboration-fit-card:focus \.metric-fit-tooltip/);
