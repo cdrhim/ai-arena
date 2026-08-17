@@ -27,5 +27,5 @@ test("every member-facing benefit surface uses the discussion-stage filter", () 
   const source = readFileSync("public/arena/arena.js", "utf8");
   assert.ok((source.match(/isBenefitReadyForDisplay/g) || []).length >= 7);
   assert.match(source, /\.filter\(isBenefitReadyForDisplay\)/);
-  assert.match(source, /els\.benefitConfigSelect\.innerHTML = \(hub\.benefits \|\| \[\]\)/);
+  assert.doesNotMatch(source, /benefitConfigSelect/);
 });

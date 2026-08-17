@@ -5,7 +5,7 @@ import test from "node:test";
 import featuredKeywordsApi from "../netlify/functions/featured-keywords.mjs";
 import { polishFeaturedKeywords } from "../netlify/lib/featured-keywords.mjs";
 
-test("Spark AI edits only the server-owned verified editorial facts and keeps exact company anchors", async () => {
+test("Clawee edits only the server-owned verified editorial facts and keeps exact company anchors", async () => {
   let requestBody = "";
   const result = await polishFeaturedKeywords({ ids: ["neander-acscent", "gorocket-oing"] }, {
     env: { GEMINI_API_KEY: "server-only-key" },
@@ -49,7 +49,7 @@ test("featured keyword API rejects anonymous requests before AI work", async () 
   assert.equal(called, false);
 });
 
-test("Discover renders four integrated editorial bubbles and keeps provider credentials server-side", () => {
+test("Discover renders a four-pick recent-achievement slideshow and keeps provider credentials server-side", () => {
   const html = fs.readFileSync("public/arena/index.html", "utf8");
   const client = fs.readFileSync("public/arena/arena.js", "utf8");
   const css = fs.readFileSync("public/arena/arena.css", "utf8");
@@ -63,22 +63,39 @@ test("Discover renders four integrated editorial bubbles and keeps provider cred
   assert.doesNotMatch(html, /FEATURED · EDITORIAL CURATION/);
   assert.match(client, /fetch\("\/api\/featured-keywords"/);
   assert.match(client, /featuredSpotlightEntries\.slice\(0, 4\)/);
-  assert.match(client, /featured-spotlight-bubble-/);
-  assert.doesNotMatch(client, /featured-spotlight-bubble-meta"><b>0\$\{index \+ 1\}/);
+  assert.match(client, /featured-spotlight-slide/);
+  assert.match(client, /featuredSpotlightVisualMarkup\(company, displayName, curation\)/);
+  assert.match(client, /featuredCurationForTeam\(team\)/);
+  assert.match(client, /curation\.spotlightImage/);
+  assert.match(client, /has-product-image/);
+  assert.match(client, /const logo = companyLogoAsset\(company\)/);
+  assert.match(client, /featured-spotlight-visual is-\$\{escapeHtml\(logo\.tone\)\}/);
+  assert.match(client, /src="\$\{escapeHtml\(logo\.src\)\}"/);
+  assert.match(client, /companyIconMarkup\(company\)/);
+  assert.match(client, /RECENT MILESTONE/);
+  assert.match(client, /prioritizeFeaturedSpotlightEntries/);
   assert.match(client, /weeklyFeaturedTeams\(hub\.teams \|\| \[\], hub\.featuredCompanies \|\| \[\]\)/);
   assert.match(client, /WEEKLY UPDATE \$\{date\} · MON 09:00 KST/);
-  assert.match(css, /\.featured-spotlight-bubble-meta\s*\{[\s\S]*?justify-content:\s*flex-end/);
-  assert.doesNotMatch(client, /featuredSpotlightIndex|featuredSpotlightTimer/);
+  assert.match(css, /\.featured-spotlight-navigation/);
   assert.match(client, /openTeamDialog\(team\)/);
   assert.doesNotMatch(client, /const teamId = event\.currentTarget\.dataset\.featuredTeamId;\s*showPage\("teams"\)/);
-  assert.match(css, /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(css, /@keyframes featured-spotlight-bubble-orbit/);
-  assert.match(css, /@keyframes featured-spotlight-cluster-orbit/);
-  assert.doesNotMatch(css, /@keyframes featured-spotlight-border-scan/);
-  assert.match(css, /\.featured-spotlight-cluster:hover[\s\S]*?opacity:\s*0\.68/);
+  assert.match(css, /@keyframes featured-slide-enter/);
+  assert.match(css, /@keyframes featured-slide-progress/);
+  assert.match(css, /\.featured-spotlight-content\s*\{[\s\S]*?z-index:\s*2;/);
+  assert.match(css, /\.featured-spotlight-visual img\s*\{[\s\S]*?object-fit:\s*contain;/);
+  assert.match(css, /\.featured-spotlight-slide\.has-product-image\s*\{[\s\S]*?var\(--featured-photo\)/);
+  assert.match(css, /\.featured-spotlight-visual\.is-product img\s*\{[\s\S]*?object-fit:\s*cover;/);
+  assert.match(css, /\.featured-spotlight-visual > span\s*\{[\s\S]*?background:\s*rgba\(255, 255, 255, 0\.92\);/);
+  assert.match(css, /\.featured-spotlight\s*\{[\s\S]*?--spotlight-neon-yellow:\s*#ffe66d;/);
+  assert.match(css, /\.featured-spotlight-head h2\s*\{[\s\S]*?color:\s*#f7fbff;[\s\S]*?text-shadow:/);
+  assert.match(css, /\.featured-spotlight-kicker\s*\{[\s\S]*?color:\s*#a9cff7;/);
+  assert.match(css, /\.featured-spotlight-footer\s*\{[\s\S]*?color:\s*rgba\(199, 220, 247, 0\.72\);/);
+  assert.match(css, /\.featured-spotlight-all\s*\{[\s\S]*?color:\s*#b8dcff;/);
+  assert.match(css, /\.featured-spotlight-slide h3\s*\{[\s\S]*?color:\s*var\(--spotlight-neon-bright\);[\s\S]*?text-shadow:/);
+  assert.match(css, /\.featured-spotlight-slide p\s*\{[\s\S]*?color:\s*var\(--spotlight-neon-soft\);/);
+  assert.match(css, /\.featured-spotlight-profile\s*\{[\s\S]*?color:\s*var\(--spotlight-neon-yellow\);/);
   assert.match(css, /\.hero-visual::before[\s\S]*?hero-visual-signal-field/);
-  assert.match(css, /\.featured-spotlight-cluster::before,[\s\S]*?\.featured-spotlight-bubble,[\s\S]*animation:\s*none !important/);
-  assert.doesNotMatch(css, /@keyframes featured-spotlight-pop/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.featured-spotlight-slide/);
   assert.doesNotMatch(css, /featured-spotlight[^}]*filter:\s*blur/is);
   assert.match(config, /from = "\/api\/featured-keywords"/);
   assert.doesNotMatch(`${html}\n${client}`, /GEMINI_API_KEY|GOOGLE_API_KEY|x-goog-api-key|Gemini/);
@@ -92,6 +109,11 @@ test("Discover hero separates editorial picks from network metrics at every resp
   assert.match(visual, /id="featuredSpotlight"/);
   assert.match(visual, /class="hero-orbit"/);
   assert.match(css, /\.hero-visual\s*\{[\s\S]*?display:\s*grid;[\s\S]*?gap:\s*14px;/);
+  assert.match(css, /@media \(min-width: 901px\)[\s\S]*?\.hero-visual\s*\{[\s\S]*?grid-template-columns:\s*minmax\(225px, 0\.72fr\) minmax\(370px, 1\.28fr\)/);
+  assert.match(css, /@media \(min-width: 901px\)[\s\S]*?\.hero-orbit\s*\{[\s\S]*?grid-column:\s*1;[\s\S]*?min-height:\s*390px;[\s\S]*?margin-left:/);
+  assert.match(css, /@media \(min-width: 901px\)[\s\S]*?\.featured-spotlight\s*\{[\s\S]*?grid-column:\s*2;[\s\S]*?align-self:\s*center;/);
+  assert.match(css, /@media \(min-width: 901px\)[\s\S]*?\.featured-spotlight-head h2\s*\{[\s\S]*?font-size:\s*clamp\(17px, 1\.35vw, 20px\)/);
+  assert.match(css, /@media \(max-width: 760px\)[\s\S]*?\.hero-visual\s*\{[\s\S]*?grid-template-columns:\s*1fr;/);
   assert.match(css, /\.featured-spotlight\s*\{[\s\S]*?position:\s*relative;[\s\S]*?width:\s*100%;/);
   assert.doesNotMatch(css, /\.featured-spotlight\s*\{[^}]*position:\s*absolute;/);
   assert.match(css, /\.featured-spotlight\s*\{[\s\S]*?padding:\s*0;[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/);
@@ -100,6 +122,8 @@ test("Discover hero separates editorial picks from network metrics at every resp
   assert.match(css, /\.hero-visual \.hero-cloud-tag\s*\{\s*display:\s*block;/);
   assert.match(css, /\.orbit-card\s*\{[\s\S]*?offset-path:\s*ellipse\(calc\(50% - 96px\) calc\(50% - 78px\) at 50% 47%\)[\s\S]*?animation:\s*hero-planet-orbit/);
   assert.match(css, /@media \(max-width: 1120px\)[\s\S]*?\.program-hero\s*\{[\s\S]*?grid-template-columns:\s*1fr;/);
-  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.featured-spotlight-cluster\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.featured-spotlight-slide\s*\{[\s\S]*?grid-template-columns:\s*1fr;/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.featured-spotlight-content\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.featured-spotlight-visual\s*\{[\s\S]*?border-left:\s*0;/);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.orbit-card,[\s\S]*?offset-path:\s*none;/);
 });

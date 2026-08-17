@@ -9,6 +9,7 @@ const communitySource = await readFile(new URL("public/arena/community.js", root
 const htmlSource = await readFile(new URL("public/arena/index.html", root), "utf8");
 
 test("browser history is connected to internal Arena page navigation", () => {
+  assert.match(arenaSource, /advisors: "global-advisors"/);
   assert.match(arenaSource, /window\.addEventListener\("popstate", handleArenaPopState\)/);
   assert.match(arenaSource, /window\.history\.pushState\(nextState/);
   assert.match(arenaSource, /window\.history\.replaceState\(nextState/);
@@ -44,6 +45,6 @@ test("community threads and collaboration reviews also return through browser hi
 });
 
 test("deployed browser assets keep the shared current cache version", () => {
-  const assetReferences = htmlSource.match(/\/arena\/(?:arena|market|community)\.js\?v=ai-arena-20260812-meeting-next-steps/g) || [];
-  assert.equal(assetReferences.length, 3);
+  const assetReferences = htmlSource.match(/\/arena\/(?:arena-activity-client|arena|market|community)\.js\?v=ai-arena-20260817-partner-events-perks-v112/g) || [];
+  assert.equal(assetReferences.length, 4);
 });

@@ -60,7 +60,7 @@ SPARKCLAW_ENABLE_PUBLIC_TECH_DISCLOSURE=false
 
 ## My Log 활동 원장 운영
 
-My Log는 `public.sc_arena_` 접두사의 별도 활동 원장을 사용합니다. 원장은 화면용 이력이며 연결 요청, Community, Bounty 등 원래 도메인 테이블이 현재 상태의 기준입니다. 모든 조회자는 해당 Workspace의 `active` 멤버십이 있어야 하며, 공개 범위는 다음과 같이 적용합니다.
+My Log는 `public.sc_arena_` 접두사의 SparkClaw AI Arena 전용 활동 원장을 사용합니다. 기록 범위는 이 플랫폼 안에서 발생한 `Discover`, `Community`, `Bounty` 액션뿐입니다. 별도 SparkClaw Program DB의 행사 RSVP, 혜택 신청, Weekly Report 및 다른 플랫폼의 활동은 수집·조회·화면 fallback 대상에 포함하지 않습니다. 원장은 화면용 이력이며 연결 요청, Community, Bounty 등 원래 도메인 테이블이 현재 상태의 기준입니다. 모든 조회자는 해당 Workspace의 `active` 멤버십이 있어야 하며, 공개 범위는 다음과 같이 적용합니다.
 
 팀 연결이 아직 확인되지 않은 Claw Member는 `arena_user` 조직으로 임시 동기화합니다. 이 값은 비권위 fallback이므로 기존 `program_team` 또는 다른 공식 조직 연결을 덮어쓰지 않으며, 이후 확인된 `program_team` 동기화는 `arena_user` 연결을 승격·교체할 수 있습니다.
 

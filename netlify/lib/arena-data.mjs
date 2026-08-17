@@ -160,18 +160,7 @@ export const ARENA_SEED = {
       preferredRegions: ["Korea", "Asia"]
     }
   ],
-  connectionRequests: [
-    {
-      id: "req-seed-commerce-1",
-      startupId: firstApplicantIdFor(["Commerce / Retail", "Marketing / AdTech"]),
-      intent: "Corporate pilot",
-      organization: "Commerce and Growth Operators",
-      name: "B2B Program Lead",
-      email: "partner@example.com",
-      message: "Interested in reviewing commerce and growth-ops applicants for pilot fit.",
-      createdAt: "2026-06-26T09:00:00.000Z"
-    }
-  ]
+  connectionRequests: []
 };
 
 function applicantIdsFor(categories, limit = 6) {
@@ -180,10 +169,6 @@ function applicantIdsFor(categories, limit = 6) {
     .sort((left, right) => Number(right.benchmarkScore || 0) - Number(left.benchmarkScore || 0))
     .slice(0, limit)
     .map((startup) => startup.id);
-}
-
-function firstApplicantIdFor(categories) {
-  return applicantIdsFor(categories, 1)[0] || applicantStartups[0]?.id || "";
 }
 
 function buildBenchmarkSubmissions(challenges) {

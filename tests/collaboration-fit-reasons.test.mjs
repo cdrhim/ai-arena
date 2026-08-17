@@ -28,7 +28,7 @@ const companies = [
   }
 ];
 
-test("Spark AI receives only allowlisted fit evidence and keeps exact company anchors", async () => {
+test("Clawee receives only allowlisted fit evidence and keeps exact company anchors", async () => {
   let requestBody = "";
   const result = await buildCollaborationFitReasons({ subjectLabel: "테스트 기업", companies }, {
     env: { GEMINI_API_KEY: "server-only-key" },

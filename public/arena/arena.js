@@ -11,13 +11,16 @@ import {
 } from "./benefit-qualification.js";
 import { plainEventDescription } from "./event-copy.js";
 import { marketDataFromProgramHub } from "./program-market.js";
-import { sectorCompanyNames } from "./sector-flywheel.js";
-import { taskKeywords } from "./task-keywords.js";
+import { rankedTaskDetails, taskDetails, taskKeywords } from "./task-keywords.js";
+import { taskMapEntries } from "./task-map.js";
 import { companyIconMarkup } from "./company-icon.js";
 import { companyLogoAsset } from "./company-logo.js";
+import { companyExternalLinkIcon, companyExternalLinks } from "./company-external-links.js";
+import { isAllowedGoogleAdminUser } from "./google-admin-auth.js";
 import {
   curatedFeaturedTeams,
   FEATURED_EDITORIAL_CRITERIA,
+  featuredCurationForTeam,
   featuredCurationUpdatedLabel
 } from "./featured-curation.js";
 import {
@@ -25,27 +28,30 @@ import {
   finishProcessStatus,
   setProcessStatus,
   startProcessStatus
-} from "./progress-status.js";
+} from "./progress-status.js?v=ai-arena-20260817-save-progress-v87";
 import {
   eventDescriptionPreview,
   formatEventTime,
+  isCommunityEventFromOrientation,
   koreanWeekday,
   shouldCollapseEventDescription,
   sortEventsChronologically
 } from "./event-timeline.js";
 import {
   PUBLIC_BRIEF_LANGUAGE_STORAGE_KEY,
+  hasExplicitPublicBriefLanguage,
   normalizePublicBriefLanguage,
   publicBriefCopy,
   publicBriefUrl,
   resolvePublicBriefLanguage
 } from "./public-brief-i18n.js";
+import { initArenaGuide } from "./arena-guide.js?v=ai-arena-20260817-prompt-transfer-v104";
 
 const SESSION_KEY = "sparkclaw-program-hub-session-v1";
-const FEATURED_SPOTLIGHT_ORDER_KEY = "sparkclaw-featured-spotlight-order-v1";
 const ARENA_HISTORY_MARKER = "sparkclaw-arena-history-v1";
 const ARENA_PAGE_HASHES = Object.freeze({
   overview: "discover",
+  advisors: "global-advisors",
   teams: "company-directory",
   discover: "task-driven-search",
   passports: "tech-passports",
@@ -62,9 +68,15 @@ const ARENA_PAGE_HASHES = Object.freeze({
 const ARENA_HASH_PAGES = Object.freeze(
   Object.fromEntries(Object.entries(ARENA_PAGE_HASHES).map(([page, hash]) => [hash, page]))
 );
+const storedPublicBriefLanguage = readStoredPublicBriefLanguage();
+let publicBriefLanguageWasChosen = hasExplicitPublicBriefLanguage({
+  search: window.location.search,
+  stored: storedPublicBriefLanguage
+});
 let publicBriefLanguage = resolvePublicBriefLanguage({
   search: window.location.search,
-  stored: readStoredPublicBriefLanguage()
+  stored: storedPublicBriefLanguage,
+  browserLanguages: navigator.languages || [navigator.language]
 });
 const TABLE_LABELS = {
   teams: "팀",
@@ -84,6 +96,7 @@ const TABLE_LABELS = {
 let authConfig = null;
 let authSession = null;
 let hub = null;
+let programHubLoadGeneration = 0;
 let arenaData = null;
 let marketData = null;
 let selectedArenaChallengeId = "";
@@ -99,17 +112,22 @@ let eventRecommendationPending = false;
 let featuredSpotlightEntries = [];
 let featuredSpotlightRequestId = 0;
 let featuredSpotlightRequestKey = "";
-let featuredSpotlightOrderKey = "";
-let featuredSpotlightOrderIds = [];
 let featuredSpotlightActiveIndex = 0;
 let featuredSpotlightRotationTimer = 0;
+let featuredSpotlightWheelLockUntil = 0;
+let latestArenaAnnouncement = null;
+let arenaAnnouncementRequestId = 0;
+let adminBenefitNoticeRequestId = 0;
 let collaborationFitReasonRequestId = 0;
 let collaborationFitReasonRequestKey = "";
 let collaborationFitReasonPending = false;
 let collaborationFitReasonsById = new Map();
+let ecosystemSwitcherCloseTimer = 0;
 let activeArenaPage = "overview";
 let activeArenaNavTarget = "";
 let restoringArenaHistory = false;
+let hubRenderRevision = 0;
+const hubPageRenderRevisions = new Map();
 
 const COMMUNITY_ROLES = new Set(["member", "b2b_partner", "human_validator", "sparklabs", "admin"]);
 const FEATURED_CRITERIA_DEFAULTS = FEATURED_EDITORIAL_CRITERIA;
@@ -144,9 +162,15 @@ const PROGRAM_ACTION_PROGRESS_STEPS = [
   "권한과 입력 조건을 검증하고 있습니다.",
   "최신 상태를 작업 공간에 반영하고 있습니다."
 ];
+const TEAM_CARD_VISIBILITY_PROGRESS_STEPS = [
+  "Clawee가 선택한 공개 범위를 저장 요청으로 정리하고 있습니다.",
+  "저장 요청을 서버에 전달했습니다. 계정 권한 확인을 기다리고 있습니다.",
+  "Program 데이터베이스의 저장 응답을 기다리고 있습니다.",
+  "아직 응답을 기다리고 있습니다. 저장 요청은 계속 처리 중입니다."
+];
 const EVENT_RECOMMENDATION_PROGRESS_STEPS = [
   "현재 파트너 프로필과 우선 과제를 확인하고 있습니다.",
-  "Spark AI가 예정 일정과 검증된 혜택의 활용도를 비교하고 있습니다.",
+  "클로이가 예정 일정과 검증된 혜택의 활용도를 비교하고 있습니다.",
   "지금 실행할 순서와 준비 사항을 정리하고 있습니다."
 ];
 
@@ -156,6 +180,8 @@ const els = {
   loginGate: document.querySelector("#loginGate"),
   loginForm: document.querySelector("#loginForm"),
   loginSubmitButton: document.querySelector('#loginForm button[type="submit"]'),
+  googleAdminLoginGroup: document.querySelector("#googleAdminLoginGroup"),
+  googleAdminLoginButton: document.querySelector("#googleAdminLoginButton"),
   authStatus: document.querySelector("#authStatus"),
   publicBriefGate: document.querySelector("#publicBriefGate"),
   publicBriefPublicMount: document.querySelector("#publicBriefPublicMount"),
@@ -164,8 +190,12 @@ const els = {
   primaryNav: document.querySelector("#primaryNav"),
   staffUtilityNav: document.querySelector("#staffUtilityNav"),
   homeButton: document.querySelector("#homeButton"),
+  ecosystemSwitcher: document.querySelector("#ecosystemSwitcher"),
+  ecosystemSwitcherMenu: document.querySelector("#ecosystemSwitcherMenu"),
+  ecosystemHomeButton: document.querySelector("[data-ecosystem-home]"),
   memberAccessButton: document.querySelector("#memberAccessButton"),
   publicBriefLanguageSwitch: document.querySelector("#publicBriefLanguageSwitch"),
+  publicBriefLanguageSelect: document.querySelector("#publicBriefLanguageSelect"),
   memberAccessClose: document.querySelector("#memberAccessClose"),
   refreshButton: document.querySelector("#refreshButton"),
   accountMenu: document.querySelector("#accountMenu"),
@@ -194,6 +224,10 @@ const els = {
   metricBenefits: document.querySelector("#metricBenefits"),
   metricEvents: document.querySelector("#metricEvents"),
   metricUpcoming: document.querySelector("#metricUpcoming"),
+  adminBenefitRequestNotice: document.querySelector("#adminBenefitRequestNotice"),
+  adminBenefitRequestBadge: document.querySelector("#adminBenefitRequestBadge"),
+  adminBenefitRequestCount: document.querySelector("#adminBenefitRequestCount"),
+  adminBenefitRequestMeta: document.querySelector("#adminBenefitRequestMeta"),
   weeklyNotice: document.querySelector("#weeklyNotice"),
   noticeUpdated: document.querySelector("#noticeUpdated"),
   sectorChart: document.querySelector("#sectorChart"),
@@ -230,9 +264,14 @@ const els = {
   teamResultCount: document.querySelector("#teamResultCount"),
   teamGrid: document.querySelector("#teamGrid"),
   teamEmpty: document.querySelector("#teamEmpty"),
+  calendarPageTitle: document.querySelector("#calendarPageTitle"),
+  calendarPageDescription: document.querySelector("#calendarPageDescription"),
+  calendarEventTitle: document.querySelector("#calendarEventTitle"),
   eventCount: document.querySelector("#eventCount"),
   eventTimeline: document.querySelector("#eventTimeline"),
   mentorList: document.querySelector("#mentorList"),
+  eventPerkTitle: document.querySelector("#eventPerkTitle"),
+  eventPerkLink: document.querySelector("#eventPerkLink"),
   eventPerkPreview: document.querySelector("#eventPerkPreview"),
   eventRecommendationPlanner: document.querySelector("#eventRecommendationPlanner"),
   eventRecommendationTitle: document.querySelector("#eventRecommendationTitle"),
@@ -247,11 +286,6 @@ const els = {
   benefitQualificationFilter: document.querySelector("#benefitQualificationFilter"),
   benefitEligibilitySummary: document.querySelector("#benefitEligibilitySummary"),
   benefitGrid: document.querySelector("#benefitGrid"),
-  benefitOperationsPanel: document.querySelector("#benefitOperationsPanel"),
-  benefitConfigForm: document.querySelector("#benefitConfigForm"),
-  benefitConfigSelect: document.querySelector("#benefitConfigSelect"),
-  benefitConfigStatus: document.querySelector("#benefitConfigStatus"),
-  benefitApplicationQueue: document.querySelector("#benefitApplicationQueue"),
   profileHealth: document.querySelector("#profileHealth"),
   tableCounts: document.querySelector("#tableCounts"),
   operationSearch: document.querySelector("#operationSearch"),
@@ -280,7 +314,9 @@ const els = {
   applicantExportStatus: document.querySelector("#applicantExportStatus"),
   dataTimestamp: document.querySelector("#dataTimestamp"),
   arenaMetricOpen: document.querySelector("#arenaMetricOpen"),
+  arenaPage: document.querySelector("#arenaPage"),
   arenaReleaseBadge: document.querySelector("#arenaReleaseBadge"),
+  bountyPreparingNotice: document.querySelector("#bountyPreparingNotice"),
   arenaMetricSubmissions: document.querySelector("#arenaMetricSubmissions"),
   arenaMetricQueue: document.querySelector("#arenaMetricQueue"),
   arenaMetricPilots: document.querySelector("#arenaMetricPilots"),
@@ -297,8 +333,6 @@ const els = {
   arenaMyStatus: document.querySelector("#arenaMyStatus"),
   arenaOpportunityList: document.querySelector("#arenaOpportunityList"),
   arenaStaffPanel: document.querySelector("#arenaStaffPanel"),
-  arenaCreateBountyForm: document.querySelector("#arenaCreateBountyForm"),
-  arenaStaffFormStatus: document.querySelector("#arenaStaffFormStatus"),
   arenaValidationQueue: document.querySelector("#arenaValidationQueue"),
   arenaOpportunityQueue: document.querySelector("#arenaOpportunityQueue"),
   teamDialog: document.querySelector("#teamDialog"),
@@ -312,10 +346,20 @@ const els = {
   toast: document.querySelector("#toast")
 };
 
+const arenaGuide = initArenaGuide({
+  getAuthHeaders: () => authHeaders(),
+  isAuthenticated: () => Boolean(authSession?.access_token),
+  navigate: (page, navigationOptions = {}) => showPage(page, {
+    skipScroll: Boolean(navigationOptions.skipScroll)
+  })
+});
+
 bindEvents();
 initialize();
 
 function bindEvents() {
+  const renderTeamsAfterInput = debounceMainThreadRender(renderTeams);
+  const renderTeamActivityAfterInput = debounceMainThreadRender(renderTeamActivity);
   if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
   window.addEventListener("popstate", handleArenaPopState);
   window.addEventListener("spark-arena:team-dialog-opened", recordTeamDialogHistory);
@@ -326,28 +370,61 @@ function bindEvents() {
     window.history.back();
   });
   window.addEventListener("spark-arena:open-program-team", handleRecommendedCompanyOpen);
+  window.addEventListener("spark-arena:announcements-updated", (event) => {
+    const announcements = Array.isArray(event.detail?.announcements) ? event.detail.announcements : [];
+    latestArenaAnnouncement = announcements[0] || null;
+    renderWeeklyNotice();
+  });
   els.loginForm.addEventListener("submit", handleLogin);
+  els.googleAdminLoginButton?.addEventListener("click", handleGoogleAdminLogin);
   els.logoutButton.addEventListener("click", handleLogout);
   els.refreshButton.addEventListener("click", handleRefresh);
   els.memberAccessButton?.addEventListener("click", openMemberAccess);
   els.memberAccessClose?.addEventListener("click", closeMemberAccess);
-  document.querySelectorAll("[data-public-brief-language]").forEach((button) => {
-    button.addEventListener("click", () => {
-      setPublicBriefLanguage(button.dataset.publicBriefLanguage, { persist: true, syncUrl: true });
-    });
+  els.publicBriefLanguageSelect?.addEventListener("change", (event) => {
+    setPublicBriefLanguage(event.currentTarget.value, { persist: true, syncUrl: true });
   });
   document.querySelectorAll("[data-close-member-access]").forEach((button) => button.addEventListener("click", closeMemberAccess));
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && els.ecosystemSwitcher?.classList.contains("is-open")) {
+      event.preventDefault();
+      setEcosystemSwitcherOpen(false, { restoreFocus: true });
+      return;
+    }
     if (event.key === "Escape" && !els.loginGate.hidden) closeMemberAccess();
     if (event.key === "Tab" && !els.loginGate.hidden) trapMemberAccessFocus(event);
   });
-  els.homeButton.addEventListener("click", () => {
-    if (isAuthenticatedViewer()) showPage("overview");
-    else {
-      showPublicBriefGate();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+  els.ecosystemSwitcher?.addEventListener("pointerenter", () => {
+    window.clearTimeout(ecosystemSwitcherCloseTimer);
+    if (window.matchMedia("(hover: hover)").matches) setEcosystemSwitcherOpen(true);
   });
+  els.ecosystemSwitcher?.addEventListener("pointerleave", () => {
+    window.clearTimeout(ecosystemSwitcherCloseTimer);
+    ecosystemSwitcherCloseTimer = window.setTimeout(() => {
+      if (!els.ecosystemSwitcher?.matches(":hover") && !els.ecosystemSwitcher?.contains(document.activeElement)) {
+        setEcosystemSwitcherOpen(false);
+      }
+    }, 110);
+  });
+  els.ecosystemSwitcher?.addEventListener("focusin", () => setEcosystemSwitcherOpen(true));
+  els.ecosystemSwitcher?.addEventListener("focusout", () => {
+    window.requestAnimationFrame(() => {
+      if (!els.ecosystemSwitcher?.contains(document.activeElement)) setEcosystemSwitcherOpen(false);
+    });
+  });
+  els.homeButton?.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowDown") return;
+    event.preventDefault();
+    setEcosystemSwitcherOpen(true, { focusFirst: true });
+  });
+  els.ecosystemHomeButton?.addEventListener("click", () => {
+    reloadArenaLandingPage();
+  });
+  els.ecosystemSwitcherMenu?.querySelector(".is-welcome")?.addEventListener("click", () => {
+    setEcosystemSwitcherOpen(false);
+  });
+  els.ecosystemSwitcherMenu?.addEventListener("keydown", handleEcosystemSwitcherKeydown);
+  els.homeButton.addEventListener("click", reloadArenaLandingPage);
   bindPrimaryNavigation();
   document.querySelectorAll("[data-go-page]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -357,6 +434,7 @@ function bindEvents() {
     });
   });
   document.addEventListener("click", (event) => {
+    if (!event.target.closest("#ecosystemSwitcher")) setEcosystemSwitcherOpen(false);
     const accessButton = event.target.closest("[data-open-member-access]");
     if (accessButton) openMemberAccess();
     const scrollButton = event.target.closest("[data-scroll-target]");
@@ -367,7 +445,7 @@ function bindEvents() {
     if (collaborationReviewButton) openCollaborationReviewDialog(collaborationReviewButton.dataset.collaborationReviewTeam);
   });
   [els.teamSearch, els.sectorFilter, els.incorporatedFilter, els.teamSort].forEach((control) => {
-    control.addEventListener(control.tagName === "INPUT" ? "input" : "change", renderTeams);
+    control.addEventListener(control.tagName === "INPUT" ? "input" : "change", control.tagName === "INPUT" ? renderTeamsAfterInput : renderTeams);
   });
   els.resetTeamFilters.addEventListener("click", resetTeamFilters);
   els.teamGrid.addEventListener("click", handleTeamGridClick);
@@ -398,14 +476,15 @@ function bindEvents() {
   els.eventRecommendationButton?.addEventListener("click", () => requestEventRecommendations({ force: true }));
   els.collaborationFitCard?.addEventListener("pointerenter", requestCollaborationFitReasons);
   els.collaborationFitCard?.addEventListener("focusin", requestCollaborationFitReasons);
+  els.collaborationFitCard?.addEventListener("click", handleCollaborationFitDropdownClick);
+  els.collaborationFitCard?.addEventListener("keydown", handleCollaborationFitDropdownKeydown);
+  document.addEventListener("click", closeCollaborationFitDropdownFromOutside);
+  document.addEventListener("keydown", closeCollaborationFitDropdownOnEscape);
   els.publicBriefForm?.addEventListener("submit", handlePublicBriefSubmit);
-  els.benefitConfigSelect?.addEventListener("change", hydrateBenefitConfigForm);
-  els.benefitConfigForm?.addEventListener("submit", handleBenefitConfigSubmit);
-  els.benefitApplicationQueue?.addEventListener("click", handleBenefitQueueAction);
   els.eventRegistrationQueue?.addEventListener("click", handleEventQueueAction);
   els.weeklyReportForm?.addEventListener("submit", handleWeeklyReportSubmit);
   els.weeklyReportQueue?.addEventListener("click", handleWeeklyReportQueueAction);
-  els.operationSearch.addEventListener("input", renderTeamActivity);
+  els.operationSearch.addEventListener("input", renderTeamActivityAfterInput);
   els.databaseLoadButton.addEventListener("click", loadSelectedDatabaseTable);
   document.querySelectorAll("[data-applicant-export-format]").forEach((button) => {
     button.addEventListener("click", handleApplicantExportDownload);
@@ -425,9 +504,60 @@ function bindEvents() {
   els.arenaSubmitContent.addEventListener("click", handleArenaSubmitClick);
   els.arenaLeaderboardContent.addEventListener("click", handleArenaLeaderboardClick);
   els.arenaOpportunityList.addEventListener("submit", handleArenaOpportunitySubmit);
-  els.arenaCreateBountyForm.addEventListener("submit", handleCreateBounty);
   els.arenaValidationQueue.addEventListener("click", handleArenaStaffQueueClick);
   els.arenaOpportunityQueue.addEventListener("click", handleArenaStaffQueueClick);
+}
+
+function debounceMainThreadRender(callback, delay = 120) {
+  let timer = 0;
+  return (...args) => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => callback(...args), delay);
+  };
+}
+
+function reloadArenaLandingPage() {
+  window.clearTimeout(ecosystemSwitcherCloseTimer);
+  setEcosystemSwitcherOpen(false);
+  window.location.assign(new URL("/arena/", window.location.origin).href);
+}
+
+function setEcosystemSwitcherOpen(open, { focusFirst = false, restoreFocus = false } = {}) {
+  const allowed = canUseEcosystemSwitcher();
+  const nextOpen = Boolean(open && allowed);
+  els.ecosystemSwitcher?.classList.toggle("is-open", nextOpen);
+  els.homeButton?.setAttribute("aria-expanded", String(nextOpen));
+  els.homeButton?.setAttribute("aria-label", nextOpen ? "SparkClaw 사이트 전환 메뉴 닫기" : "SparkLabs·SparkClaw AI Arena 홈");
+  if (els.ecosystemSwitcherMenu) els.ecosystemSwitcherMenu.hidden = !nextOpen;
+  if (nextOpen && focusFirst) {
+    window.requestAnimationFrame(() => {
+      els.ecosystemSwitcherMenu?.querySelector('[role="menuitem"]')?.focus();
+    });
+  } else if (!nextOpen && restoreFocus) {
+    els.homeButton?.focus();
+  }
+}
+
+function canUseEcosystemSwitcher() {
+  return Boolean(els.ecosystemSwitcher?.classList.contains("is-enabled"));
+}
+
+function handleEcosystemSwitcherKeydown(event) {
+  const items = [...(els.ecosystemSwitcherMenu?.querySelectorAll('[role="menuitem"]') || [])];
+  if (!items.length) return;
+  const currentIndex = Math.max(0, items.indexOf(document.activeElement));
+  if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+    event.preventDefault();
+    const nextIndex = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? items.length - 1
+        : (currentIndex + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items[nextIndex]?.focus();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    setEcosystemSwitcherOpen(false, { restoreFocus: true });
+  }
 }
 
 async function initialize() {
@@ -439,14 +569,17 @@ async function initialize() {
       authConfigError = error.message || "회원 로그인 설정을 확인할 수 없습니다.";
       authConfig = { authConfigured: false, features: {} };
     }
-    authSession = readStoredSession();
-    if (authSession?.access_token && authConfig?.authConfigured) {
+    const oauthResult = await consumeOAuthSessionFromUrl();
+    if (oauthResult.error) authConfigError = oauthResult.error;
+    const restoredSession = await restoreStoredSession();
+    if (restoredSession && authConfig?.authConfigured) {
       try {
-        await loadProgramHub({ allowRefresh: true, quiet: true });
+        await loadProgramHub({ allowRefresh: true, quiet: true, bootstrap: true });
         return;
       } catch (error) {
-        clearStoredSession();
-        authConfigError = error.message || "회원 세션이 만료되었습니다.";
+        authConfigError = authSession?.access_token
+          ? error.message || "저장된 로그인으로 작업 공간을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+          : "회원 세션이 만료되었습니다. 다시 로그인해 주세요.";
       }
     }
     showPublicBriefGate(authConfigError, authConfigError ? "error" : "", { historyMode: "replace" });
@@ -463,6 +596,103 @@ async function loadAuthConfig() {
   const payload = await safeJson(response);
   if (!response.ok) throw new Error(payload?.error || "로그인 설정을 불러오지 못했습니다.");
   authConfig = payload;
+  if (els.googleAdminLoginGroup) {
+    els.googleAdminLoginGroup.hidden = !payload?.googleAdminLoginEnabled;
+  }
+  if (!publicBriefLanguageWasChosen && payload?.recommendedLanguage) {
+    setPublicBriefLanguage(resolvePublicBriefLanguage({
+      recommended: payload.recommendedLanguage,
+      browserLanguages: navigator.languages || [navigator.language]
+    }));
+  }
+}
+
+function handleGoogleAdminLogin() {
+  const loginCopy = publicBriefCopy(publicBriefLanguage).login;
+  if (!authConfig?.authConfigured || !authConfig?.googleAdminLoginEnabled) {
+    setAuthStatus(loginCopy.googleNotReady || loginCopy.notReady, "error");
+    return;
+  }
+  const redirectUrl = new URL("/arena/", window.location.origin);
+  if (publicBriefLanguage && publicBriefLanguage !== "ko") {
+    redirectUrl.searchParams.set("lang", publicBriefLanguage);
+  }
+  const authorizeUrl = new URL(`${authConfig.supabaseUrl}/auth/v1/authorize`);
+  authorizeUrl.searchParams.set("provider", "google");
+  authorizeUrl.searchParams.set("redirect_to", redirectUrl.toString());
+  authorizeUrl.searchParams.set("scopes", "openid email profile");
+  setAuthStatus(loginCopy.googleStarting || loginCopy.starting);
+  window.location.assign(authorizeUrl.toString());
+}
+
+async function consumeOAuthSessionFromUrl() {
+  const params = new URLSearchParams(String(window.location.hash || "").replace(/^#/, ""));
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token");
+  const oauthError = params.get("error_description") || params.get("error");
+  if (!accessToken && !oauthError) return { handled: false, error: "" };
+
+  clearOAuthCallbackUrl();
+  if (oauthError) return { handled: true, error: koreanAuthError(oauthError) };
+  const expiresIn = Math.max(Number(params.get("expires_in")) || 3600, 60);
+  const session = {
+    access_token: accessToken,
+    refresh_token: refreshToken || "",
+    token_type: params.get("token_type") || "bearer",
+    expires_in: expiresIn,
+    expires_at: Math.floor(Date.now() / 1000) + expiresIn
+  };
+  const validationError = await googleAdminOAuthValidationError(session);
+  if (validationError) {
+    await revokeSupabaseSession(session);
+    clearStoredSession();
+    return { handled: true, error: validationError };
+  }
+  saveStoredSession(session);
+  return { handled: true, error: "" };
+}
+
+async function googleAdminOAuthValidationError(session) {
+  const loginCopy = publicBriefCopy(publicBriefLanguage).login;
+  const domainError = loginCopy.googleDomainRequired || "sparklabs.co.kr 업무용 Google 계정만 사용할 수 있습니다.";
+  if (!session?.access_token || !authConfig?.authConfigured) return domainError;
+  try {
+    const response = await fetch(`${authConfig.supabaseUrl}/auth/v1/user`, {
+      headers: {
+        apikey: authConfig.supabaseAnonKey,
+        Authorization: `Bearer ${session.access_token}`
+      }
+    });
+    const user = await safeJson(response);
+    if (!response.ok) return domainError;
+    const allowedDomains = Array.isArray(authConfig?.adminDomains)
+      ? authConfig.adminDomains.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean)
+      : [];
+    return isAllowedGoogleAdminUser(user, allowedDomains) ? "" : domainError;
+  } catch {
+    return domainError;
+  }
+}
+
+async function revokeSupabaseSession(session) {
+  if (!session?.access_token || !authConfig?.authConfigured) return;
+  try {
+    await fetch(`${authConfig.supabaseUrl}/auth/v1/logout`, {
+      method: "POST",
+      headers: {
+        apikey: authConfig.supabaseAnonKey,
+        Authorization: `Bearer ${session.access_token}`
+      }
+    });
+  } catch {
+    // The local session is still cleared when the remote logout cannot complete.
+  }
+}
+
+function clearOAuthCallbackUrl() {
+  const url = new URL(window.location.href);
+  url.hash = "";
+  window.history.replaceState(window.history.state, "", url);
 }
 
 async function handleLogin(event) {
@@ -499,7 +729,8 @@ async function handleLogin(event) {
     }
     advanceProcessStatus(els.authStatus, progressToken, 1);
     saveStoredSession(session);
-    await loadProgramHub({ allowRefresh: false });
+    arenaGuide.reset();
+    await loadProgramHub({ allowRefresh: false, bootstrap: true });
     els.loginForm.reset();
     finishProcessStatus(els.authStatus, progressToken);
     closeMemberAccess({ restoreFocus: false });
@@ -515,8 +746,9 @@ async function handleLogin(event) {
   }
 }
 
-async function loadProgramHub({ allowRefresh = true, quiet = false } = {}) {
-  const response = await fetch("/api/program-hub", {
+async function loadProgramHub({ allowRefresh = true, quiet = false, bootstrap = false } = {}) {
+  const loadGeneration = ++programHubLoadGeneration;
+  const response = await fetch(bootstrap ? "/api/program-hub?bootstrap=1" : "/api/program-hub", {
     headers: {
       Accept: "application/json",
       ...authHeaders()
@@ -524,7 +756,7 @@ async function loadProgramHub({ allowRefresh = true, quiet = false } = {}) {
   });
 
   if (response.status === 401 && allowRefresh && (await refreshSession())) {
-    return loadProgramHub({ allowRefresh: false, quiet });
+    return loadProgramHub({ allowRefresh: false, quiet, bootstrap });
   }
 
   const payload = await safeJson(response);
@@ -537,8 +769,17 @@ async function loadProgramHub({ allowRefresh = true, quiet = false } = {}) {
 
   resetCollaborationFitReasonState();
   hub = payload;
-  await mergeAuthenticatedSafeSnapshot();
   const programDirectoryViewer = usesProgramDirectoryForViewer();
+  if (bootstrap) {
+    marketData = programDirectoryViewer ? marketDataFromProgramHub(hub) : emptyMarketData(hub.viewer);
+    arenaData = emptyArenaData();
+    databaseSchema = null;
+    renderHub();
+    showApp();
+    loadLatestArenaAnnouncement();
+    void hydrateProgramHubInBackground(loadGeneration);
+    return;
+  }
   if (shouldLoadPrototypeData()) {
     try {
       await loadArenaSnapshot({ allowRefresh: false, publish: false });
@@ -555,7 +796,41 @@ async function loadProgramHub({ allowRefresh = true, quiet = false } = {}) {
   databaseSchema = null;
   renderHub();
   showApp();
+  loadLatestArenaAnnouncement();
   if (!quiet) showToast("프로그램 DB의 최신 내용을 반영했습니다.");
+}
+
+async function hydrateProgramHubInBackground(loadGeneration) {
+  try {
+    const arenaPromise = shouldLoadPrototypeData()
+      ? fetchArenaSnapshotData({ allowRefresh: false }).catch((error) => ({ error }))
+      : Promise.resolve(null);
+    const hubResponsePromise = fetch("/api/program-hub", {
+      headers: { Accept: "application/json", ...authHeaders() }
+    });
+    const [hubResponse, arenaSnapshot] = await Promise.all([hubResponsePromise, arenaPromise]);
+    const fullHub = await safeJson(hubResponse);
+    if (!hubResponse.ok) throw new Error(fullHub?.error || "추가 프로그램 데이터를 불러오지 못했습니다.");
+    if (loadGeneration !== programHubLoadGeneration || !authSession?.access_token) return;
+
+    resetCollaborationFitReasonState();
+    hub = fullHub;
+    const programDirectoryViewer = usesProgramDirectoryForViewer();
+    if (arenaSnapshot && !arenaSnapshot.error) {
+      marketData = arenaSnapshot.market;
+      arenaData = arenaSnapshot.competition;
+      if (programDirectoryViewer) marketData = marketDataFromProgramHub(hub, marketData);
+    } else {
+      marketData = programDirectoryViewer ? marketDataFromProgramHub(hub) : emptyMarketData(hub.viewer);
+      arenaData = emptyArenaData();
+    }
+    databaseSchema = null;
+    renderHub();
+    loadLatestArenaAnnouncement();
+  } catch {
+    // Keep the fast authenticated bootstrap usable if secondary data is slow
+    // or temporarily unavailable.
+  }
 }
 
 async function mergeAuthenticatedSafeSnapshot() {
@@ -583,7 +858,12 @@ async function mergeAuthenticatedSafeSnapshot() {
 
 function normalizePublicHub(payload = {}) {
   const teams = (payload.teams || []).filter((team) => team?.publicProfile !== false).map(normalizePublicTeam).filter((team) => team.id && team.name);
-  const events = (payload.events || []).filter((event) => event?.isPublic !== false && event?.visibility !== "private");
+  const events = (payload.events || []).filter(
+    (event) =>
+      event?.isPublic !== false &&
+      event?.visibility !== "private" &&
+      isCommunityEventFromOrientation(event)
+  );
   const benefits = (payload.benefits || []).filter(
     (benefit) =>
       benefit?.isActive !== false &&
@@ -651,6 +931,7 @@ function normalizePublicTeam(team = {}) {
     evidence: Array.isArray(profile.evidence || team.evidence) ? [...(profile.evidence || team.evidence)].slice(0, 6) : [],
     evidenceLevel: profile.evidenceLevel || team.evidenceLevel || "needs_verification",
     missingInfo: Array.isArray(profile.missingInfo || team.missingInfo) ? [...(profile.missingInfo || team.missingInfo)].slice(0, 4) : [],
+    investorProfile: normalizeInvestorProfile(profile.investorProfile || team.investorProfile),
     updatedAt: profile.updatedAt || team.updatedAt || null,
     tags: Array.isArray(profile.tags || team.tags) ? [...(profile.tags || team.tags)].slice(0, 8) : [],
     publicProfile: true,
@@ -668,7 +949,46 @@ function summarizePublicSectors(teams = []) {
   return [...counts.entries()].map(([name, count]) => ({ name, count })).sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, "ko"));
 }
 
+function normalizeInvestorProfile(value = {}) {
+  if (!value || typeof value !== "object") return null;
+  return {
+    teamSummary: String(value.teamSummary || "").slice(0, 1400),
+    partneringSummary: String(value.partneringSummary || "").slice(0, 700),
+    tractionSummary: String(value.tractionSummary || "").slice(0, 900),
+    programProof: String(value.programProof || "").slice(0, 500),
+    metrics: Array.isArray(value.metrics) ? value.metrics.filter(Boolean).map((item) => String(item).slice(0, 180)).slice(0, 3) : [],
+    specialtyTasks: Array.isArray(value.specialtyTasks)
+      ? value.specialtyTasks.filter((item) => item?.label && item?.description).map((item) => ({
+          label: String(item.label).slice(0, 180),
+          description: String(item.description).slice(0, 500),
+          evidence: String(item.evidence || "").slice(0, 220),
+          rank: Number(item.rank) || 0,
+          tier: String(item.tier || ""),
+          basis: Array.isArray(item.basis) ? item.basis.map((entry) => String(entry).slice(0, 80)).slice(0, 5) : []
+        }))
+      : [],
+    proofPoints: Array.isArray(value.proofPoints)
+      ? value.proofPoints.filter((item) => item?.label && item?.value).map((item) => ({
+          label: String(item.label).slice(0, 80),
+          value: String(item.value).slice(0, 900)
+        })).slice(0, 4)
+      : [],
+    strengthTags: Array.isArray(value.strengthTags) ? value.strengthTags.filter(Boolean).map((item) => String(item).slice(0, 50)).slice(0, 6) : [],
+    sourceLabel: String(value.sourceLabel || "").slice(0, 200),
+    profileUpdatedAt: value.profileUpdatedAt || null,
+    requiresVerification: value.requiresVerification !== false
+  };
+}
+
 async function loadArenaSnapshot({ allowRefresh = true, publish = true } = {}) {
+  const snapshot = await fetchArenaSnapshotData({ allowRefresh });
+  marketData = snapshot.market;
+  arenaData = snapshot.competition;
+  if (publish) publishMarketContext();
+  return arenaData;
+}
+
+async function fetchArenaSnapshotData({ allowRefresh = true } = {}) {
   const response = await fetch("/api/arena", {
     headers: {
       Accept: "application/json",
@@ -676,16 +996,15 @@ async function loadArenaSnapshot({ allowRefresh = true, publish = true } = {}) {
     }
   });
   if (response.status === 401 && allowRefresh && (await refreshSession())) {
-    return loadArenaSnapshot({ allowRefresh: false, publish });
+    return fetchArenaSnapshotData({ allowRefresh: false });
   }
   const payload = await safeJson(response);
-  if (response.ok) marketData = payload;
-  const competition = response.ok ? payload.competition : null;
-  arenaData = hasCompetitionChallenges(competition)
+  if (!response.ok) throw new Error(payload?.error || "Arena 데이터를 불러오지 못했습니다.");
+  const competition = payload.competition;
+  const resolvedCompetition = hasCompetitionChallenges(competition)
     ? competition
     : await loadCompetitionSnapshot({ allowRefresh });
-  if (publish) publishMarketContext();
-  return arenaData;
+  return { market: payload, competition: resolvedCompetition };
 }
 
 async function loadCompetitionSnapshot({ allowRefresh = true } = {}) {
@@ -771,19 +1090,34 @@ function usesProgramDirectoryForViewer() {
 }
 
 function renderHub() {
+  hubRenderRevision += 1;
+  hubPageRenderRevisions.clear();
   renderAccount();
   renderOverview();
-  populateTeamFilters();
-  renderTeams();
-  renderCalendar();
-  populateBenefitFilters();
-  renderBenefits();
-  renderOperations();
-  renderWeeklyReporting();
-  renderArena();
+  hubPageRenderRevisions.set("overview", hubRenderRevision);
   configurePermissions();
+  renderHubPage(activeArenaPage);
   els.dataTimestamp.textContent = `최근 동기화 ${formatDateTime(hub.project?.generatedAt)}`;
   publishMarketContext();
+}
+
+function renderHubPage(pageName) {
+  if (!hub || hubPageRenderRevisions.get(pageName) === hubRenderRevision) return;
+  if (pageName === "teams") {
+    populateTeamFilters();
+    renderTeams();
+  } else if (pageName === "calendar") {
+    renderCalendar();
+  } else if (pageName === "benefits") {
+    populateBenefitFilters();
+    renderBenefits();
+  } else if (pageName === "operations") {
+    renderOperations();
+    renderWeeklyReporting();
+  } else if (pageName === "arena") {
+    renderArena();
+  }
+  hubPageRenderRevisions.set(pageName, hubRenderRevision);
 }
 
 function publishMarketContext() {
@@ -802,22 +1136,49 @@ function configurePermissions() {
   const canReadRaw = Boolean(hub.permissions?.canViewRawDatabase);
   const role = hub.viewer?.role || "public";
   const clawMemberViewer = role === "member";
+  const externalPartnerViewer = role === "b2b_partner";
+  const adminViewer = Boolean(hub.viewer?.canScore) || ["sparklabs", "admin"].includes(String(role).toLowerCase());
+  const canSwitchSparkClawSites = clawMemberViewer || adminViewer;
   const publicViewer = isPublicViewer();
   const communityMember = COMMUNITY_ROLES.has(role);
   document.body.classList.toggle("is-public-viewer", publicViewer);
   document.body.classList.toggle("is-claw-member", clawMemberViewer);
+  document.body.classList.toggle("is-admin-viewer", adminViewer);
+  els.ecosystemSwitcher?.classList.toggle("is-enabled", canSwitchSparkClawSites);
+  els.homeButton?.setAttribute("aria-haspopup", canSwitchSparkClawSites ? "menu" : "false");
+  if (!canSwitchSparkClawSites) setEcosystemSwitcherOpen(false);
+  document.querySelectorAll("[data-hide-from-admin]").forEach((element) => {
+    element.hidden = adminViewer;
+  });
+  document.querySelectorAll("[data-hide-from-admin-or-partner]").forEach((element) => {
+    element.hidden = element.hasAttribute("data-arena-updates-hidden") || adminViewer || externalPartnerViewer;
+  });
+  document.querySelectorAll("[data-hide-from-admin-or-claw-member]").forEach((element) => {
+    element.hidden = adminViewer || clawMemberViewer;
+  });
   document.querySelectorAll("[data-hide-from-claw-member]").forEach((element) => {
-    element.hidden = clawMemberViewer;
+    element.hidden = clawMemberViewer || (element.hasAttribute("data-hide-from-admin") && adminViewer);
   });
   document.querySelectorAll("[data-show-for-claw-member]").forEach((element) => {
     element.hidden = !clawMemberViewer;
   });
+  document.querySelectorAll("[data-show-for-admin]").forEach((element) => {
+    element.hidden = !adminViewer;
+  });
+  const roleAwareCommunityPanels = document.querySelector("#roleAwareCommunityPanels");
+  if (roleAwareCommunityPanels) {
+    const visiblePanels = [...roleAwareCommunityPanels.children].filter((element) => !element.hidden);
+    roleAwareCommunityPanels.hidden = visiblePanels.length === 0;
+    roleAwareCommunityPanels.classList.toggle("has-one-visible-panel", visiblePanels.length === 1);
+  }
   document.querySelectorAll("[data-nav-roles]").forEach((button) => {
     const roles = String(button.dataset.navRoles || "").split(",").map((item) => item.trim()).filter(Boolean);
     const roleAllowed = roles.includes(role);
     const feature = button.dataset.feature;
     const featureAllowed = !feature || Boolean(authConfig?.features?.[feature]) || Boolean(hub.viewer?.canScore);
-    button.hidden = !(roleAllowed && featureAllowed);
+    const hiddenForAdmin = button.hasAttribute("data-hide-from-admin") && adminViewer;
+    const hiddenForClawMember = button.hasAttribute("data-hide-from-claw-member") && clawMemberViewer;
+    button.hidden = !(roleAllowed && featureAllowed) || hiddenForAdmin || hiddenForClawMember;
   });
   document.querySelectorAll("[data-member-only]").forEach((button) => {
     button.classList.toggle("is-locked", publicViewer);
@@ -861,7 +1222,10 @@ function configurePermissions() {
   if (!canReadRaw && document.querySelector('[data-page-panel="database"]').classList.contains("is-active")) {
     showPage("overview", { historyMode: "replace" });
   }
-  if (clawMemberViewer && document.querySelector('[data-page-panel="calendar"].is-active, [data-page-panel="benefits"].is-active, [data-page-panel="partnerships"].is-active')) {
+  if ((clawMemberViewer || adminViewer) && document.querySelector('[data-page-panel="calendar"].is-active, [data-page-panel="benefits"].is-active')) {
+    showPage("overview", { historyMode: "replace" });
+  }
+  if (clawMemberViewer && document.querySelector('[data-page-panel="partnerships"].is-active')) {
     showPage("overview", { historyMode: "replace" });
   }
 }
@@ -872,6 +1236,8 @@ function renderAccount() {
   const partnerProfile = partnerProfileForViewer();
   const organizationName = partnerOrganizationName(partnerProfile);
   els.accountName.textContent = organizationName || email;
+  els.accountName.title = organizationName ? `${organizationName} · ${email}` : email;
+  els.accountMenu.setAttribute("aria-label", `로그인 계정 ${email}`);
   els.accountRole.textContent = partnerProfile?.profileLabel || koreanRole(viewer.role);
   const logoUrl = String(partnerProfile?.logoUrl || "").trim();
   els.accountInitial.classList.toggle("has-logo", Boolean(logoUrl));
@@ -939,7 +1305,7 @@ function renderOverview() {
     ? `<button class="primary-button compact" data-overview-scroll="agenticDiscoverySection" type="button">맞춤 파트너 찾기</button><button class="secondary-button compact" data-overview-page="teams" type="button">전체 참가기업 보기</button><button class="secondary-button compact" data-overview-page="calendar" type="button">일정·혜택 보기</button>`
     : publicViewer
       ? `<button class="primary-button compact" data-overview-page="teams" type="button">공개 기업 탐색</button><button class="secondary-button compact" data-overview-scroll="publicBriefSection" type="button">기업 Brief 제출</button><button class="secondary-button compact" data-overview-access type="button">Member access</button>`
-      : clawMemberViewer
+      : clawMemberViewer || operatorViewer
         ? `<button class="primary-button compact" data-overview-page="community" type="button">도움 요청하기</button><button class="secondary-button compact" data-overview-page="teams" type="button">기업 둘러보기</button>`
         : `<button class="primary-button compact" data-overview-page="community" type="button">도움 요청하기</button><button class="secondary-button compact" data-overview-page="teams" type="button">기업 둘러보기</button><button class="secondary-button compact" data-overview-page="benefits" type="button">혜택 확인</button>`;
   els.heroActions.querySelectorAll("[data-overview-page]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.overviewPage)));
@@ -975,15 +1341,22 @@ function renderOverview() {
       ? [
           ["제조 비전", "제조 현장의 비전 검사 문제를 해결할 AI 회사를 찾아줘"],
           ["문서 자동화", "한국어 문서 업무를 자동화할 B2B SaaS 파트너를 찾아줘"],
-          ["개발자 도구", "개발자 도구와 AI 인프라 분야의 초기 회사를 찾아줘"]
+          ["개발자 도구", "개발자 도구와 AI 인프라 분야의 초기 회사를 찾아줘"],
+          ["기술 검토", "엔터프라이즈 보안과 데이터 인프라를 함께 검토할 기술 경험이 있는 팀을 찾아줘"],
+          ["공동 사업", "고객 제안과 공동 PoC를 함께 추진할 수 있는 AI 팀을 찾아줘"],
+          ["운영 경험", "AI 제품을 실제 고객사에 도입하고 운영해 본 팀을 찾아줘"]
         ]
       : [
           ["고객 연결", "제조 대기업 PoC 경험이 있는 동료 창업자와 연결해줘"],
           ["평가 도움", "LLM 에이전트 평가를 제품에 적용한 팀을 찾아줘"],
-          ["API 파트너", "우리 제품과 함께 판매할 수 있는 API 파트너를 찾아줘"]
+          ["API 파트너", "우리 제품과 함께 판매할 수 있는 API 파트너를 찾아줘"],
+          ["기술 검토", "보안·데이터 인프라 아키텍처를 함께 검토할 기술 경험이 있는 팀을 찾아줘"],
+          ["공동 사업", "고객 제안과 공동 PoC를 함께 추진할 수 있는 동료 팀을 찾아줘"],
+          ["운영 경험", "AI 제품을 실제 고객사에 도입하고 운영해 본 팀의 경험을 듣고 싶어"]
         ];
   document.querySelectorAll("[data-agent-prompt]").forEach((button, index) => {
     const preset = promptPresets[index];
+    button.hidden = !preset;
     if (!preset) return;
     button.textContent = preset[0];
     button.dataset.agentPrompt = preset[1];
@@ -1028,15 +1401,48 @@ function renderOverview() {
   renderCollaborationFitTooltip(metrics);
   els.metricBenefits.textContent = formatNumber(activeBenefitCount);
   els.metricEvents.textContent = formatNumber(metrics.events);
-  els.metricUpcoming.textContent = metrics.upcomingEvents
-    ? `예정된 일정 ${formatNumber(metrics.upcomingEvents)}건`
-    : "현재 등록된 일정 기준";
+  els.metricUpcoming.textContent = "8월 13일 BootCamp Orientation 포함 · 이후 일정";
   renderPartnerProfile();
   renderWeeklyNotice();
   renderSectorChart();
   renderOverviewEvents();
   renderOverviewBenefits();
   renderFeaturedCriteria();
+  loadAdminBenefitRequestNotice();
+}
+
+async function loadAdminBenefitRequestNotice() {
+  if (!els.adminBenefitRequestNotice || !isAdminViewer()) return;
+  const requestId = ++adminBenefitNoticeRequestId;
+  els.adminBenefitRequestBadge.textContent = "확인 중";
+  els.adminBenefitRequestBadge.classList.remove("is-alert");
+  els.adminBenefitRequestCount.textContent = "—";
+  els.adminBenefitRequestMeta.textContent = "신규 요청 여부를 확인하고 있습니다.";
+  try {
+    const response = await fetch("/api/benefit-needs-survey", {
+      headers: { ...authHeaders(), Accept: "application/json" },
+      cache: "no-store"
+    });
+    const payload = await safeJson(response);
+    if (requestId !== adminBenefitNoticeRequestId) return;
+    if (!response.ok || payload?.available === false || !payload?.staffSummary) {
+      throw new Error(payload?.error || "혜택 요청 현황을 불러오지 못했습니다.");
+    }
+    const count = Math.max(0, Number(payload.staffSummary.newRequestCount) || 0);
+    const latestAt = String(payload.staffSummary.latestSubmittedAt || "").trim();
+    els.adminBenefitRequestBadge.textContent = count ? "신규 요청 있음" : "새 요청 없음";
+    els.adminBenefitRequestBadge.classList.toggle("is-alert", count > 0);
+    els.adminBenefitRequestCount.textContent = `${formatNumber(count)}건`;
+    els.adminBenefitRequestMeta.textContent = count
+      ? `확인 대기 중인 신규 요청${latestAt ? ` · 최근 접수 ${formatDateTime(latestAt)}` : ""}`
+      : "현재 확인 대기 중인 Claw Member 혜택 요청이 없습니다.";
+  } catch (error) {
+    if (requestId !== adminBenefitNoticeRequestId) return;
+    els.adminBenefitRequestBadge.textContent = "확인 필요";
+    els.adminBenefitRequestBadge.classList.remove("is-alert");
+    els.adminBenefitRequestCount.textContent = "—";
+    els.adminBenefitRequestMeta.textContent = error.message || "혜택 요청 현황을 불러오지 못했습니다.";
+  }
 }
 
 function readStoredPublicBriefLanguage() {
@@ -1097,6 +1503,8 @@ function applyPublicBriefLoginCopy(copy) {
   const password = els.loginForm?.elements?.password;
   if (password) password.placeholder = login.passwordPlaceholder;
   setText(els.loginGate?.querySelector("[data-public-brief-login-submit]"), login.submit);
+  setText(els.loginGate?.querySelector("[data-public-brief-google-admin-login]"), login.googleAdmin || "SparkLabs Google login");
+  setText(els.loginGate?.querySelector("[data-public-brief-google-admin-note]"), login.googleAdminNote || "Only approved SparkLabs work accounts receive staff access.");
   const trust = els.loginGate?.querySelector(".login-card-trust");
   trust?.setAttribute("aria-label", login.trustLabel);
   [...(trust?.querySelectorAll("span") || [])].forEach((element, index) => setText(element, login.trust[index] || ""));
@@ -1107,14 +1515,12 @@ function applyPublicBriefLanguage() {
   LOGIN_PROGRESS_STEPS.splice(0, LOGIN_PROGRESS_STEPS.length, ...copy.login.progress);
   PUBLIC_BRIEF_PROGRESS_STEPS.splice(0, PUBLIC_BRIEF_PROGRESS_STEPS.length, ...copy.progress);
   document.documentElement.lang = copy.htmlLang;
+  document.documentElement.dir = copy.direction || (publicBriefLanguage === "ar" ? "rtl" : "ltr");
   els.homeButton?.setAttribute("aria-label", copy.homeLabel);
   els.publicBriefGate?.setAttribute("aria-label", copy.gateLabel);
   els.publicBriefLanguageSwitch?.setAttribute("aria-label", copy.languageLabel);
-  document.querySelectorAll("[data-public-brief-language]").forEach((button) => {
-    const active = button.dataset.publicBriefLanguage === publicBriefLanguage;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
+  els.publicBriefLanguageSelect?.setAttribute("aria-label", copy.languageLabel);
+  if (els.publicBriefLanguageSelect) els.publicBriefLanguageSelect.value = publicBriefLanguage;
   setText(els.memberAccessButton, copy.memberLogin);
   if (!els.publicBriefForm || els.publicBriefForm.dataset.mode !== "discovery-brief") {
     applyPublicBriefLoginCopy(copy);
@@ -1167,7 +1573,10 @@ function applyPublicBriefLanguage() {
 
 function setPublicBriefLanguage(language, { persist = false, syncUrl = false } = {}) {
   publicBriefLanguage = normalizePublicBriefLanguage(language);
-  if (persist) persistPublicBriefLanguage(publicBriefLanguage);
+  if (persist) {
+    publicBriefLanguageWasChosen = true;
+    persistPublicBriefLanguage(publicBriefLanguage);
+  }
   if (syncUrl) {
     const nextUrl = publicBriefUrl(window.location.href, publicBriefLanguage);
     window.history.replaceState(window.history.state, "", nextUrl);
@@ -1444,7 +1853,7 @@ function renderFeaturedCriteria() {
 }
 
 function setMetricCardCopy(items) {
-  document.querySelectorAll(".metric-card").forEach((card, index) => {
+  document.querySelectorAll(".metric-card:not(.admin-benefit-request-notice)").forEach((card, index) => {
     const copy = items[index];
     if (!copy) return;
     const label = card.querySelector(":scope > span");
@@ -1479,7 +1888,7 @@ function renderCollaborationFitTooltip(metrics = {}) {
     return;
   }
   const companySummary = companies
-    .map((company) => `${company.name} ${Math.round(Number(company.score))}점 · ${collaborationFitReason(company)}`)
+    .map((company, index) => `추천 ${index + 1}위 ${company.name} · ${collaborationFitReason(company)}`)
     .join(", ");
   els.metricProfilesTooltip.innerHTML = `
     <strong>협업 적합 기업 ${formatNumber(count)}개</strong>
@@ -1496,16 +1905,47 @@ function renderCollaborationFitTooltip(metrics = {}) {
             <strong>${escapeHtml(company.name)}</strong>
             <small>${escapeHtml(collaborationFitReason(company))}</small>
             <span id="${reasonId}" class="fit-company-selection-reason${pending ? " is-loading" : ""}">
-              <span class="fit-company-selection-label"><i aria-hidden="true"></i>${pending ? "SPARK AI 협업 제안 정리 중" : "SPARK AI 협업 활용 제안"}</span>
+              <span class="fit-company-selection-label"><i aria-hidden="true"></i>${pending ? "클로이 협업 제안 정리 중" : "클로이 협업 활용 제안"}</span>
               <span class="fit-company-selection-copy">${escapeHtml(hoverReason)}</span>
             </span>
           </span>
-          <b class="fit-company-score">${formatNumber(Math.round(Number(company.score)))}점</b>
+          <b class="fit-company-rank">추천 ${index + 1}위</b>
         </li>`;
       }).join("")}
     </ol>
   `;
   els.collaborationFitCard.setAttribute("aria-label", `협업 적합 기업 ${formatNumber(count)}개. ${companySummary}`.slice(0, 1800));
+}
+
+function setCollaborationFitDropdownOpen(open) {
+  if (!els.collaborationFitCard) return;
+  const nextOpen = Boolean(open);
+  els.collaborationFitCard.classList.toggle("is-open", nextOpen);
+  els.collaborationFitCard.setAttribute("aria-expanded", String(nextOpen));
+}
+
+function handleCollaborationFitDropdownClick(event) {
+  if (!els.collaborationFitCard || event.target.closest(".fit-company-item")) return;
+  setCollaborationFitDropdownOpen(!els.collaborationFitCard.classList.contains("is-open"));
+  if (els.collaborationFitCard.classList.contains("is-open")) requestCollaborationFitReasons();
+}
+
+function handleCollaborationFitDropdownKeydown(event) {
+  if (event.target !== els.collaborationFitCard || !["Enter", " "].includes(event.key)) return;
+  event.preventDefault();
+  handleCollaborationFitDropdownClick(event);
+}
+
+function closeCollaborationFitDropdownFromOutside(event) {
+  if (!els.collaborationFitCard?.classList.contains("is-open")) return;
+  if (els.collaborationFitCard.contains(event.target)) return;
+  setCollaborationFitDropdownOpen(false);
+}
+
+function closeCollaborationFitDropdownOnEscape(event) {
+  if (event.key !== "Escape" || !els.collaborationFitCard?.classList.contains("is-open")) return;
+  setCollaborationFitDropdownOpen(false);
+  els.collaborationFitCard.focus({ preventScroll: true });
 }
 
 function collaborationFitHoverReason(company = {}) {
@@ -1595,49 +2035,80 @@ function collaborationFitReason(company = {}) {
 }
 
 function renderWeeklyNotice() {
-  const notice = hub.weeklyNotice;
+  if (!els.weeklyNotice || !els.noticeUpdated) return;
+  const notice = latestArenaAnnouncement;
   if (!notice) {
-    if (isPublicViewer()) {
-      els.weeklyNotice.innerHTML = `<h3>문제에서 연결까지, SparkLabs가 함께 검토합니다.</h3><p>공개 프로필을 먼저 탐색하거나 기업 Brief를 남겨주세요. 요청을 받은 대상 스타트업이 My Log에서 승인한 뒤에만 SparkLabs가 소개를 진행합니다.</p><button class="text-link" data-go-page="teams" type="button">공개 기업 둘러보기 →</button>`;
-      els.noticeUpdated.textContent = "PUBLIC GUIDE";
-      els.weeklyNotice.querySelector("[data-go-page]")?.addEventListener("click", (event) => showPage(event.currentTarget.dataset.goPage));
-    } else {
-      els.weeklyNotice.innerHTML = `<p class="empty-copy">등록된 주간 안내가 없습니다.</p>`;
-      els.noticeUpdated.textContent = "안내 없음";
-    }
+    els.weeklyNotice.innerHTML = `<div><h3>SparkLabs의 최신 AI Arena 공지를 기다리고 있습니다.</h3><p>새 공지가 등록되면 Community와 이 영역에 동시에 표시됩니다.</p></div><button class="text-link" data-go-page="community" type="button">Community 보기 →</button>`;
+    els.noticeUpdated.textContent = "COMMUNITY NOTICE";
+    els.weeklyNotice.querySelector("[data-go-page]")?.addEventListener("click", () => showPage("community"));
     return;
   }
   els.weeklyNotice.innerHTML = `
-    <h3>${escapeHtml(notice.title || "주간 프로그램 안내")}</h3>
-    <p>${escapeHtml(notice.body || "안내 내용이 아직 입력되지 않았습니다.")}</p>
-    ${notice.surveyIntro ? `<p class="notice-intro">${escapeHtml(notice.surveyIntro)}</p>` : ""}
-    ${hub.viewerTeam?.activity ? `<div class="weekly-report-state"><strong>내 팀 리포트 ${formatNumber(hub.viewerTeam.activity.reportsSubmitted)}회 제출</strong><span>리마인드 ${formatNumber(hub.viewerTeam.activity.reportReminders)}건</span></div>` : ""}
-    ${notice.buttonLabel ? `<button class="text-link" data-go-page="workspace" type="button">${escapeHtml(notice.buttonLabel)} · 현황 보기 →</button>` : ""}
+    <div class="overview-notice-copy">
+      <span>SPARKLABS OFFICIAL</span>
+      <h3>${escapeHtml(notice.title || "AI Arena 공지")}</h3>
+      <p>${escapeHtml(announcementExcerpt(notice.bodyMarkdown))}</p>
+    </div>
+    <button class="text-link" data-announcement-id="${escapeHtml(notice.id)}" type="button">Community에서 공지 보기 →</button>
   `;
-  els.weeklyNotice.querySelector("[data-go-page]")?.addEventListener("click", (event) => showPage(event.currentTarget.dataset.goPage));
-  els.noticeUpdated.textContent = notice.updatedAt ? formatDate(notice.updatedAt) : "업데이트됨";
+  els.weeklyNotice.querySelector("[data-announcement-id]")?.addEventListener("click", openLatestArenaAnnouncement);
+  els.noticeUpdated.textContent = notice.updatedAt || notice.createdAt ? formatDate(notice.updatedAt || notice.createdAt) : "LATEST";
+}
+
+async function loadLatestArenaAnnouncement() {
+  if (!authSession?.access_token) return;
+  const requestId = ++arenaAnnouncementRequestId;
+  try {
+    const response = await fetch("/api/arena-announcements", {
+      cache: "no-store",
+      headers: { Accept: "application/json", ...authHeaders() }
+    });
+    const payload = await safeJson(response);
+    if (!response.ok || requestId !== arenaAnnouncementRequestId) return;
+    latestArenaAnnouncement = Array.isArray(payload?.announcements) ? payload.announcements[0] || null : null;
+    renderWeeklyNotice();
+  } catch {
+    // The top notice keeps its calm fallback when Community is temporarily unavailable.
+  }
+}
+
+function announcementExcerpt(value) {
+  const text = String(value || "")
+    .replace(/\[([^\]]+)\]\([^\)]+\)/gu, "$1")
+    .replace(/[`*_>#~-]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  return text.length > 210 ? `${text.slice(0, 209).trimEnd()}…` : text || "공지 내용을 Community에서 확인해 주세요.";
+}
+
+function openLatestArenaAnnouncement(event) {
+  const id = event.currentTarget.dataset.announcementId || "";
+  showPage("community");
+  window.requestAnimationFrame(() => {
+    window.dispatchEvent(new CustomEvent("spark-arena:restore-history-overlay", { detail: { type: "community-thread", id } }));
+  });
 }
 
 function renderSectorChart() {
-  const sectors = (hub.sectors || []).slice(0, 8);
-  const max = Math.max(1, ...sectors.map((sector) => Number(sector.count || 0)));
-  els.sectorChart.innerHTML = sectors.length
-    ? sectors
+  const tasks = taskMapEntries(hub.teams || [], 12);
+  const max = Math.max(1, ...tasks.map((task) => Number(task.count || 0)));
+  els.sectorChart.innerHTML = tasks.length
+    ? tasks
         .map(
-          (sector, index) => {
-            const companies = sectorCompanyNames(hub.teams || [], sector.name);
-            const nameId = `sector-name-${index}`;
-            const countId = `sector-count-${index}`;
+          (task, index) => {
+            const companies = task.companies || [];
+            const nameId = `task-name-${index}`;
+            const countId = `task-count-${index}`;
             const companyChips = companies.map((name) => `<span class="sector-company-chip" role="listitem">${escapeHtml(name)}</span>`).join("");
             const duration = Math.min(34, Math.max(14, companies.length * 1.35));
             return `
             <div class="sector-row" tabindex="0" role="group" aria-labelledby="${nameId}" aria-describedby="${countId}">
               <div class="sector-row-summary">
-                <span id="${nameId}" title="${escapeHtml(sector.name)}">${escapeHtml(sector.name)}</span>
-                <div class="sector-track"><i style="width:${Math.max(4, (sector.count / max) * 100)}%"></i></div>
-                <strong id="${countId}">${formatNumber(sector.count)}</strong>
+                <span id="${nameId}" title="${escapeHtml(task.name)}">${escapeHtml(task.name)}</span>
+                <div class="sector-track"><i style="width:${Math.max(4, (task.count / max) * 100)}%"></i></div>
+                <strong id="${countId}">${formatNumber(task.count)}</strong>
               </div>
-              <div class="sector-flywheel" aria-label="${escapeHtml(sector.name)} 분야 기업 목록">
+              <div class="sector-flywheel" aria-label="${escapeHtml(task.name)} Task를 해결하는 기업 목록">
                 <div class="sector-flywheel-track" style="--sector-flywheel-duration:${duration}s">
                   <div class="sector-flywheel-set" role="list">${companyChips || `<span class="sector-company-chip is-empty" role="listitem">기업 프로필 준비 중</span>`}</div>
                   <div class="sector-flywheel-set" aria-hidden="true">${companyChips || `<span class="sector-company-chip is-empty">기업 프로필 준비 중</span>`}</div>
@@ -1648,7 +2119,7 @@ function renderSectorChart() {
           }
         )
         .join("")
-    : `<p class="empty-copy">산업 데이터가 없습니다.</p>`;
+    : `<p class="empty-copy">공개 프로필에서 확인된 해결 Task가 없습니다.</p>`;
 }
 
 function renderOverviewEvents() {
@@ -1656,7 +2127,7 @@ function renderOverviewEvents() {
   const weeklyTeamIds = new Set(weeklyEntries.map(({ team }) => String(team.id || "")));
   const fallbackEntries = curatedFeaturedTeams(hub.teams || [], 4)
     .filter(({ team }) => !weeklyTeamIds.has(String(team.id || "")));
-  const featuredEntries = randomizedFeaturedSpotlightEntries([...weeklyEntries, ...fallbackEntries].slice(0, 4));
+  const featuredEntries = prioritizeFeaturedSpotlightEntries([...weeklyEntries, ...fallbackEntries]).slice(0, 4);
   featuredSpotlightEntries = featuredEntries.map(({ team, curation }) => ({
     team,
     curation,
@@ -1668,43 +2139,16 @@ function renderOverviewEvents() {
   refineFeaturedSpotlight(featuredEntries.filter(({ curation }) => curation.sourceType !== "weekly_program_update"));
 }
 
-function randomizedFeaturedSpotlightEntries(entries) {
-  const safeEntries = Array.isArray(entries) ? entries.filter(({ team }) => team?.id) : [];
-  const orderKey = safeEntries.map(({ team }) => String(team.id)).sort().join("|");
-  if (orderKey !== featuredSpotlightOrderKey) {
-    const shuffledIds = safeEntries.map(({ team }) => String(team.id));
-    for (let index = shuffledIds.length - 1; index > 0; index -= 1) {
-      const swapIndex = Math.floor(Math.random() * (index + 1));
-      [shuffledIds[index], shuffledIds[swapIndex]] = [shuffledIds[swapIndex], shuffledIds[index]];
-    }
-    const previousOrder = readPreviousFeaturedSpotlightOrder();
-    if (shuffledIds.length > 1 && shuffledIds.join("|") === previousOrder.join("|")) {
-      shuffledIds.push(shuffledIds.shift());
-    }
-    writePreviousFeaturedSpotlightOrder(shuffledIds);
-    featuredSpotlightOrderKey = orderKey;
-    featuredSpotlightOrderIds = shuffledIds;
-    featuredSpotlightActiveIndex = 0;
-  }
-  const entriesById = new Map(safeEntries.map((entry) => [String(entry.team.id), entry]));
-  return featuredSpotlightOrderIds.map((id) => entriesById.get(id)).filter(Boolean);
-}
-
-function readPreviousFeaturedSpotlightOrder() {
-  try {
-    const value = JSON.parse(window.localStorage.getItem(FEATURED_SPOTLIGHT_ORDER_KEY) || "[]");
-    return Array.isArray(value) ? value.map(String) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writePreviousFeaturedSpotlightOrder(ids) {
-  try {
-    window.localStorage.setItem(FEATURED_SPOTLIGHT_ORDER_KEY, JSON.stringify(ids));
-  } catch {
-    // Random ordering remains available when storage is blocked.
-  }
+function prioritizeFeaturedSpotlightEntries(entries) {
+  return (Array.isArray(entries) ? entries : [])
+    .filter(({ team }) => team?.id)
+    .sort((left, right) => {
+      const sourcePriority = Number(right.curation?.sourceType === "weekly_program_update") - Number(left.curation?.sourceType === "weekly_program_update");
+      if (sourcePriority) return sourcePriority;
+      const recency = Date.parse(right.curation?.verifiedAt || 0) - Date.parse(left.curation?.verifiedAt || 0);
+      if (Number.isFinite(recency) && recency) return recency;
+      return Number(left.curation?.rank || 99) - Number(right.curation?.rank || 99);
+    });
 }
 
 function weeklyFeaturedTeams(teams = [], featured = []) {
@@ -1713,6 +2157,7 @@ function weeklyFeaturedTeams(teams = [], featured = []) {
     .map((item) => {
       const team = teamsById.get(String(item.teamId || ""));
       if (!team) return null;
+      const editorialMedia = featuredCurationForTeam(team);
       return {
         team,
         curation: {
@@ -1724,7 +2169,9 @@ function weeklyFeaturedTeams(teams = [], featured = []) {
           appealKeywords: Array.isArray(item.keywords) && item.keywords.length ? item.keywords.slice(0, 3) : ["주간 실행"],
           sourceLabel: "SparkClaw weekly update",
           verifiedAt: hub.featuredCompaniesCycle?.sourceUpdatedAt || hub.featuredCompaniesCycle?.publishedAt || "",
-          sourceType: "weekly_program_update"
+          sourceType: "weekly_program_update",
+          spotlightImage: editorialMedia?.spotlightImage || "",
+          spotlightImagePosition: editorialMedia?.spotlightImagePosition || "center"
         }
       };
     })
@@ -1748,62 +2195,103 @@ function renderFeaturedSpotlightCluster({ refined = false } = {}) {
     els.overviewEvents.innerHTML = `<p class="featured-spotlight-loading">최근 공개 실적을 확인하고 있습니다.</p>`;
     return;
   }
-  els.overviewEvents.innerHTML = entries
-    .map((item, index) => {
+  featuredSpotlightActiveIndex = Math.min(featuredSpotlightActiveIndex, entries.length - 1);
+  const slides = entries.map((item, index) => {
       const { team: company, curation } = item;
       const keywords = (Array.isArray(item.keywords) ? item.keywords : curation.appealKeywords)
-        .slice(0, 2)
-        .map((keyword) => escapeHtml(keyword))
-        .join(" · ");
+        .slice(0, 3)
+        .map((keyword) => `<span>${escapeHtml(keyword)}</span>`)
+        .join("");
       const displayName = curation.displayName || company.name || company.companyName || "AI Company";
-      return `<button class="featured-spotlight-bubble featured-spotlight-bubble-${index + 1}${refined ? " is-refined" : ""}" data-featured-team-id="${escapeHtml(company.id)}" data-spotlight-index="${index}" type="button" aria-label="${escapeHtml(displayName)} 기업 상세 보기" title="${escapeHtml(item.hook || curation.hook)}">
-        <span class="featured-spotlight-bubble-meta"><i>${escapeHtml(primarySector(company.sector) || "AI")}</i></span>
-        <strong>${escapeHtml(displayName)}</strong>
-        <span class="featured-spotlight-bubble-keywords">${keywords}</span>
-      </button>`;
-    })
-    .join("");
-  els.overviewEvents.querySelectorAll("[data-featured-team-id]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      const teamId = event.currentTarget.dataset.featuredTeamId;
-      const team = (hub.teams || []).find((candidate) => String(candidate.id) === teamId);
+      const achievement = String(curation.achievement || item.hook || curation.hook || "최근 실행 성과를 확인했습니다.").trim();
+      const visual = featuredSpotlightVisualMarkup(company, displayName, curation);
+      const slideTitleId = `featuredSpotlightTitle${index}`;
+      const backgroundStyle = curation.spotlightImage
+        ? ` style="--featured-photo:url('${escapeHtml(curation.spotlightImage)}');--featured-photo-position:${escapeHtml(curation.spotlightImagePosition || "center")}"`
+        : "";
+      return `<article class="featured-spotlight-slide${curation.spotlightImage ? " has-product-image" : ""}${refined ? " is-refined" : ""}" data-featured-slide="${index}" data-featured-team-id="${escapeHtml(company.id)}" role="button" tabindex="0" aria-labelledby="${slideTitleId}"${backgroundStyle} ${index === featuredSpotlightActiveIndex ? "" : "hidden"}>
+        <div class="featured-spotlight-content">
+          <div class="featured-spotlight-slide-meta"><span>RECENT MILESTONE</span><i>${escapeHtml(primarySector(company.sector) || "AI")}</i></div>
+          <h3 id="${slideTitleId}">${escapeHtml(displayName)}</h3>
+          <p>${escapeHtml(achievement)}</p>
+          <div class="featured-spotlight-keywords">${keywords}</div>
+          <span class="featured-spotlight-profile" aria-hidden="true">기업 프로필 보기 →</span>
+        </div>
+        ${visual}
+      </article>`;
+    }).join("");
+  const navigation = entries.map((item, index) => `<button type="button" data-spotlight-nav="${index}" aria-label="${escapeHtml(item.curation.displayName || item.team.name || `추천 ${index + 1}`)} 보기" aria-current="${index === featuredSpotlightActiveIndex ? "true" : "false"}"><span></span></button>`).join("");
+  els.overviewEvents.innerHTML = `<div class="featured-spotlight-stage">${slides}</div><div class="featured-spotlight-navigation"><button type="button" data-spotlight-direction="-1" aria-label="이전 선정 기업">←</button><div>${navigation}</div><span><b data-spotlight-current>${featuredSpotlightActiveIndex + 1}</b> / ${entries.length}</span><button type="button" data-spotlight-direction="1" aria-label="다음 선정 기업">→</button></div><div class="featured-spotlight-progress" aria-hidden="true"><i></i></div>`;
+  els.overviewEvents.querySelectorAll("[data-featured-team-id]").forEach((slide) => {
+    const openFeaturedTeam = () => {
+      const teamId = slide.dataset.featuredTeamId;
+      const team = (hub.teams || []).find((candidate) => String(candidate.id) === teamId)
+        || featuredSpotlightEntries.find((item) => String(item.team?.id) === teamId)?.team;
       if (team) openTeamDialog(team);
+    };
+    slide.addEventListener("click", openFeaturedTeam);
+    slide.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openFeaturedTeam();
     });
-    button.addEventListener("pointerenter", () => {
-      stopFeaturedSpotlightRotation();
-      setFeaturedSpotlightActive(Number(button.dataset.spotlightIndex || 0));
-    });
-    button.addEventListener("pointerleave", startFeaturedSpotlightRotation);
-    button.addEventListener("focus", () => {
-      stopFeaturedSpotlightRotation();
-      setFeaturedSpotlightActive(Number(button.dataset.spotlightIndex || 0));
-    });
-    button.addEventListener("blur", startFeaturedSpotlightRotation);
   });
+  els.overviewEvents.querySelectorAll("[data-spotlight-nav]").forEach((button) => button.addEventListener("click", () => {
+    setFeaturedSpotlightActive(Number(button.dataset.spotlightNav || 0));
+  }));
+  els.overviewEvents.querySelectorAll("[data-spotlight-direction]").forEach((button) => button.addEventListener("click", () => {
+    setFeaturedSpotlightActive(featuredSpotlightActiveIndex + Number(button.dataset.spotlightDirection || 0));
+  }));
+  els.overviewEvents.removeEventListener("wheel", handleFeaturedSpotlightWheel);
+  els.overviewEvents.addEventListener("wheel", handleFeaturedSpotlightWheel, { passive: false });
+  setFeaturedSpotlightActive(featuredSpotlightActiveIndex);
   startFeaturedSpotlightRotation();
 }
 
+function handleFeaturedSpotlightWheel(event) {
+  if (event.ctrlKey || event.metaKey) return;
+  const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+  if (Math.abs(delta) < 8) return;
+  event.preventDefault();
+  const now = Date.now();
+  if (now < featuredSpotlightWheelLockUntil) return;
+  featuredSpotlightWheelLockUntil = now + 360;
+  setFeaturedSpotlightActive(featuredSpotlightActiveIndex + (delta > 0 ? 1 : -1));
+  startFeaturedSpotlightRotation();
+}
+
+function featuredSpotlightVisualMarkup(company, displayName, curation = {}) {
+  if (curation.spotlightImage) {
+    return `<div class="featured-spotlight-visual is-product" aria-hidden="true"><img src="${escapeHtml(curation.spotlightImage)}" alt="" loading="eager" decoding="async"></div>`;
+  }
+  const logo = companyLogoAsset(company);
+  if (logo) {
+    return `<div class="featured-spotlight-visual is-${escapeHtml(logo.tone)}" aria-hidden="true"><span><img src="${escapeHtml(logo.src)}" alt="" loading="eager" decoding="async"></span></div>`;
+  }
+  return `<div class="featured-spotlight-visual is-fallback" aria-hidden="true"><span>${companyIconMarkup(company)}</span><b>${escapeHtml(displayName)}</b></div>`;
+}
+
 function setFeaturedSpotlightActive(index) {
-  const buttons = [...(els.overviewEvents?.querySelectorAll("[data-featured-team-id]") || [])];
-  if (!buttons.length) return;
-  featuredSpotlightActiveIndex = ((Number(index) || 0) % buttons.length + buttons.length) % buttons.length;
-  buttons.forEach((button, buttonIndex) => {
-    const active = buttonIndex === featuredSpotlightActiveIndex;
-    button.classList.toggle("is-spotlight-active", active);
-    button.dataset.highlighted = active ? "true" : "false";
-  });
-  els.overviewEvents?.classList.toggle("has-spotlight-active", buttons.length > 0);
+  const slides = [...(els.overviewEvents?.querySelectorAll("[data-featured-slide]") || [])];
+  if (!slides.length) return;
+  featuredSpotlightActiveIndex = ((Number(index) || 0) % slides.length + slides.length) % slides.length;
+  slides.forEach((slide, slideIndex) => { slide.hidden = slideIndex !== featuredSpotlightActiveIndex; });
+  els.overviewEvents?.querySelectorAll("[data-spotlight-nav]").forEach((button) => button.setAttribute("aria-current", Number(button.dataset.spotlightNav) === featuredSpotlightActiveIndex ? "true" : "false"));
+  const current = els.overviewEvents?.querySelector("[data-spotlight-current]");
+  if (current) current.textContent = String(featuredSpotlightActiveIndex + 1);
+  const progress = els.overviewEvents?.querySelector(".featured-spotlight-progress i");
+  if (progress) { progress.classList.remove("is-running"); window.requestAnimationFrame(() => progress.classList.add("is-running")); }
 }
 
 function startFeaturedSpotlightRotation() {
   stopFeaturedSpotlightRotation();
-  const buttons = [...(els.overviewEvents?.querySelectorAll("[data-featured-team-id]") || [])];
-  if (!buttons.length) return;
+  const slides = [...(els.overviewEvents?.querySelectorAll("[data-featured-slide]") || [])];
+  if (!slides.length) return;
   setFeaturedSpotlightActive(featuredSpotlightActiveIndex);
-  if (buttons.length < 2 || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  if (slides.length < 2 || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
   featuredSpotlightRotationTimer = window.setInterval(() => {
     setFeaturedSpotlightActive(featuredSpotlightActiveIndex + 1);
-  }, 2800);
+  }, 3800);
 }
 
 function stopFeaturedSpotlightRotation() {
@@ -1927,6 +2415,12 @@ function renderArena() {
   if (!arenaData) return;
   const metrics = arenaData.metrics || {};
   const bountyReleased = arenaData.releaseState === "open";
+  const memberPreparing = isClawMemberViewer() && !bountyReleased;
+  els.arenaPage?.classList.toggle("is-member-preparing", memberPreparing);
+  if (els.bountyPreparingNotice) els.bountyPreparingNotice.hidden = !memberPreparing;
+  els.arenaPage?.querySelectorAll(":scope > section").forEach((section) => {
+    section.inert = memberPreparing;
+  });
   els.arenaMetricOpen.textContent = formatNumber(metrics.openChallenges);
   els.arenaMetricSubmissions.textContent = formatNumber(metrics.validatedSubmissions);
   els.arenaMetricQueue.textContent = formatNumber(metrics.validationQueue);
@@ -2458,42 +2952,6 @@ async function submitArenaOpportunity(form) {
   }
 }
 
-async function handleCreateBounty(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const data = new FormData(form);
-  setInlineStatus(els.arenaStaffFormStatus, "Bounty를 저장하고 있습니다.");
-  disableForm(form, true);
-  try {
-    await postArenaAction("saveCompetitionChallenge", {
-      title: String(data.get("title") || ""),
-      sponsor: String(data.get("sponsor") || ""),
-      shortDescription: String(data.get("shortDescription") || ""),
-      longDescription: String(data.get("shortDescription") || ""),
-      opportunity: String(data.get("opportunity") || ""),
-      evaluationCriteria: String(data.get("evaluationCriteria") || ""),
-      evaluationMode: String(data.get("evaluationMode") || "hybrid"),
-      status: String(data.get("status") || "draft"),
-      visibility: "public",
-      challengeType: "product_benchmark",
-      metricKey: "pass_rate",
-      metricDisplayName: "Task Pass Rate",
-      higherIsBetter: true,
-      submissionLimitPerDay: 3,
-      maxSelectedSubmissions: 1,
-      publicSplitPercentage: 40,
-      rules: "재현 가능한 데모 또는 제품 URL과 검증 방법을 제출해야 합니다."
-    });
-    form.reset();
-    setInlineStatus(els.arenaStaffFormStatus, "Bounty가 감사 로그와 함께 저장되었습니다.", "success");
-    showToast("새 Bounty를 저장했습니다.");
-  } catch (error) {
-    setInlineStatus(els.arenaStaffFormStatus, error.message, "error");
-  } finally {
-    disableForm(form, false);
-  }
-}
-
 async function handleArenaStaffQueueClick(event) {
   const reviewButton = event.target.closest("[data-review-submission]");
   const opportunityButton = event.target.closest("[data-update-opportunity]");
@@ -2717,7 +3175,7 @@ function renderTeams() {
         !incorporated || (team.privateDetailsVisible && (incorporated === "yes" ? team.isIncorporated : !team.isIncorporated));
       return matchesQuery && matchesSector && matchesIncorporated;
     })
-    .sort((left, right) => teamSortValue(left, right, sort));
+    .sort((left, right) => directoryTeamSortValue(left, right, sort));
 
   els.teamResultCount.textContent = `${formatNumber(teams.length)}개 회사`;
   els.teamGrid.innerHTML = teams.map(teamCardMarkup).join("");
@@ -2726,9 +3184,17 @@ function renderTeams() {
 
 function teamCardMarkup(team) {
   const activity = team.activity;
+  const progress = team.publicSignals || activity || {};
+  const investor = normalizeInvestorProfile(team.investorProfile) || {};
   const publicViewer = isPublicViewer();
   const partnerViewer = hub?.viewer?.role === "b2b_partner";
-  const founder = team.founder ? `Founder · ${team.founder}` : team.item || team.companyName || "팀 정보";
+  const founder = team.founder ? `Founder · ${team.founder}` : team.companyName || team.item || "참가기업";
+  const introductionHidden = (team.cardHiddenFields || []).includes("introduction");
+  const introduction = investor.partneringSummary || investor.teamSummary || team.serviceSummary || team.oneLiner || team.aiIdeaSummary || (introductionHidden ? "팀이 소개 내용을 비공개로 설정했습니다." : "팀 소개가 아직 입력되지 않았습니다.");
+  const investorMetrics = (investor.metrics || []).slice(0, 3);
+  const tasks = teamCapabilityTasks(team, investor);
+  const progressSignals = teamProgressSignals(progress);
+  const stage = teamProgramStage(team);
   const officialLogo = companyLogoAsset(team);
   const logoMarkup = officialLogo
     ? `<span class="team-card-logo is-${officialLogo.tone}" data-official-company-logo="${escapeHtml(team.id)}" title="${escapeHtml(officialLogo.websiteHost)} 공식 사이트 헤더 로고"><img src="${escapeHtml(officialLogo.src)}" alt="${escapeHtml(team.name || team.companyName || "기업")} 공식 로고" loading="lazy" decoding="async"></span>`
@@ -2745,27 +3211,69 @@ function teamCardMarkup(team) {
           <span class="sector-tag" title="${escapeHtml(team.sector || "미분류")}">${escapeHtml(primarySector(team.sector) || "미분류")}</span>
         </div>
       </div>
-      <p class="team-one-liner">${escapeHtml(team.oneLiner || team.aiIdeaSummary || team.serviceSummary || "팀 소개가 아직 입력되지 않았습니다.")}</p>
+      <div class="team-introduction-block">
+        <span>팀 소개</span>
+        <p class="team-one-liner">${escapeHtml(introduction)}</p>
+      </div>
+      ${investorMetrics.length ? `<div class="team-investor-metrics" aria-label="핵심 정량 근거">${investorMetrics.map((metric) => `<span>${escapeHtml(metric)}</span>`).join("")}</div>` : ""}
       <div class="team-card-tags">
-        ${publicViewer ? `<span class="status-tag">Public profile</span>` : team.status ? `<span class="status-tag">${escapeHtml(team.status)}</span>` : ""}
+        <span class="stage-tag"><small>현단계</small>${escapeHtml(stage)}</span>
+        ${team.isViewerTeam && team.cardVisibility?.canEdit ? `<span class="type-tag is-privacy">내 카드 · 공개범위 설정 가능</span>` : ""}
         ${publicViewer ? `<span class="evidence-tag is-${escapeHtml(team.evidenceLevel || "needs_verification")}">${escapeHtml(evidenceLevelLabel(team.evidenceLevel))}</span>` : ""}
         ${team.privateDetailsVisible && team.isBuilder ? `<span class="type-tag">Builder</span>` : ""}
         ${team.privateDetailsVisible && team.isIncorporated ? `<span class="type-tag">법인</span>` : ""}
       </div>
-      ${activity ? `<div class="activity-dots">
-        <div><strong>${formatNumber(activity.mentoringSessions)}</strong><span>멘토링</span></div>
-        <div><strong>${formatNumber(Math.max(activity.interviews || 0, activity.reportedInterviews || 0))}</strong><span>인터뷰</span></div>
-        <div><strong>${formatNumber(activity.pmfResponses)}</strong><span>PMF 응답</span></div>
-      </div>` : `<p class="privacy-note">${partnerViewer ? "참가기업의 기본 프로필만 표시합니다. 연락처와 내부 정보는 비공개입니다." : "공개 동의된 회사 정보만 표시합니다."}</p>`}
+      ${progressSignals.length ? `<div class="activity-dots evidence-numbers">${progressSignals.map((signal) => `<div><strong>${escapeHtml(signal.value)}</strong><span>${escapeHtml(signal.label)}</span></div>`).join("")}</div>` : ""}
+      ${companyOfficialLinksMarkup(team)}
+      <div class="team-task-preview">
+        <span class="team-task-preview-label">해결 가능한 Task · 근거 순</span>
+        <ol class="team-task-ranked-list">${tasks.map((task, index) => `<li><span class="task-rank-badge">${index + 1}</span><div><strong>${escapeHtml(task.label)}</strong><p>${escapeHtml(task.description)}</p>${task.evidence ? `<small>공개 근거 · ${escapeHtml(task.evidence)}</small>` : ""}</div></li>`).join("")}</ol>
+      </div>
+      <p class="privacy-note">${partnerViewer ? "Program Supabase의 공개 가능한 프로필·집계만 표시합니다. 인터뷰 원문과 연락처는 비공개입니다." : "공개 가능한 팀 정보와 집계값만 표시합니다."}</p>
       <div class="team-card-footer">
-        <span>${escapeHtml(team.group || "Discoverer")}</span>
+        <span>Program DB · ${escapeHtml(stage)}</span>
         <div class="team-card-footer-actions">
           ${partnerViewer ? `<button class="team-compare-button" data-compare-program-team="${escapeHtml(team.id)}" type="button">비교하기</button>` : ""}
-          <button class="team-detail-button" data-team-id="${escapeHtml(team.id)}" type="button">팀 상세보기 →</button>
+          <button class="team-detail-button" data-team-id="${escapeHtml(team.id)}" type="button">${team.isViewerTeam && team.cardVisibility?.canEdit ? "내 카드 공개 설정 →" : "팀 상세보기 →"}</button>
         </div>
       </div>
     </article>
   `;
+}
+
+function companyOfficialLinksMarkup(company, { section = false } = {}) {
+  const links = companyExternalLinks(company);
+  if (!links.length) return "";
+  const linkMarkup = links.map((link) => `<a class="company-official-link is-${escapeHtml(link.kind)}" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(`${link.label} 공식 링크`)}"><span class="company-official-link-icon" aria-hidden="true">${escapeHtml(companyExternalLinkIcon(link.kind))}</span><span>${escapeHtml(link.label)}</span></a>`).join("");
+  if (section) {
+    return `<section class="company-official-links-section"><h2>공식 채널·앱</h2><p class="company-official-links-note">회사 공식 사이트와 앱스토어에서 확인된 링크입니다.</p><div class="company-official-links is-detail">${linkMarkup}</div></section>`;
+  }
+  return `<div class="company-official-links" aria-label="공식 SNS 및 앱스토어 링크">${linkMarkup}</div>`;
+}
+
+function teamProgramStage(team = {}) {
+  const value = String(team.programStage || team.group || "").trim().toLowerCase();
+  if (value.includes("scaler")) return "scaler";
+  if (value.includes("validator")) return "validator";
+  if (value.includes("discoverer")) return "discoverer";
+  return value || "미입력";
+}
+
+function teamProgressSignals(progress = {}, limit = 3) {
+  const values = [
+    { key: "teamSize", label: "팀원", suffix: "명" },
+    { key: "customerInterviews", label: "고객 인터뷰", suffix: "회" },
+    { key: "payingCustomers", label: "유료 고객", suffix: "곳" },
+    { key: "weeklyReports", label: "주간 리포트", suffix: "회" },
+    { key: "hypotheses", label: "검증 가설", suffix: "개" },
+    { key: "mentoringSessions", label: "멘토링", suffix: "회" },
+    { key: "pmfResponses", label: "PMF 응답", suffix: "회" }
+  ]
+    .map((item) => ({ ...item, numeric: Number(progress?.[item.key] || 0) }))
+    .filter((item) => Number.isFinite(item.numeric) && item.numeric > 0)
+    .map((item) => ({ label: item.label, value: `${formatNumber(item.numeric)}${item.suffix}` }));
+  if (progress?.pmfPhase) values.push({ label: "PMF 단계", value: String(progress.pmfPhase).slice(0, 32) });
+  return values.slice(0, Math.max(1, Number(limit) || 3));
 }
 
 function handleTeamGridClick(event) {
@@ -2795,7 +3303,13 @@ function handleRecommendedCompanyOpen(event) {
 
 function openTeamDialog(team, { recordHistory = true } = {}) {
   const activity = team.activity;
+  const progress = team.publicSignals || activity || {};
+  const investor = normalizeInvestorProfile(team.investorProfile) || {};
+  const progressSignals = teamProgressSignals(progress, 6);
+  const tasks = teamCapabilityTasks(team, investor);
+  const stage = teamProgramStage(team);
   const publicViewer = isPublicViewer();
+  const clawMemberViewer = isClawMemberViewer();
   const partnerViewer = hub?.viewer?.role === "b2b_partner";
   const canRequestCollaborationReview = Boolean(hub?.permissions?.canRequestCollaborationReview && !team.isViewerTeam);
   const pendingCollaborationReview = (hub?.collaborationReviews || []).find(
@@ -2806,60 +3320,153 @@ function openTeamDialog(team, { recordHistory = true } = {}) {
       ? `<button class="primary-button compact" type="button" disabled>협업 검토 답변 대기 중</button>`
       : `<button class="primary-button compact" data-collaboration-review-team="${escapeHtml(String(team.id || ""))}" type="button">이 회사에 협업 검토 요청</button>`
     : `<button class="primary-button compact" data-brief-company="${escapeHtml(team.name || team.companyName || "AI company")}" type="button">이 회사와 협업 검토</button>`;
+  const visibilityEditor = team.isViewerTeam && hub?.permissions?.canEditTeamCardVisibility
+    ? teamCardVisibilityEditorMarkup(team)
+    : "";
+  const introductionHidden = (team.cardHiddenFields || []).includes("introduction");
+  const capabilitiesHidden = (team.cardHiddenFields || []).includes("capabilities");
   els.teamDialogContent.innerHTML = `
     <section class="team-detail-hero">
-      <span class="eyebrow">${escapeHtml(team.group || "DISCOVERER")} · ${escapeHtml(primarySector(team.sector) || "TEAM")}</span>
+      <span class="eyebrow">${escapeHtml(stage.toUpperCase())} · ${escapeHtml(primarySector(team.sector) || "TEAM")}</span>
       <h1>${escapeHtml(team.name || "이름 없는 팀")}</h1>
-      <p>${escapeHtml(team.oneLiner || team.item || "팀 소개가 아직 입력되지 않았습니다.")}</p>
+      <p>${escapeHtml(team.oneLiner || team.item || (introductionHidden ? "팀이 소개 내용을 비공개로 설정했습니다." : "팀 소개가 아직 입력되지 않았습니다."))}</p>
     </section>
     <div class="team-detail-body">
+      ${visibilityEditor}
       <div class="team-detail-meta">
-        <div><span>프로필</span><strong>${publicViewer ? "공개 동의·검수" : partnerViewer ? "참가기업 기본 프로필" : escapeHtml(team.status || "미입력")}</strong></div>
+        <div><span>현단계</span><strong>${escapeHtml(stage)}</strong></div>
         <div><span>산업</span><strong>${escapeHtml(team.sector || "미분류")}</strong></div>
         ${team.privateDetailsVisible ? `<div><span>법인</span><strong>${team.isIncorporated ? "설립" : "미설립·미입력"}</strong></div>` : ""}
         ${team.privateDetailsVisible ? `<div><span>팀 형태</span><strong>${team.isSoloFounder ? "1인 창업" : team.isBuilder ? "Builder" : "팀"}</strong></div>` : ""}
       </div>
+      <section class="investor-team-summary"><h2>팀 경쟁력</h2><p>${escapeHtml(investor.teamSummary || team.serviceSummary || team.oneLiner || team.aiIdeaSummary || "팀 소개가 아직 입력되지 않았습니다.")}</p></section>
+      ${investor.metrics?.length ? `<section><h2>핵심 정량 하이라이트</h2><div class="investor-metric-grid">${investor.metrics.map((metric) => `<article><span>VERIFIED CLAIM</span><strong>${escapeHtml(metric)}</strong></article>`).join("")}</div></section>` : ""}
+      ${investor.proofPoints?.length ? `<section><h2>투자 검토 포인트</h2><div class="investor-proof-grid">${investor.proofPoints.map((point) => `<article><span>${escapeHtml(point.label)}</span><p>${escapeHtml(point.value)}</p></article>`).join("")}</div></section>` : ""}
       ${team.founder ? `<section><h2>창업자</h2><p>${escapeHtml(team.founder)}</p></section>` : ""}
       ${team.item ? `<section><h2>아이템</h2><p>${escapeHtml(team.item)}</p></section>` : ""}
-      <section>
-        <h2>서비스 설명</h2>
-        <p>${escapeHtml(team.serviceSummary || team.oneLiner || "서비스 설명이 아직 입력되지 않았습니다.")}</p>
-      </section>
-      <section><h2>해결하는 Task</h2><div class="task-keywords large">${taskKeywords(team, 8).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div></section>
+      <section><h2>서비스 설명</h2><p>${escapeHtml(team.oneLiner || team.serviceSummary || "서비스 설명이 아직 입력되지 않았습니다.")}</p></section>
+      ${tasks.length ? `<section><h2>해결 가능한 모든 Task</h2><p class="evidence-disclosure">Program Supabase의 지원서·서비스 설명·AI 아이디어·공개 키워드와 운영 집계를 함께 확인해 근거 강도 순으로 정렬했습니다.</p><div class="task-detail-list is-ranked">${tasks.map((task, index) => `<article><span class="task-rank-badge">${index + 1}</span><div><strong>${escapeHtml(task.label)}</strong><p>${escapeHtml(task.description)}</p>${task.evidence ? `<small>공개 근거 · ${escapeHtml(task.evidence)}</small>` : ""}</div></article>`).join("")}</div></section>` : capabilitiesHidden ? `<section class="team-private-field-note"><h2>해결 Task</h2><p>팀이 역량·Task 정보를 비공개로 설정했습니다.</p></section>` : ""}
       ${team.aiIdeaSummary ? `<section><h2>AI 아이디어</h2><p>${escapeHtml(team.aiIdeaSummary)}</p></section>` : ""}
-      ${team.expertise ? `<section><h2>팀 전문성</h2><p>${escapeHtml(team.expertise)}</p></section>` : ""}
+      ${team.expertise && !/^(?:domain|technical)$/i.test(String(team.expertise).trim()) ? `<section><h2>팀 전문성</h2><p>${escapeHtml(team.expertise)}</p></section>` : ""}
       ${publicViewer && team.evidence?.length ? `<section><h2>공개된 근거</h2><ul class="team-evidence-list">${team.evidence.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>` : ""}
       ${publicViewer && team.missingInfo?.length ? `<section class="needs-verification-section"><h2>추가 확인할 정보</h2><ul class="team-evidence-list">${team.missingInfo.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>` : ""}
-      ${activity ? `<section>
-        <h2>프로그램 활동</h2>
-        <div class="detail-activity-grid">
-          <div><strong>${formatNumber(activity.mentoringSessions)}</strong><span>멘토링</span></div>
-          <div><strong>${formatNumber(activity.hypotheses)}</strong><span>가설</span></div>
-          <div><strong>${formatNumber(Math.max(activity.interviews || 0, activity.reportedInterviews || 0))}</strong><span>인터뷰</span></div>
-          <div><strong>${formatNumber(activity.pmfResponses)}</strong><span>PMF 응답</span></div>
-          <div><strong>${formatNumber(activity.eventRegistrations)}</strong><span>행사 등록</span></div>
-          <div><strong>${formatNumber(activity.benefitApplications)}</strong><span>혜택 신청</span></div>
-        </div>
-      </section>` : ""}
+      ${progressSignals.length ? `<section><h2>검증 숫자</h2><p class="evidence-disclosure">Program Supabase의 팀·주간 리포트·가설·멘토링·PMF 테이블에서 공개 가능한 집계만 표시합니다.</p><div class="detail-activity-grid">${progressSignals.map((signal) => `<div><strong>${escapeHtml(signal.value)}</strong><span>${escapeHtml(signal.label)}</span></div>`).join("")}</div></section>` : ""}
       ${
         team.mentor
           ? `<section><h2>담당 멘토</h2><p>${escapeHtml(team.mentor.name)}${team.mentor.affiliation ? ` · ${escapeHtml(team.mentor.affiliation)}` : ""}</p></section>`
           : ""
       }
+      ${companyOfficialLinksMarkup(team, { section: true })}
       <div class="team-detail-actions">
         ${team.websiteUrl ? `<a class="detail-link" href="${escapeHtml(team.websiteUrl)}" target="_blank" rel="noopener noreferrer">회사 웹사이트 열기 ↗</a>` : ""}
         ${collaborationAction}
       </div>
       <p class="controlled-intro-note">요청을 보내면 소개 의사가 기록되고 상대 팀 My Log에 전달됩니다. 대상 스타트업이 승인한 뒤에도 연락처는 자동 공개하지 않으며, SparkLabs가 소개 범위와 다음 단계를 확인합니다.</p>
+      ${clawMemberViewer ? "" : `<p class="controlled-intro-note is-evidence">경력·학력·성과는 팀 제출 지원자료와 Program Supabase의 공개 가능한 집계에서만 구성했습니다. 내부 심사점수, 고객 인터뷰 원문, 주간 리포트 본문, 이메일, 연락처와 내부 운영 메모는 노출하지 않습니다.${investor.sourceLabel ? ` 근거: ${escapeHtml(investor.sourceLabel)}.` : ""}</p>`}
       ${publicViewer ? `<p class="profile-updated-note">정보 기준 · ${team.updatedAt ? escapeHtml(formatDate(team.updatedAt)) : "최근 업데이트일 확인 필요"}</p>` : ""}
     </div>
   `;
+  els.teamDialogContent.querySelector("[data-team-card-visibility-form]")?.addEventListener("submit", handleTeamCardVisibilitySubmit);
   els.teamDialog.showModal();
   if (recordHistory) {
     window.dispatchEvent(new CustomEvent("spark-arena:team-dialog-opened", {
       detail: { id: String(team.id || ""), source: "program" }
     }));
   }
+}
+
+function teamCardVisibilityEditorMarkup(team = {}) {
+  const fields = team.cardVisibility?.fields || {};
+  const options = [
+    ["introduction", "팀·서비스 소개", "카드 소개 문장과 상세 서비스 설명"],
+    ["achievements", "정량 성과·검증 숫자", "매출·고객·인터뷰 등 공개 가능한 집계"],
+    ["capabilities", "해결 Task·역량", "Task 목록, 전문성, 매칭 키워드"],
+    ["aiIdea", "AI 적용 아이디어", "AI 활용 방향과 구현 아이디어"],
+    ["website", "회사 웹사이트", "카드 및 상세 화면의 외부 링크"]
+  ];
+  return `<section class="team-card-visibility-panel">
+    <div class="team-card-visibility-head">
+      <div><span class="eyebrow">MY TEAM CARD</span><h2>내 카드 공개 범위</h2></div>
+      <span class="privacy-safety-badge">연락처·내부 원문은 항상 비공개</span>
+    </div>
+    <p>공개 항목은 승인된 Arena 회원과 산업 파트너에게 표시됩니다. 비공개 항목은 본인 팀과 SparkLabs 운영진만 확인할 수 있습니다.</p>
+    <form data-team-card-visibility-form>
+      <div class="team-card-visibility-grid">
+        ${options.map(([name, label, description]) => `<label>
+          <span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(description)}</small></span>
+          <select name="${escapeHtml(name)}" aria-label="${escapeHtml(label)} 공개 범위">
+            <option value="public" ${fields[name] !== "private" ? "selected" : ""}>공개</option>
+            <option value="private" ${fields[name] === "private" ? "selected" : ""}>비공개</option>
+          </select>
+        </label>`).join("")}
+      </div>
+      <div class="team-card-visibility-actions">
+        <small>팀명·산업·현단계는 Directory 식별을 위해 계속 표시됩니다.</small>
+        <button class="primary-button compact" type="submit" data-idle-label="공개 범위 저장">공개 범위 저장</button>
+      </div>
+      <p class="form-status" data-team-card-visibility-status aria-live="polite"></p>
+    </form>
+  </section>`;
+}
+
+async function handleTeamCardVisibilitySubmit(event) {
+  event.preventDefault();
+  if (programActionPending) return;
+  const form = event.currentTarget;
+  const status = form.querySelector("[data-team-card-visibility-status]");
+  const fields = Object.fromEntries(
+    ["introduction", "achievements", "capabilities", "aiIdea", "website"].map((name) => [
+      name,
+      form.elements[name]?.value === "private" ? "private" : "public"
+    ])
+  );
+  programActionPending = true;
+  disableForm(form, true);
+  const submitButton = form.querySelector('button[type="submit"]');
+  const progressToken = startProcessStatus(status, TEAM_CARD_VISIBILITY_PROGRESS_STEPS, {
+    announcement: "Clawee 저장 가이드가 공개 범위 저장 과정을 시작했습니다.",
+    interval: 1800,
+    showElapsed: true
+  });
+  if (submitButton) submitButton.textContent = "Clawee 저장 중…";
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 30000);
+  try {
+    const result = await postProgramAction("updateTeamCardVisibility", { fields }, { signal: controller.signal });
+    hub = result.snapshot;
+    if (usesProgramDirectoryForViewer()) marketData = marketDataFromProgramHub(hub, marketData);
+    renderHub();
+    finishProcessStatus(status, progressToken, "저장했습니다. 다른 회원과 파트너 화면에도 즉시 반영됩니다.", "success");
+    showToast("내 팀 카드 공개 범위를 저장했습니다.");
+  } catch (error) {
+    const message = error?.name === "AbortError"
+      ? "30초 안에 저장 완료를 확인하지 못했습니다. 잠시 후 카드를 다시 열어 반영 여부를 확인해 주세요."
+      : error.message;
+    finishProcessStatus(status, progressToken, message, "error");
+    showToast(message);
+  } finally {
+    window.clearTimeout(timeoutId);
+    programActionPending = false;
+    disableForm(form, false);
+    if (submitButton) submitButton.textContent = submitButton.dataset.idleLabel || "공개 범위 저장";
+  }
+}
+
+function teamCapabilityTasks(team, investor = {}) {
+  const derived = rankedTaskDetails({
+    ...team,
+    investorProfile: investor,
+    functions: [...(team.functions || []), ...(team.matchingKeywords || []), ...(investor.strengthTags || [])],
+    tags: investor.strengthTags || []
+  }, 32).filter((task) => task.label !== "해결 Task 확인 필요");
+  const combined = [...(investor.specialtyTasks || []), ...derived];
+  const seen = new Set();
+  return combined.filter((task) => {
+    const key = String(task.label || "").toLocaleLowerCase("ko-KR").replace(/[^\p{L}\p{N}]+/gu, "");
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map((task, index) => ({ ...task, rank: index + 1 }));
 }
 
 function closeTeamDialog(options = {}) {
@@ -2953,10 +3560,22 @@ function resetTeamFilters() {
 
 function renderCalendar() {
   const events = sortEventsChronologically(hub.events || []);
+  const partnerCatalogView = isPartnerBenefitCatalogViewer();
+  if (els.calendarPageTitle) {
+    els.calendarPageTitle.textContent = partnerCatalogView ? "프로그램의 주요 만남과 파트너 혜택" : "만나고, 배우고, 바로 활용하세요.";
+  }
+  if (els.calendarPageDescription) {
+    els.calendarPageDescription.textContent = partnerCatalogView
+      ? "8월 13일 OT부터 이후 공개 주요 일정과 프로그램 파트너의 Verified Perks 제공 사례를 확인합니다."
+      : "공개 행사와 제공 조건이 확인된 파트너 혜택을 한곳에서 확인합니다.";
+  }
+  if (els.calendarEventTitle) els.calendarEventTitle.textContent = partnerCatalogView ? "공개 주요 일정" : "전체 일정";
+  if (els.eventPerkTitle) els.eventPerkTitle.textContent = partnerCatalogView ? "프로그램 파트너 제공 혜택" : "지금 활용할 수 있는 혜택";
+  if (els.eventPerkLink) els.eventPerkLink.textContent = partnerCatalogView ? "제공 사례 살펴보기 →" : "자격과 신청 조건 확인 →";
   els.eventCount.textContent = `${formatNumber(events.length)}건`;
   els.eventTimeline.innerHTML = events.length
     ? events.map(eventTimelineMarkup).join("")
-    : `<p class="empty-copy">등록된 일정이 없습니다.</p>`;
+    : `<p class="empty-copy">${partnerCatalogView ? "8월 13일 OT 이후 공개되는 주요 일정이 여기에 추가됩니다." : "등록된 일정이 없습니다."}</p>`;
   if (els.mentorList) {
     els.mentorList.innerHTML = (hub.mentors || []).length
       ? hub.mentors.map(mentorMarkup).join("")
@@ -2972,11 +3591,13 @@ function renderEventRecommendationIntro() {
   const organizationName = partnerOrganizationName(hub?.partnerProfile) || hub?.viewerTeam?.name || hub?.viewer?.organization || "현재 계정";
   els.eventRecommendationTitle.textContent = staffOperations
     ? "SparkLabs 운영 우선 이벤트를 계산합니다."
+    : hub?.viewer?.role === "b2b_partner"
+      ? `${organizationName} 파트너가 확인할 공개 일정을 정리합니다.`
     : `${organizationName}에 지금 맞는 이벤트를 계산합니다.`;
   els.eventRecommendationDescription.textContent = staffOperations
     ? "시작 임박도·운영 정보 누락·행사 중요도를 교차해 먼저 확인할 순서를 정리합니다. 같은 우선도에서는 빠른 일정부터 보여줍니다."
     : hub?.viewer?.role === "b2b_partner"
-      ? "현재 파트너 프로필과 우선 과제, 예정 일정, 검증된 혜택을 교차해 활용 순서를 정리합니다."
+      ? "8월 13일 OT 이후 공개 주요 일정과 다른 파트너사의 Verified Perks 제공 사례를 함께 정리합니다."
       : "현재 계정의 역할과 공개 프로필, 예정 일정, 검증된 혜택을 교차해 활용 순서를 정리합니다.";
   const buttonTitle = els.eventRecommendationButton?.querySelector("strong");
   const buttonDescription = els.eventRecommendationButton?.querySelector("small");
@@ -3033,7 +3654,7 @@ async function requestEventRecommendations({ force = false, allowRefresh = true 
       payload.recommendation?.mode === "staff_operations"
         ? "현재 공개 일정의 긴급도·운영 리스크·중요도 기준으로 우선순위를 정리했습니다."
         : payload.recommendation?.source === "spark_ai"
-          ? "Spark AI가 현재 프로필과 공개 일정을 기준으로 추천을 완료했습니다."
+          ? "클로이가 현재 프로필과 공개 일정을 기준으로 추천을 완료했습니다."
           : "현재 공개 데이터 기준으로 추천을 정리했습니다.",
       "success"
     );
@@ -3054,8 +3675,8 @@ function renderEventRecommendations(recommendation = {}) {
   const items = Array.isArray(recommendation.recommendations) ? recommendation.recommendations : [];
   const staffOperations = recommendation.mode === "staff_operations" || isEventOperationsViewer();
   const sourceLabel = staffOperations
-    ? recommendation.source === "spark_ai" ? "Spark AI 운영 분석 완료" : "운영 데이터 기반 정렬"
-    : recommendation.source === "spark_ai" ? "Spark AI 분석 완료" : "현재 데이터 기반 추천";
+    ? recommendation.source === "spark_ai" ? "클로이 운영 분석 완료" : "운영 데이터 기반 정렬"
+    : recommendation.source === "spark_ai" ? "클로이 분석 완료" : "현재 데이터 기반 추천";
   const cards = items.map((item, index) => {
     const typeLabel = item.itemType === "perk" ? "VERIFIED PERK" : "EVENT";
     const timing = item.timing || (item.date ? formatDate(item.date) : "현재 조건 확인");
@@ -3136,7 +3757,7 @@ function renderEventPerkPreview() {
           </article>`
         )
         .join("")
-    : `<p class="empty-copy">제공 조건을 확인 중입니다. 확인이 끝난 혜택만 공개합니다.</p>`;
+    : `<p class="empty-copy">${isPartnerBenefitCatalogViewer() ? "확인된 프로그램 파트너 제공 혜택이 등록되면 여기에 표시됩니다." : "제공 조건을 확인 중입니다. 확인이 끝난 혜택만 공개합니다."}</p>`;
 }
 
 function eventTimelineMarkup(event) {
@@ -3236,21 +3857,13 @@ function populateBenefitFilters() {
     `;
     if (BENEFIT_QUALIFICATIONS.includes(selectedQualification)) els.benefitQualificationFilter.value = selectedQualification;
   }
-  if (hub.permissions?.canManageProgramActions && els.benefitConfigSelect) {
-    const selected = els.benefitConfigSelect.value;
-    els.benefitConfigSelect.innerHTML = (hub.benefits || [])
-      .map((benefit) => `<option value="${escapeHtml(benefit.id)}">${escapeHtml(benefit.provider || "Partner")} · ${escapeHtml(benefit.title)}</option>`)
-      .join("");
-    if ([...els.benefitConfigSelect.options].some((option) => option.value === selected)) {
-      els.benefitConfigSelect.value = selected;
-    }
-  }
 }
 
 function renderBenefits() {
   if (!hub) return;
   const category = els.benefitCategoryFilter.value;
   const operatorView = isBenefitQualificationOperator();
+  const partnerCatalogView = isPartnerBenefitCatalogViewer();
   const viewerQualification = viewerBenefitQualification(hub.viewerTeam || {});
   const qualification = operatorView ? String(els.benefitQualificationFilter?.value || "") : "";
   const benefits = (hub.benefits || []).filter(
@@ -3260,26 +3873,41 @@ function renderBenefits() {
       (!category || benefit.category === category) &&
       (!operatorView || benefitMatchesQualification(benefit, qualification))
   );
-  renderBenefitPageContext({ operatorView, viewerQualification, qualification, benefits });
+  renderBenefitPageContext({ operatorView, partnerCatalogView, viewerQualification, qualification, benefits });
   els.benefitGrid.classList.toggle("is-grouped", Boolean(benefits.length));
   els.benefitGrid.innerHTML = benefits.length
-    ? operatorView
+    ? partnerCatalogView
+      ? partnerBenefitCatalogMarkup(benefits)
+      : operatorView
       ? operatorBenefitGroupsMarkup(benefits, qualification)
       : memberBenefitGroupsMarkup(benefits, viewerQualification)
     : `<div class="empty-state"><strong>선택한 카테고리와 자격에 해당하는 혜택이 없습니다.</strong></div>`;
-  renderBenefitOperations();
 }
 
-function renderBenefitPageContext({ operatorView, viewerQualification, qualification, benefits }) {
+function renderBenefitPageContext({ operatorView, partnerCatalogView, viewerQualification, qualification, benefits }) {
   if (els.benefitPageTitle) {
-    els.benefitPageTitle.textContent = operatorView ? "자격별 팀 성장 혜택" : `${benefitQualificationLabel(viewerQualification)} 팀 성장 혜택`;
+    els.benefitPageTitle.textContent = partnerCatalogView
+      ? "프로그램 파트너 혜택 카탈로그"
+      : operatorView
+        ? "자격별 팀 성장 혜택"
+        : `${benefitQualificationLabel(viewerQualification)} 팀 성장 혜택`;
   }
   if (els.benefitPageDescription) {
-    els.benefitPageDescription.textContent = operatorView
-      ? "관리자·파트너 검토 화면입니다. 대상 자격을 선택해 제공 범위와 조건을 비교할 수 있습니다."
-      : "로그인한 팀의 프로그램 상태와 제공 조건을 비교해 신청 가능 여부를 분류했습니다.";
+    els.benefitPageDescription.textContent = partnerCatalogView
+      ? "파트너 신청 화면이 아닙니다. 다른 프로그램 파트너가 Claw Member에게 제공하는 혜택과 제공 방식을 살펴봅니다."
+      : operatorView
+        ? "관리자 검토 화면입니다. 대상 자격을 선택해 제공 범위와 조건을 비교할 수 있습니다."
+        : "로그인한 팀의 프로그램 상태와 제공 조건을 비교해 신청 가능 여부를 분류했습니다.";
   }
   if (!els.benefitEligibilitySummary) return;
+  if (partnerCatalogView) {
+    const providers = new Set(benefits.map((benefit) => benefit.provider).filter(Boolean));
+    const categories = [...new Set(benefits.map((benefit) => benefit.category).filter(Boolean))].slice(0, 5);
+    els.benefitEligibilitySummary.innerHTML = `
+      <div><span class="section-kicker">PARTNER CATALOG</span><strong>${formatNumber(providers.size)}개 파트너 · ${formatNumber(benefits.length)}개 혜택</strong></div>
+      <div class="benefit-summary-chips">${categories.map((item) => `<span><b>${escapeHtml(item)}</b></span>`).join("")}</div>`;
+    return;
+  }
   if (operatorView) {
     const counts = Object.fromEntries(BENEFIT_QUALIFICATIONS.map((item) => [item, benefits.filter((benefit) => benefitMatchesQualification(benefit, item)).length]));
     els.benefitEligibilitySummary.innerHTML = `
@@ -3305,7 +3933,11 @@ function renderBenefitPageContext({ operatorView, viewerQualification, qualifica
 }
 
 function isBenefitQualificationOperator() {
-  return Boolean(hub?.permissions?.canManageProgramActions) || hub?.viewer?.role === "b2b_partner";
+  return Boolean(hub?.permissions?.canManageProgramActions);
+}
+
+function isPartnerBenefitCatalogViewer() {
+  return hub?.viewer?.role === "b2b_partner";
 }
 
 function memberBenefitGroupsMarkup(benefits, viewerQualification) {
@@ -3337,6 +3969,17 @@ function operatorBenefitGroupsMarkup(benefits, qualification) {
   }).join("");
 }
 
+function partnerBenefitCatalogMarkup(benefits) {
+  return benefitGroupMarkup(
+    "파트너 제공 사례",
+    "Claw Member 대상 프로그램 혜택을 제공사와 제공 조건 중심으로 확인합니다.",
+    benefits.map((benefit) => benefitCardMarkup(benefit, {
+      qualification: benefitTargetQualifications(benefit)[0],
+      catalogView: true
+    }))
+  );
+}
+
 function benefitGroupMarkup(title, description, cards) {
   return `<section class="benefit-qualification-group">
     <div class="benefit-qualification-head"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div><span>${formatNumber(cards.length)}개</span></div>
@@ -3344,7 +3987,7 @@ function benefitGroupMarkup(title, description, cards) {
   </section>`;
 }
 
-function benefitCardMarkup(benefit, { status = null, qualification = "" } = {}) {
+function benefitCardMarkup(benefit, { status = null, qualification = "", catalogView = false } = {}) {
   const application = benefit.viewerApplication;
   const verificationConfirmed = ["confirmed", "verified"].includes(String(benefit.verificationStatus || "confirmed").toLowerCase());
   const verification = verificationConfirmed ? "확인 완료" : benefit.verificationStatus === "pending" ? "제공 확인 중" : "신청 중지";
@@ -3376,7 +4019,9 @@ function benefitCardMarkup(benefit, { status = null, qualification = "" } = {}) 
         <p class="benefit-provider-name">${escapeHtml(benefit.provider || "제공사 미입력")} · ${escapeHtml(benefit.category || "미분류")}</p>
       </div>
       <p class="benefit-summary">${escapeHtml(summarizeBenefit(benefit))}</p>
-      ${benefitEligibilityAssessmentMarkup(benefit)}
+      ${catalogView
+        ? `<p class="benefit-catalog-context">프로그램 제공 사례 · 신청은 Claw Member 대상</p>`
+        : benefitEligibilityAssessmentMarkup(benefit)}
       <div class="benefit-card-footer">
         <span class="type-tag">${escapeHtml(benefit.tier || "Program benefit")}</span>
         ${count}
@@ -3483,56 +4128,6 @@ async function handleEventRegistrationAction(event) {
   await runProgramAction(action, payload, "RSVP 상태를 업데이트했습니다.", "calendar");
 }
 
-function renderBenefitOperations() {
-  if (!els.benefitOperationsPanel) return;
-  const staff = Boolean(hub.permissions?.canManageProgramActions);
-  els.benefitOperationsPanel.hidden = !staff;
-  if (!staff) return;
-  hydrateBenefitConfigForm();
-  const applications = hub.programQueues?.benefitApplications || hub.benefitApplications || [];
-  els.benefitApplicationQueue.innerHTML = applications.length
-    ? applications.map(benefitApplicationQueueMarkup).join("")
-    : `<p class="empty-copy">접수된 베네핏 신청이 없습니다.</p>`;
-}
-
-function hydrateBenefitConfigForm() {
-  if (!hub?.permissions?.canManageProgramActions || !els.benefitConfigForm) return;
-  const benefit = (hub.benefits || []).find((item) => String(item.id) === String(els.benefitConfigSelect.value)) || hub.benefits?.[0];
-  if (!benefit) return;
-  els.benefitConfigSelect.value = benefit.id;
-  const config = benefit.operations || {};
-  const fields = els.benefitConfigForm.elements;
-  fields.value.value = config.value || benefit.value || "";
-  fields.eligibility.value = (config.eligibility || benefit.eligibility || []).join("\n");
-  fields.applicationInstructions.value = config.applicationInstructions || benefit.applicationInstructions || "";
-  fields.applicationUrl.value = config.applicationUrl || benefit.applicationUrl || "";
-  fields.visibility.value = config.visibility || benefit.visibility || "all_members";
-  fields.verificationStatus.value = config.verificationStatus || benefit.verificationStatus || "confirmed";
-  fields.selectedTeamIds.value = (config.selectedTeamIds || []).join(", ");
-}
-
-async function handleBenefitConfigSubmit(event) {
-  event.preventDefault();
-  if (programActionPending) return;
-  const form = new FormData(els.benefitConfigForm);
-  const payload = Object.fromEntries(form.entries());
-  payload.eligibility = String(payload.eligibility || "").split(/\n+/).map((item) => item.trim()).filter(Boolean);
-  payload.selectedTeamIds = String(payload.selectedTeamIds || "").split(/[,\n]+/).map((item) => item.trim()).filter(Boolean);
-  setInlineStatus(els.benefitConfigStatus, "운영 설정을 저장하는 중입니다.");
-  await runProgramAction("upsertBenefitConfig", payload, "베네핏 운영 설정을 저장했습니다.", "benefits", els.benefitConfigStatus);
-}
-
-async function handleBenefitQueueAction(event) {
-  const button = event.target.closest("[data-benefit-application-status]");
-  if (!button || programActionPending) return;
-  await runProgramAction(
-    "updateBenefitApplication",
-    { applicationId: button.dataset.applicationId, status: button.dataset.benefitApplicationStatus },
-    "신청 상태를 업데이트했습니다.",
-    "benefits"
-  );
-}
-
 async function handleEventQueueAction(event) {
   const button = event.target.closest("[data-event-registration-status]");
   if (!button || programActionPending) return;
@@ -3571,18 +4166,6 @@ async function handleWeeklyReportQueueAction(event) {
     "주간 리포트 상태를 업데이트했습니다.",
     "operations"
   );
-}
-
-function benefitApplicationQueueMarkup(application) {
-  return `<article class="program-queue-item">
-    <div><strong>${escapeHtml(application.teamName || "Team")} · ${escapeHtml(application.benefitTitle || "Benefit")}</strong><span>${escapeHtml(benefitApplicationStatusLabel(application.status))} · ${escapeHtml(formatDate(application.appliedAt || application.updatedAt))}</span></div>
-    <div class="queue-actions">
-      <button data-application-id="${escapeHtml(application.id)}" data-benefit-application-status="link_sent" type="button">링크 안내</button>
-      <button data-application-id="${escapeHtml(application.id)}" data-benefit-application-status="approved" type="button">승인</button>
-      <button data-application-id="${escapeHtml(application.id)}" data-benefit-application-status="fulfilled" type="button">지급 완료</button>
-      <button data-application-id="${escapeHtml(application.id)}" data-benefit-application-status="rejected" type="button">반려</button>
-    </div>
-  </article>`;
 }
 
 function renderEventRegistrationQueue() {
@@ -3710,11 +4293,12 @@ async function runProgramAction(action, payload, successMessage, page, statusEle
   }
 }
 
-async function postProgramAction(action, payload = {}) {
+async function postProgramAction(action, payload = {}, options = {}) {
   const response = await fetch("/api/program-hub", {
     method: "POST",
     headers: { "content-type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ action, payload })
+    body: JSON.stringify({ action, payload }),
+    signal: options.signal
   });
   const result = await safeJson(response);
   if (!response.ok) throw new Error(result?.error || "프로그램 요청을 처리하지 못했습니다.");
@@ -4071,6 +4655,7 @@ async function handleRefresh() {
 }
 
 async function handleLogout() {
+  programHubLoadGeneration += 1;
   window.dispatchEvent(new CustomEvent("spark-arena:discovery-reset"));
   if (authSession?.access_token && authConfig?.authConfigured) {
     fetch(`${authConfig.supabaseUrl}/auth/v1/logout`, {
@@ -4091,11 +4676,12 @@ async function handleLogout() {
   resetEventRecommendationState();
   featuredSpotlightEntries = [];
   featuredSpotlightRequestKey = "";
-  featuredSpotlightOrderKey = "";
-  featuredSpotlightOrderIds = [];
   featuredSpotlightActiveIndex = 0;
+  latestArenaAnnouncement = null;
+  arenaAnnouncementRequestId += 1;
   stopFeaturedSpotlightRotation();
   resetCollaborationFitReasonState();
+  arenaGuide.reset();
   closeTeamDialog({ historyMode: "none" });
   closeAllHistoryOverlays();
   showPublicBriefGate("로그아웃되었습니다. 회원 기능을 다시 이용하려면 로그인해 주세요.", "success", { historyMode: "replace" });
@@ -4106,6 +4692,7 @@ function showApp() {
   closeMemberAccess({ restoreFocus: false });
   document.body.classList.remove("is-public-brief-view");
   document.documentElement.lang = "ko";
+  document.documentElement.dir = "ltr";
   els.homeButton?.setAttribute("aria-label", publicBriefCopy("ko").homeLabel);
   if (els.publicBriefLanguageSwitch) els.publicBriefLanguageSwitch.hidden = true;
   els.publicBriefGate.hidden = true;
@@ -4114,6 +4701,7 @@ function showApp() {
   els.refreshButton.hidden = false;
   els.accountMenu.hidden = false;
   els.memberAccessButton.hidden = true;
+  arenaGuide.setVisible(true);
   const historyState = window.history.state;
   if (isArenaHistoryForViewer(historyState)) {
     if (historyState.kind === "team-dialog") closeTeamDialog({ historyMode: "none" });
@@ -4134,6 +4722,9 @@ function showPublicBriefGate(message = "", tone = "", { historyMode = "none" } =
   renderPartnerBriefExperience(null);
   mountPublicBrief("public");
   closeMemberAccess({ restoreFocus: false });
+  setEcosystemSwitcherOpen(false);
+  els.ecosystemSwitcher?.classList.remove("is-enabled");
+  els.homeButton?.setAttribute("aria-haspopup", "false");
   document.body.classList.add("is-public-brief-view");
   els.publicBriefGate.hidden = false;
   els.programApp.hidden = true;
@@ -4142,6 +4733,7 @@ function showPublicBriefGate(message = "", tone = "", { historyMode = "none" } =
   els.accountMenu.hidden = true;
   if (els.publicBriefLanguageSwitch) els.publicBriefLanguageSwitch.hidden = false;
   els.memberAccessButton.hidden = false;
+  arenaGuide.setVisible(false);
   applyPublicBriefLanguage();
   document.querySelector("[data-public-brief-login]")?.removeAttribute("hidden");
   if (message) setAuthStatus(message, tone);
@@ -4317,7 +4909,7 @@ function setCurrentNavigationItem(pageName, target = "") {
   });
 }
 
-function showPage(pageName, { navTarget = "", historyMode = "push", restoreScrollY = null } = {}) {
+function showPage(pageName, { navTarget = "", historyMode = "push", restoreScrollY = null, skipScroll = false } = {}) {
   if (!hub || !isAuthenticatedViewer()) {
     showLogin("AI Arena 콘텐츠를 보려면 로그인해 주세요.");
     return;
@@ -4327,19 +4919,32 @@ function showPage(pageName, { navTarget = "", historyMode = "push", restoreScrol
     else showToast("Community는 승인된 Arena 회원과 기업 파트너가 이용할 수 있습니다.");
     return;
   }
-  if (isClawMemberViewer() && ["calendar", "benefits"].includes(pageName)) {
+  if ((isClawMemberViewer() || isAdminViewer()) && ["calendar", "benefits"].includes(pageName)) {
     pageName = "overview";
-    showToast("Events & Perks는 기존 SparkClaw 프로그램 사이트에서 확인해 주세요.");
+    navTarget = "";
+    showToast(
+      isAdminViewer()
+        ? "SparkLabs 관리자 화면에서는 Events & Perks를 표시하지 않습니다."
+        : "Events & Perks는 기존 SparkClaw 프로그램 사이트에서 확인해 주세요."
+    );
   }
   if (isClawMemberViewer() && pageName === "partnerships") {
     pageName = "overview";
     navTarget = "";
     showToast("Claw Member의 기업 간 협업은 기업 상세의 협업 검토 요청과 My Log에서 진행해 주세요.");
   }
-  if (pageName === "operations" && !hub.permissions?.canViewOperations) pageName = "overview";
+  if (isAdminViewer() && ["discover", "passports"].includes(pageName)) {
+    pageName = "overview";
+    navTarget = "";
+  }
+  if (pageName === "operations") {
+    pageName = "workspace";
+    navTarget = "";
+  }
   if (pageName === "database" && !hub.permissions?.canViewRawDatabase) pageName = "overview";
   const navigationButton = document.querySelector(`[data-page="${CSS.escape(pageName)}"]`);
   if (navigationButton?.hidden) pageName = "overview";
+  renderHubPage(pageName);
   document.querySelectorAll("[data-page-panel]").forEach((panel) => {
     const active = panel.dataset.pagePanel === pageName;
     panel.hidden = !active;
@@ -4354,6 +4959,7 @@ function showPage(pageName, { navTarget = "", historyMode = "push", restoreScrol
   closePrimaryNavigationMenus();
   activeArenaPage = pageName;
   activeArenaNavTarget = navTarget;
+  if (pageName === "overview") loadLatestArenaAnnouncement();
   if (pageName === "database") {
     if (!databaseSchema) loadDatabaseSchema();
     if (!applicantExportMetadata) loadApplicantExportMetadata();
@@ -4361,10 +4967,12 @@ function showPage(pageName, { navTarget = "", historyMode = "push", restoreScrol
   if (pageName === "calendar") queueMicrotask(() => requestEventRecommendations());
   window.dispatchEvent(new CustomEvent("spark-arena:page", { detail: { page: pageName } }));
   syncArenaPageHistory(pageName, navTarget, historyMode);
-  const nextScrollY = Number.isFinite(Number(restoreScrollY)) ? Math.max(0, Number(restoreScrollY)) : 0;
-  window.requestAnimationFrame(() => {
-    window.scrollTo({ top: nextScrollY, behavior: historyMode === "none" ? "auto" : "smooth" });
-  });
+  if (!skipScroll) {
+    const nextScrollY = Number.isFinite(Number(restoreScrollY)) ? Math.max(0, Number(restoreScrollY)) : 0;
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: nextScrollY, behavior: historyMode === "none" ? "auto" : "smooth" });
+    });
+  }
 }
 
 function arenaViewerKey() {
@@ -4567,7 +5175,7 @@ function replacePublicArenaHistory() {
 }
 
 function primaryPageFor(pageName) {
-  if (["teams", "discover", "passports", "compare", "partnerships"].includes(pageName)) return "overview";
+  if (["advisors", "teams", "discover", "passports", "compare", "partnerships"].includes(pageName)) return "overview";
   if (pageName === "benefits") return "calendar";
   if (["operations", "database"].includes(pageName)) return "workspace";
   return pageName;
@@ -4575,6 +5183,11 @@ function primaryPageFor(pageName) {
 
 function isClawMemberViewer() {
   return String(hub?.viewer?.role || "").toLowerCase() === "member";
+}
+
+function isAdminViewer() {
+  const role = String(hub?.viewer?.role || "").toLowerCase();
+  return Boolean(hub?.viewer?.canScore) || ["sparklabs", "admin"].includes(role);
 }
 
 function isPublicViewer() {
@@ -4603,6 +5216,19 @@ async function refreshSession() {
   } catch {
     return false;
   }
+}
+
+async function restoreStoredSession() {
+  authSession = readStoredSession();
+  if (!authConfig?.authConfigured || (!authSession?.access_token && !authSession?.refresh_token)) return false;
+
+  const expiresAt = Number(authSession?.expires_at || 0);
+  const expiresSoon = expiresAt > 0 && expiresAt <= Math.floor(Date.now() / 1000) + 60;
+  if ((!authSession?.access_token || expiresSoon) && authSession?.refresh_token) {
+    await refreshSession();
+  }
+
+  return Boolean(authSession?.access_token);
 }
 
 function saveStoredSession(session) {
@@ -4677,6 +5303,22 @@ function teamSortValue(left, right, sort) {
     return activityScore(right.activity) - activityScore(left.activity) || left.name.localeCompare(right.name, "ko");
   }
   return left.name.localeCompare(right.name, "ko");
+}
+
+function isViewerDirectoryTeam(team) {
+  const viewerTeamId = String(hub?.viewerTeam?.id || "");
+  return Boolean(team?.isViewerTeam || (viewerTeamId && String(team?.id || "") === viewerTeamId));
+}
+
+function directoryTeamSortValue(left, right, sort) {
+  if (isClawMemberViewer()) {
+    const leftIsViewerTeam = isViewerDirectoryTeam(left);
+    const rightIsViewerTeam = isViewerDirectoryTeam(right);
+    if (leftIsViewerTeam !== rightIsViewerTeam) {
+      return leftIsViewerTeam ? -1 : 1;
+    }
+  }
+  return teamSortValue(left, right, sort);
 }
 
 function activityScore(activity = {}) {

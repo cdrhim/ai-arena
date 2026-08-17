@@ -53,8 +53,9 @@ test("AI Arena keeps all primary navigation behind login while role-specific sur
   assert.match(html, /id="teamGrid"/);
   assert.match(html, /id="eventTimeline"/);
   assert.match(html, /id="benefitGrid"/);
-  assert.match(html, /id="benefitConfigForm"/);
-  assert.match(html, /id="benefitApplicationQueue"/);
+  assert.doesNotMatch(html, /STAFF BENEFIT OPS/);
+  assert.doesNotMatch(html, /id="benefitConfigForm"/);
+  assert.doesNotMatch(html, /id="benefitApplicationQueue"/);
   assert.match(html, /id="eventRegistrationQueue"/);
   assert.match(html, /ARENA UPDATES/);
   assert.match(html, /FEATURED PERKS/);
@@ -65,7 +66,7 @@ test("AI Arena keeps all primary navigation behind login while role-specific sur
   assert.match(js, /function renderTeams/);
   assert.match(js, /function renderCalendar/);
   assert.match(js, /function renderBenefits/);
-  assert.match(js, /function renderBenefitOperations/);
+  assert.doesNotMatch(js, /function renderBenefitOperations/);
   assert.match(js, /function renderEventRegistrationQueue/);
   assert.match(js, /function renderOperations/);
   assert.match(js, /function configurePermissions/);
@@ -157,6 +158,7 @@ test("member access entrance stays accessible, motion-safe, and authentication-n
   assert.match(css, /@media \(max-width:\s*720px\)[\s\S]*?\.member-access-shell\s*\{[\s\S]{0,180}?grid-template-columns:\s*1fr/);
   assert.match(css, /\.member-access-layer:not\(\[hidden\]\) \.member-access-shell\s*\{\s*animation:\s*member-access-shell-in/);
   assert.match(css, /@keyframes member-access-shell-in/);
+  assert.match(css, /\.member-access-shell \.login-story h1\s*\{[\s\S]*?word-break:\s*keep-all;[\s\S]*?overflow-wrap:\s*normal;/);
   assert.match(css, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.member-access-layer:not\(\[hidden\]\)[\s\S]*?animation:\s*none\s*!important/);
 
   assert.match(js, /memberAccessReturnFocus = document\.activeElement instanceof HTMLElement/);

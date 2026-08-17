@@ -24,7 +24,7 @@ test("sparse profiles stay explicit instead of receiving an invented task", () =
   assert.deepEqual(searchableTaskKeywords({ name: "Unknown Product" }), []);
 });
 
-test("Task-driven Search exposes tasks while Company Directory keeps them out of cards", () => {
+test("Task-driven Search와 Company Directory가 서로 다른 깊이로 Task를 설명한다", () => {
   const html = readFileSync("public/arena/index.html", "utf8");
   const market = readFileSync("public/arena/market.js", "utf8");
   const arena = readFileSync("public/arena/arena.js", "utf8");
@@ -33,6 +33,8 @@ test("Task-driven Search exposes tasks while Company Directory keeps them out of
   assert.match(market, /function marketTeamCardMarkup[\s\S]*?taskKeywordMarkup\(startup, 4\)/);
   assert.match(market, /\["해결 Task", \(team\) => taskKeywords/);
   const directoryCard = arena.match(/function teamCardMarkup\(team\) \{[\s\S]*?^\}/m)?.[0] || "";
-  assert.doesNotMatch(directoryCard, /해결 Task|task-keyword-block/);
-  assert.match(arena, /<h2>해결하는 Task<\/h2>/);
+  assert.match(directoryCard, /해결 가능한 Task · 근거 순/);
+  assert.match(directoryCard, /teamCapabilityTasks/);
+  assert.match(arena, /<h2>해결 가능한 모든 Task<\/h2>/);
+  assert.match(arena, /rankedTaskDetails/);
 });

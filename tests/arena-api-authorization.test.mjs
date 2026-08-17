@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import arena, { filterStartupTechStacksForViewer } from "../netlify/functions/arena.mjs";
+import arena, { competitionChallengeFromBrief, filterStartupTechStacksForViewer } from "../netlify/functions/arena.mjs";
 
 test("ordinary members cannot call privileged Arena API actions directly", async () => {
   const previous = captureEnv(["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_KEY"]);
@@ -111,6 +111,37 @@ test("converted B2B accounts cannot inherit legacy member tech-stack ownership",
   assert.deepEqual(visible.techStack.groups, []);
   assert.equal(visible.techStack.restricted, true);
   assert.deepEqual(visible.products[0].links, [{ type: "website", url: "https://example.com" }]);
+});
+
+test("a published unified Brief becomes the linked public competition challenge", () => {
+  const challenge = competitionChallengeFromBrief(
+    {
+      id: "brief_1",
+      status: "published",
+      visibility: "public",
+      problemTitle: "Partner support automation",
+      organization: "Partner Co",
+      problem: "Reduce response time.",
+      currentWorkflow: "Agents triage every request manually.",
+      opportunity: "Paid pilot",
+      evaluationCriteria: ["Accuracy", "Latency"],
+      dataPolicy: "Synthetic data only",
+      challengeType: "endpoint_eval",
+      evaluationMode: "hybrid",
+      deadline: "2026-09-30",
+      rules: "Provide a reproducible endpoint."
+    },
+    null,
+    "2026-08-17T09:00:00.000Z"
+  );
+
+  assert.equal(challenge.sponsorBriefId, "brief_1");
+  assert.equal(challenge.status, "open");
+  assert.equal(challenge.visibility, "public");
+  assert.equal(challenge.releaseApprovedAt, "2026-08-17T09:00:00.000Z");
+  assert.deepEqual(challenge.evaluationCriteria, ["Accuracy", "Latency"]);
+  assert.equal(challenge.evaluationMode, "hybrid");
+  assert.equal(challenge.challengeType, "endpoint_eval");
 });
 
 test("direct Arena API cannot bypass the staged Claw Member Bounty release gate", async () => {

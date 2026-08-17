@@ -6,7 +6,7 @@ import {
 import { storeSimilarTeamRecommendationsSafely } from "../lib/similar-team-recommendations-store.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
-export default async function similarTeamRecommendations(req) {
+async function similarTeamRecommendations(req) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (!["GET", "POST"].includes(req.method)) return json({ error: "Method not allowed" }, 405);
 
@@ -54,6 +54,8 @@ export default async function similarTeamRecommendations(req) {
   }
 }
 
+export default withScArenaDevelopmentLogging("similar-team-recommendations", similarTeamRecommendations);
+
 function json(payload, status = 200) {
   return corsResponse(JSON.stringify(payload), status, {
     "content-type": "application/json; charset=utf-8",
@@ -72,3 +74,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

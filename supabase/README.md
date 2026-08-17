@@ -17,6 +17,20 @@ The activity ledger migration belongs in the Arena Auth project because its fore
 - `sc_arena_activity_viewers` adds explicit recipients such as the owner of a post receiving a comment.
 - `sc_arena_activity_user_state` stores per-user read and archive state without mutating the event.
 
+## Administrator and development logs
+
+- `sc_arena_admin_audit_logs` is a seven-year, append-only audit projection of every authoritative `staff` and `admin` activity event. A database trigger writes it in the same transaction and the migration backfills existing staff history.
+- `sc_arena_development_logs` stores sanitized server diagnostics for 180 days. It never accepts request bodies, authorization headers, cookies, tokens, secrets, query strings, or raw user content.
+- Browser roles have no direct table access. `sc_arena_append_development_log` is `service_role`-only; the two read RPCs verify an active workspace staff membership before returning rows.
+- Apply `20260817173000_sc_arena_admin_and_development_logs.sql` to the Arena Auth project, never the Program DB.
+
+## SparkLabs Google login
+
+1. Create a Google OAuth Web client and register the Arena origin. Use the Supabase project callback URL shown on its Google provider page as the Google authorized redirect URI.
+2. Enable Google in the Arena Auth Supabase project and add `https://sparkclaw-arena.netlify.app/arena/` to Supabase Auth redirect URLs.
+3. Set `SPARKLABS_ARENA_GOOGLE_ADMIN_LOGIN_ENABLED=true` in Netlify only after the provider is live.
+4. Google authentication does not grant staff access by itself. Server-side `viewerFromUser` still requires the verified email to match `SPARKLABS_ARENA_ADMIN_DOMAINS` or the explicit administrator allowlist.
+
 ## Company logo assets
 
 - `sc_arena_organization_assets` links each `sc_arena_organizations` row to its current logo object and records the source URL, source host, MIME type, byte size, SHA-256 checksum, display tone, and verification state.

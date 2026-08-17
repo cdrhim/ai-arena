@@ -21,13 +21,19 @@ test("Company preview stack draws five unique, safe candidates and reveals them 
   assert.match(js, /const pool = \[\.\.\.curatedCompanyPreviewCandidates\]/);
   assert.match(js, /pool\.splice\(index, 1\)\[0\]/);
   assert.match(js, /const remainingKeys = new Set\(remaining\.map\(curatedCompanyPreviewKey\)\)/);
-  assert.match(js, /window\.setInterval\(showRandomCuratedCompany, 2100\)/);
+  assert.match(js, /window\.setInterval\(showRandomCuratedCompany, 1600\)/);
+  assert.match(js, /classList\.add\("is-leaving"\)/);
+  assert.match(js, /classList\.add\("is-settling"\)/);
+  assert.match(js, /window\.setTimeout\([\s\S]*?, 240\)/);
   assert.match(js, /window\.matchMedia\?\.\("\(prefers-reduced-motion: reduce\)"\)\.matches/);
 });
 
 test("Curated company cards fill the right side, fan in depth, reveal one card, and respect reduced motion", () => {
   assert.match(css, /\.curated-company-stack \{[\s\S]*?left:\s*clamp\(150px, 39%, 250px\)[\s\S]*?perspective:\s*760px/);
   assert.match(css, /\.curated-company-stack-card:nth-child\(5\) \{[\s\S]*?rotate\(-2\.2deg\) scale\(0\.86\)/);
-  assert.match(css, /\.curated-company-stack\.is-revealing \.curated-company-stack-card:first-child \{[\s\S]*?translate3d\(42px, -84%, 70px\)/);
+  assert.match(css, /\.curated-company-stack\.is-revealing \.curated-company-stack-card:first-child \{[\s\S]*?translate3d\(54px, -66%, 70px\)/);
+  assert.match(css, /\.curated-company-stack\.is-leaving \{[\s\S]*?opacity:\s*0;[\s\S]*?visibility:\s*visible/);
+  assert.match(css, /\.curated-company-stack\.is-settling \.curated-company-stack-card:nth-child\(5\) \{[\s\S]*?opacity:\s*0;/);
+  assert.match(css, /rgba\(11, 75, 137, 0\.97\), rgba\(43, 125, 207, 0\.96\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.curated-company-stack,[\s\S]*?\.curated-company-stack-card \{\s*transition:\s*none !important/);
 });

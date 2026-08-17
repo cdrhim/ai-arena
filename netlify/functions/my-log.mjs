@@ -1,11 +1,12 @@
 import { loadProgramDirectoryContext } from "../lib/program-hub.mjs";
+import { loadPublicBriefMonitor } from "../lib/public-brief-store.mjs";
 import { loadScArenaMyLog } from "../lib/sc-arena-activity.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
 const ALLOWED_ROLES = new Set(["admin", "sparklabs", "member", "b2b_partner", "human_validator"]);
 const ALLOWED_DOMAINS = new Set(["discover", "community", "bounty"]);
 
-export default async function myLog(req, options = {}) {
+async function myLog(req, options = {}) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (req.method !== "GET") return json({ error: "지원하지 않는 요청 방식입니다." }, 405);
 
@@ -30,23 +31,30 @@ export default async function myLog(req, options = {}) {
     const domain = ALLOWED_DOMAINS.has(domainValue) ? domainValue : null;
     const cursor = limitedValue(url.searchParams.get("cursor"), 640);
     const limit = boundedLimit(url.searchParams.get("limit"));
-    const result = await (options.loadMyLog || loadScArenaMyLog)({
-      req,
-      viewer: context.viewer,
-      viewerTeamId: context.viewerTeamId,
-      viewerTeamName: context.viewerTeamName,
-      domain,
-      cursor,
-      limit,
-      env,
-      fetchImpl
-    });
+    const staff = ["admin", "sparklabs"].includes(context.viewer?.role);
+    const [result, publicBriefMonitor] = await Promise.all([
+      (options.loadMyLog || loadScArenaMyLog)({
+        req,
+        viewer: context.viewer,
+        viewerTeamId: context.viewerTeamId,
+        viewerTeamName: context.viewerTeamName,
+        domain,
+        cursor,
+        limit,
+        env,
+        fetchImpl
+      }),
+      staff && !cursor
+        ? safeLoadPublicBriefMonitor(options.loadPublicBriefMonitor || loadPublicBriefMonitor)
+        : Promise.resolve(null)
+    ]);
 
     return json({
       available: Boolean(result?.available),
       events: Array.isArray(result?.events) ? result.events : [],
       nextCursor: result?.nextCursor || null,
-      reason: result?.available ? "" : limitedValue(result?.reason || "unavailable", 80)
+      reason: result?.available ? "" : limitedValue(result?.reason || "unavailable", 80),
+      ...(staff && publicBriefMonitor ? { publicBriefMonitor } : {})
     });
   } catch (error) {
     const status = Number(error?.status) || 500;
@@ -56,6 +64,55 @@ export default async function myLog(req, options = {}) {
     );
   }
 }
+
+async function safeLoadPublicBriefMonitor(loader) {
+  try {
+    return publicBriefMonitorPayload(await loader({ limit: 100 }));
+  } catch {
+    return { available: false, totalCount: 0, latestAt: null, items: [] };
+  }
+}
+
+function publicBriefMonitorPayload(value) {
+  const items = (Array.isArray(value?.items) ? value.items : [])
+    .map((item) => {
+      const id = limitedValue(item?.id, 120);
+      const organization = limitedValue(item?.organization, 160);
+      const createdAt = safeTimestamp(item?.createdAt);
+      if (!id || !organization || !createdAt) return null;
+      return {
+        id,
+        organization,
+        problemSummary: limitedValue(item?.problemSummary, 240),
+        status: limitedValue(item?.status, 40) || "received",
+        createdAt,
+        updatedAt: safeTimestamp(item?.updatedAt) || createdAt,
+        deadline: /^\d{4}-\d{2}-\d{2}$/.test(String(item?.deadline || "")) ? String(item.deadline) : ""
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 100);
+  return {
+    available: value?.available === true,
+    totalCount: boundedMonitorCount(value?.totalCount, items),
+    latestAt: items[0]?.createdAt || null,
+    items
+  };
+}
+
+function boundedMonitorCount(value, items) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0
+    ? Math.min(Math.floor(parsed), 500)
+    : items.length;
+}
+
+function safeTimestamp(value) {
+  const parsed = Date.parse(String(value || ""));
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
+}
+
+export default withScArenaDevelopmentLogging("my-log", myLog);
 
 async function resolveViewerContext(viewer, resolveDirectoryContext, env, fetchImpl) {
   if (!["public", "member"].includes(viewer?.role)) {
@@ -102,3 +159,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

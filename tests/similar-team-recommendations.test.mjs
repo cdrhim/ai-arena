@@ -96,8 +96,12 @@ test("schema and Compare UI keep recommendations private, relational, and user-s
   assert.match(html, /id="similarTeamPanel"[\s\S]+TEAMS LIKE MINE/);
   assert.match(client, /isClawMemberViewer\(\)[\s\S]+loadSimilarTeamRecommendations/);
   assert.match(client, /data-similar-team-compare/);
+  assert.match(client, /similarTeamBasisLabel/);
+  assert.match(client, /class="similar-team-basis"/);
+  assert.doesNotMatch(client, /escapeHtml\(item\.score\)[\s\S]{0,40}점/);
   assert.match(client, /비교 슬롯은 직접 선택/);
   assert.match(css, /\.similar-team-list\s*\{[\s\S]*grid-template-columns/);
+  assert.match(css, /\.similar-team-basis\s*\{/);
   assert.match(netlify, /from = "\/api\/similar-team-recommendations"/);
 });
 

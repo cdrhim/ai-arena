@@ -23,6 +23,9 @@ test("featured curation is an explicit SparkLabs editorial list", () => {
   assert.equal(featuredCurationForTeam(teams[0]), null);
   assert.ok(featured.every(({ curation }) => curation.achievement && curation.sourceUrl && curation.verifiedAt));
   assert.ok(featured.every(({ curation }) => curation.hook && curation.appealKeywords.length === 3));
+  assert.ok(featured.every(({ curation }) => curation.spotlightImage?.startsWith("/arena/assets/featured/")));
+  assert.equal(featuredCurationForTeam(teams[2]).websiteUrl, "https://www.acscent.co.kr/");
+  assert.equal(featuredCurationForTeam(teams[2]).sourceUrl, "https://www.acscent.co.kr/");
 });
 
 test("featured editorial facts expose only public milestone copy and fallback appeal keywords", () => {

@@ -29,7 +29,7 @@ erDiagram
 
 ## Why the ledger is separate from current state
 
-The operational stores remain authoritative for the latest connection, Community, and Bounty state. `sc_arena_activity_events` is an append-only, presentation-safe history for My Log. This avoids losing earlier status changes when a current record is updated and allows one reverse-chronological query across all three domains.
+The operational stores remain authoritative for the latest connection, Community, and Bounty state. `sc_arena_activity_events` is an append-only, presentation-safe history for My Log. This avoids losing earlier status changes when a current record is updated and allows one reverse-chronological query across all three domains. Only actions created inside SparkClaw AI Arena are eligible; Program DB events, perks, weekly reports, and activity from other platforms are explicitly out of scope.
 
 Each event has:
 
@@ -63,6 +63,6 @@ Raw post bodies, internal review notes, emails, phone numbers, credentials, and 
 2. Review and apply `supabase/migrations/20260812090000_sc_arena_activity_ledger.sql` in one transaction.
 3. Verify all nine tables, RLS policies, functions, grants, and indexes.
 4. Deploy server dual writes and the `/api/my-log` read path.
-5. Backfill legacy Blob events in timestamp order with stable source ids and `on conflict do nothing` semantics.
+5. Backfill only Arena-owned Discover, Community, and Bounty Blob events in timestamp order with stable source ids and `on conflict do nothing` semantics. Never backfill Program DB event registrations, perks, weekly reports, or other-platform activity.
 6. Reconcile counts per source and date before treating the ledger as complete history.
 7. Keep legacy reads as a temporary fallback until backfill and dual-write reconciliation pass.

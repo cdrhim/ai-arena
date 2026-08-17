@@ -72,7 +72,8 @@ test("client renders the safe fallback first and refines through a server-only e
   const html = fs.readFileSync("public/arena/index.html", "utf8");
   const client = fs.readFileSync("public/arena/community.js", "utf8");
   const config = fs.readFileSync("netlify.toml", "utf8");
-  assert.match(html, /<h2>Arena 소식<\/h2>/);
+  assert.match(html, /WHAT'S NEW/);
+  assert.match(html, /Community의 최신 SparkLabs 공지/);
   assert.match(client, /communityHighlightItems\(context\.hub \|\| \{\}\)/);
   assert.match(client, /communityHighlightsForViewer\(items, context\.viewer\)/);
   assert.match(client, /fetch\("\/api\/community-highlights"/);

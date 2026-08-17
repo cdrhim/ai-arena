@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { normalizePublicBrief, savePublicBrief } from "../netlify/lib/public-brief-store.mjs";
+import { loadPublicBriefMonitor, normalizePublicBrief, savePublicBrief } from "../netlify/lib/public-brief-store.mjs";
 
 const NOW = "2026-08-07T00:00:00.000Z";
 const validInput = Object.freeze({
@@ -109,6 +109,38 @@ test("public Brief persistence retries optimistic conflicts and remains idempote
   assert.equal(Object.hasOwn(first, "problem"), false);
 });
 
+test("public Brief monitoring returns only privacy-bounded discovery intake records", async () => {
+  const discovery = normalizePublicBrief(validInput, NOW);
+  const olderDiscovery = normalizePublicBrief({ ...validInput, email: "older@example.com" }, "2026-08-06T00:00:00.000Z");
+  const partnerUpdate = normalizePublicBrief({
+    ...validInput,
+    requestType: "partner_profile_update",
+    partnerProfileId: "youngone-trade",
+    ownerUserId: "auth-user-123"
+  }, "2026-08-08T00:00:00.000Z");
+  const monitor = await loadPublicBriefMonitor({
+    store: readStore([partnerUpdate, olderDiscovery, discovery]),
+    allowMemoryFallback: false,
+    limit: 1
+  });
+
+  assert.equal(monitor.available, true);
+  assert.equal(monitor.totalCount, 2);
+  assert.equal(monitor.items.length, 1);
+  assert.deepEqual(monitor.items[0], {
+    id: discovery.id,
+    organization: "Youngone",
+    problemSummary: "Need governed manufacturing AI",
+    status: "received",
+    createdAt: NOW,
+    updatedAt: NOW,
+    deadline: "2026-10-31"
+  });
+  assert.equal(Object.hasOwn(monitor.items[0], "email"), false);
+  assert.equal(Object.hasOwn(monitor.items[0], "contactName"), false);
+  assert.equal(Object.hasOwn(monitor.items[0], "website"), false);
+});
+
 test("public Brief production writes fail closed when durable storage is unavailable", async () => {
   const unavailableStore = {
     async getWithMetadata() {
@@ -148,6 +180,14 @@ function memoryStore({ conflictOnce = false } = {}) {
       if (options.onlyIfMatch && options.onlyIfMatch !== `v${version}`) throw conflict();
       rows = JSON.parse(value);
       version += 1;
+    }
+  };
+}
+
+function readStore(rows) {
+  return {
+    async getWithMetadata() {
+      return { data: structuredClone(rows), etag: "v1" };
     }
   };
 }

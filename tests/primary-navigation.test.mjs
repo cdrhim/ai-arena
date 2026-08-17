@@ -22,6 +22,7 @@ test("every primary tab exposes an accessible child menu", () => {
 test("dropdowns link every existing child surface and preserve staff permissions", () => {
   for (const page of [
     "overview",
+    "advisors",
     "teams",
     "discover",
     "passports",
@@ -32,7 +33,6 @@ test("dropdowns link every existing child surface and preserve staff permissions
     "benefits",
     "workspace",
     "arena",
-    "operations",
     "database"
   ]) {
     assert.match(primaryNav, new RegExp(`data-nav-page="${page}"`));
@@ -46,7 +46,7 @@ test("dropdowns link every existing child surface and preserve staff permissions
   assert.match(primaryNav, /data-nav-target="myLogMatches"/);
   assert.match(primaryNav, /data-nav-target="myLogCommunity"/);
   assert.match(primaryNav, /data-nav-target="myLogBounties"/);
-  assert.match(primaryNav, /data-nav-page="operations" data-permission="canViewOperations"/);
+  assert.doesNotMatch(primaryNav, /Program Operations|data-nav-page="operations"/);
   assert.match(primaryNav, /data-nav-page="database" data-permission="canViewRawDatabase"/);
 });
 

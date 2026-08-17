@@ -18,7 +18,7 @@ export async function buildEventRecommendations(input = {}, options = {}) {
     return { ...fallback, source: "profile_fallback", model: null, warning: "현재 추천할 수 있는 공개 일정이나 확정 혜택이 없습니다." };
   }
   if (!apiKey) {
-    return { ...fallback, source: "profile_fallback", model: null, warning: "Spark AI 연결이 설정되지 않아 현재 공개 데이터로 추천을 계산했습니다." };
+    return { ...fallback, source: "profile_fallback", model: null, warning: "클로이 연결이 설정되지 않아 현재 공개 데이터로 추천을 계산했습니다." };
   }
 
   try {
@@ -39,7 +39,7 @@ export async function buildEventRecommendations(input = {}, options = {}) {
       warning: ""
     };
   } catch (error) {
-    console.warn("[event-recommendations] Spark AI provider request failed", {
+    console.warn("[event-recommendations] Clawee provider request failed", {
       model,
       message: bounded(error?.message || "Unknown AI provider error", 320)
     });
@@ -47,7 +47,7 @@ export async function buildEventRecommendations(input = {}, options = {}) {
       ...fallback,
       source: "profile_fallback",
       model: null,
-      warning: "Spark AI 추천을 불러오지 못해 현재 공개 일정과 확정 혜택을 기준으로 계산했습니다."
+      warning: "클로이 추천을 불러오지 못해 현재 공개 일정과 확정 혜택을 기준으로 계산했습니다."
     };
   }
 }

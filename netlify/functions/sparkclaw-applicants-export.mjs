@@ -5,7 +5,7 @@ import {
 import { assertProgramDatabaseAccess } from "../lib/program-database.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
-export default async function sparkclawApplicantsExport(req) {
+async function sparkclawApplicantsExport(req) {
   if (req.method === "OPTIONS") return response(null, 204);
   if (req.method !== "GET") return json({ error: "Method not allowed" }, 405);
 
@@ -32,6 +32,8 @@ export default async function sparkclawApplicantsExport(req) {
   }
 }
 
+export default withScArenaDevelopmentLogging("sparkclaw-applicants-export", sparkclawApplicantsExport);
+
 function json(payload, status = 200) {
   return response(JSON.stringify(payload), status, {
     "content-type": "application/json; charset=utf-8"
@@ -48,3 +50,4 @@ function response(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

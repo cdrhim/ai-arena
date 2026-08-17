@@ -4,6 +4,7 @@ import { audienceScopeLabel, audienceScopeOptionsForRole } from "./audience-scop
 import { communityPromptProfile, personalizedCommunityPrompts } from "./community-prompts.js?v=ai-arena-20260812-meeting-next-steps";
 import { communityHighlightItems, communityHighlightsForViewer } from "./featured-news.js";
 import { communityLiveCopy } from "./community-live.js";
+import { sortCommunityThreads } from "./community-sort.js";
 
 const SESSION_KEY = "sparkclaw-program-hub-session-v1";
 const FOUNDER_POST_TYPES = {
@@ -37,6 +38,7 @@ const FOUNDER_POST_TYPES = {
   }
 };
 const POST_TYPE_ALIASES = { ask: "ask", show: "ship", ship: "ship", connect: "connect", outcome: "outcome" };
+const CUSTOM_CHANNEL_VALUE = "__custom_channel__";
 const DISCOVERY_PROGRESS_STEPS = [
   "요청에서 목표와 필수 조건을 구조화하고 있습니다.",
   "참가기업의 안전한 기본 프로필에서 후보를 탐색하고 있습니다.",
@@ -50,7 +52,7 @@ const COMMUNITY_PROGRESS_STEPS = [
 ];
 const COMMUNITY_DRAFT_PROGRESS_STEPS = [
   "작성한 내용을 게시 가능한 맥락으로 구조화하고 있습니다.",
-  "Spark AI가 가장 적합한 채널과 공개 범위를 분석하고 있습니다.",
+  "클로이가 가장 적합한 채널과 공개 범위를 분석하고 있습니다.",
   "읽기 쉬운 제목과 게시 설정을 정리하고 있습니다."
 ];
 let context = window.__sparkArenaContext || {};
@@ -74,6 +76,12 @@ let communityLiveTimer = null;
 let arenaAnnouncements = [];
 let arenaAnnouncementRequestId = 0;
 let announcementDraftMode = false;
+let preferredDraftCategorySlug = "";
+let discoveryGuideStepTimer = null;
+let discoveryGuideHideTimer = null;
+let benefitSurveyViewerKey = "";
+let benefitSurveyRequestId = 0;
+let benefitSurveyPending = false;
 
 const els = {
   discoveryForm: document.querySelector("#agenticDiscoveryForm"),
@@ -81,6 +89,8 @@ const els = {
   discoverySubmit: document.querySelector("#agenticDiscoverySubmit"),
   discoveryStatus: document.querySelector("#agenticDiscoveryStatus"),
   discoveryResults: document.querySelector("#agenticDiscoveryResults"),
+  discoveryFlight: document.querySelector("#claweeDiscoveryFlight"),
+  discoveryFlightMessage: document.querySelector("#claweeDiscoveryFlightMessage"),
   featuredNews: document.querySelector("#featuredNews"),
   announcementBoard: document.querySelector("#communityAnnouncementBoard"),
   announcementList: document.querySelector("#communityAnnouncementList"),
@@ -91,9 +101,12 @@ const els = {
   liveTitle: document.querySelector("#communityLiveTitle"),
   liveMeta: document.querySelector("#communityLiveMeta"),
   partnerLogoRail: document.querySelector("#partnerLogoRail"),
-  memberPerkRequestForm: document.querySelector("#memberPerkRequestForm"),
-  memberPerkRequestInput: document.querySelector("#memberPerkRequestInput"),
-  memberPerkRequestStatus: document.querySelector("#memberPerkRequestStatus"),
+  memberBenefitSurveyForm: document.querySelector("#memberBenefitSurveyForm"),
+  memberBenefitSurveyName: document.querySelector("#memberBenefitSurveyName"),
+  memberBenefitSurveyDetails: document.querySelector("#memberBenefitSurveyDetails"),
+  memberBenefitSurveyReason: document.querySelector("#memberBenefitSurveyReason"),
+  memberBenefitSurveyStatus: document.querySelector("#memberBenefitSurveyStatus"),
+  memberBenefitSurveySubmit: document.querySelector('#memberBenefitSurveyForm button[type="submit"]'),
   promptKicker: document.querySelector("#communityPromptKicker"),
   promptTitle: document.querySelector("#communityPromptTitle"),
   promptList: document.querySelector("#communityPromptList"),
@@ -103,11 +116,20 @@ const els = {
   promptGuideCopy: document.querySelector("#communityPromptGuideCopy"),
   composer: document.querySelector("#communityComposer"),
   categories: document.querySelector("#communityCategories"),
+  createChannelToggle: document.querySelector("#communityCreateChannelToggle"),
+  createChannelForm: document.querySelector("#communityCreateChannelForm"),
+  createChannelName: document.querySelector("#communityCreateChannelName"),
+  createChannelDescription: document.querySelector("#communityCreateChannelDescription"),
+  createChannelVisibility: document.querySelector("#communityCreateChannelVisibility"),
+  createChannelCancel: document.querySelector("#communityCreateChannelCancel"),
+  createChannelStatus: document.querySelector("#communityCreateChannelStatus"),
   threadForm: document.querySelector("#communityThreadForm"),
   threadLinkedLabel: document.querySelector("#communityThreadLinkedLabel"),
   threadBody: document.querySelector("#communityThreadBody"),
   threadTitle: document.querySelector("#communityThreadTitle"),
   threadCategory: document.querySelector("#communityThreadCategory"),
+  customChannelField: document.querySelector("#communityCustomChannelField"),
+  customChannelName: document.querySelector("#communityCustomChannelName"),
   threadVisibility: document.querySelector("#communityThreadVisibility"),
   threadAnalyze: document.querySelector("#communityAnalyzeDraft"),
   threadMetadata: document.querySelector("#communityDraftMetadata"),
@@ -146,6 +168,7 @@ window.addEventListener("spark-arena:data", (event) => {
   renderConversationPrompts();
   configureAnnouncementComposer();
   loadArenaAnnouncements();
+  loadMemberBenefitSurvey();
 });
 
 window.addEventListener("spark-arena:page", (event) => {
@@ -167,11 +190,12 @@ window.addEventListener("spark-arena:restore-history-overlay", (event) => {
 
 function bindEvents() {
   els.discoveryForm?.addEventListener("submit", runAgenticDiscovery);
+  els.discoveryQuery?.addEventListener("keydown", handleDiscoveryQueryKeydown);
   els.announcementMode?.addEventListener("click", prepareArenaAnnouncement);
   els.announcementList?.addEventListener("click", handleAnnouncementOpen);
   els.featuredNews?.addEventListener("click", handleAnnouncementOpen);
   els.featuredNews?.addEventListener("keydown", handleAnnouncementOpen);
-  els.memberPerkRequestForm?.addEventListener("submit", prepareMemberPerkRequest);
+  els.memberBenefitSurveyForm?.addEventListener("submit", submitMemberBenefitSurvey);
   els.discoveryResults?.addEventListener("click", (event) => {
     const card = event.target.closest("[data-recommended-product-id]");
     if (!card) return;
@@ -190,9 +214,12 @@ function bindEvents() {
     const button = event.target.closest("[data-community-category]");
     if (!button) return;
     selectedCategory = button.dataset.communityCategory || "";
-    renderCategories();
+    renderFlexibleCategories();
     renderThreads();
   });
+  els.createChannelToggle?.addEventListener("click", () => toggleCreateChannelForm());
+  els.createChannelCancel?.addEventListener("click", () => toggleCreateChannelForm(false));
+  els.createChannelForm?.addEventListener("submit", createForumCategory);
   document.querySelectorAll("[data-community-sort]").forEach((button) => {
     button.addEventListener("click", () => {
       selectedSort = button.dataset.communitySort || "hot";
@@ -208,6 +235,10 @@ function bindEvents() {
   els.threadBody?.addEventListener("input", () => {
     if (lastAnalyzedBody && els.threadBody.value.trim() !== lastAnalyzedBody) invalidateThreadAnalysis();
   });
+  els.threadCategory?.addEventListener("change", () => {
+    preferredDraftCategorySlug = String(els.threadCategory?.value || "");
+    syncCustomThreadCategory({ focus: true });
+  });
   els.threadForm?.addEventListener("submit", createThread);
   els.threadList?.addEventListener("click", (event) => {
     const voteButton = event.target.closest("[data-community-vote]");
@@ -221,6 +252,10 @@ function bindEvents() {
   els.threadDialogClose?.addEventListener("click", closeThreadDialog);
   els.threadDialog?.addEventListener("click", (event) => {
     if (event.target === els.threadDialog) closeThreadDialog();
+    const editThreadButton = event.target.closest("[data-community-edit-thread]");
+    if (editThreadButton) beginThreadEdit(editThreadButton.dataset.communityEditThread);
+    const cancelThreadButton = event.target.closest("[data-community-cancel-thread-edit]");
+    if (cancelThreadButton) renderThreadDialog();
   });
   els.threadDialog?.addEventListener("cancel", (event) => {
     event.preventDefault();
@@ -229,62 +264,118 @@ function bindEvents() {
   els.threadDialog?.addEventListener("close", resetThreadDialogState);
   els.commentForm?.addEventListener("submit", createComment);
   els.commentList?.addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-community-edit-comment]");
+    if (editButton) {
+      beginCommentEdit(editButton.dataset.communityEditComment);
+      return;
+    }
+    const cancelButton = event.target.closest("[data-community-cancel-comment-edit]");
+    if (cancelButton) {
+      renderThreadDialog();
+      return;
+    }
     const replyButton = event.target.closest("[data-community-reply]");
     if (replyButton) selectCommentReply(replyButton.dataset.communityReply);
   });
   els.replyCancel?.addEventListener("click", clearCommentReply);
 }
 
-function prepareMemberPerkRequest(event) {
+function handleDiscoveryQueryKeydown(event) {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) return;
   event.preventDefault();
-  const request = String(els.memberPerkRequestInput?.value || "").trim();
-  if (request.length < 6) {
-    setStatus(els.memberPerkRequestStatus, "원하는 혜택을 조금 더 구체적으로 적어주세요.", "error");
-    els.memberPerkRequestInput?.focus();
+  if (event.repeat || discoveryPending || !els.discoveryForm) return;
+  if (els.discoverySubmit) els.discoveryForm.requestSubmit(els.discoverySubmit);
+  else els.discoveryForm.requestSubmit();
+}
+
+async function submitMemberBenefitSurvey(event) {
+  event.preventDefault();
+  if (benefitSurveyPending || !els.memberBenefitSurveyForm) return;
+  const formData = new FormData(els.memberBenefitSurveyForm);
+  const solutionName = String(formData.get("solutionName") || "").trim();
+  const solutionDetails = String(formData.get("solutionDetails") || "").trim();
+  const solutionReason = String(formData.get("solutionReason") || "").trim();
+  if (solutionName.length < 2) {
+    setStatus(els.memberBenefitSurveyStatus, "필요한 솔루션 명을 2자 이상 적어주세요.", "error");
+    els.memberBenefitSurveyName?.focus();
     return;
   }
-
-  if (!els.threadBody) return;
-  if (els.threadLinkedLabel) els.threadLinkedLabel.value = "perk_request";
-  els.threadBody.value = [
-    "원하는 혜택:",
-    request,
-    "",
-    "필요한 이유:",
-    "",
-    "예상 사용 방식 또는 팀 규모:",
-    "",
-    "희망 시점 또는 조건:"
-  ].join("\n");
-  invalidateThreadAnalysis({ preserveStatus: true });
-
-  if (els.promptGuide && els.promptGuideTitle && els.promptGuideCopy) {
-    els.promptGuide.hidden = false;
-    els.promptGuideTitle.textContent = "원하는 혜택 요청 초안";
-    els.promptGuideCopy.textContent = "필요한 이유와 예상 사용 방식까지 보완한 뒤 Spark AI로 제목·채널·공개 범위를 제안받아 게시해 주세요.";
+  if (solutionDetails.length < 10) {
+    setStatus(els.memberBenefitSurveyStatus, "솔루션 세부 내용을 10자 이상 적어주세요.", "error");
+    els.memberBenefitSurveyDetails?.focus();
+    return;
   }
+  if (solutionReason.length < 10) {
+    setStatus(els.memberBenefitSurveyStatus, "필요한 이유를 10자 이상 적어주세요.", "error");
+    els.memberBenefitSurveyReason?.focus();
+    return;
+  }
+  benefitSurveyPending = true;
+  setFormPending(els.memberBenefitSurveyForm, true);
+  if (els.memberBenefitSurveySubmit) els.memberBenefitSurveySubmit.textContent = "혜택 수요를 저장하는 중…";
+  setStatus(els.memberBenefitSurveyStatus, "혜택 수요를 비공개 데이터베이스에 저장하고 있습니다.");
+  try {
+    const response = await fetch("/api/benefit-needs-survey", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ solutionName, solutionDetails, solutionReason })
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || "설문 응답을 저장하지 못했습니다.");
+    applyMemberBenefitSurvey(payload?.survey);
+    setStatus(els.memberBenefitSurveyStatus, "혜택 수요가 저장되었습니다. SparkLabs 운영진만 검토합니다.", "success");
+  } catch (error) {
+    setStatus(els.memberBenefitSurveyStatus, error.message || "설문 응답을 저장하지 못했습니다.", "error");
+  } finally {
+    benefitSurveyPending = false;
+    setFormPending(els.memberBenefitSurveyForm, false);
+    if (els.memberBenefitSurveySubmit) els.memberBenefitSurveySubmit.textContent = "혜택 수요 업데이트하기 →";
+  }
+}
 
-  setStatus(els.memberPerkRequestStatus, "Community 초안을 만들었습니다. 이동 후 내용을 확인해 주세요.", "success");
-  document.querySelector('[data-go-page="community"]')?.click();
-  window.requestAnimationFrame(() => {
-    els.composer?.scrollIntoView({ behavior: "smooth", block: "start" });
-    els.threadBody?.focus({ preventScroll: true });
-    const requestEnd = els.threadBody.value.indexOf("\n\n필요한 이유:");
-    const caretPosition = requestEnd >= 0 ? requestEnd + "\n\n필요한 이유:\n".length : els.threadBody.value.length;
-    els.threadBody.setSelectionRange(caretPosition, caretPosition);
-  });
+async function loadMemberBenefitSurvey() {
+  const key = viewerKey(context.viewer);
+  if (context.viewer?.role !== "member" || !context.viewer?.id) {
+    if (benefitSurveyViewerKey) resetMemberBenefitSurvey();
+    return;
+  }
+  if (key === benefitSurveyViewerKey) return;
+  benefitSurveyViewerKey = key;
+  const requestId = ++benefitSurveyRequestId;
+  try {
+    const response = await fetch("/api/benefit-needs-survey", { headers: authHeaders() });
+    const payload = await response.json().catch(() => null);
+    if (requestId !== benefitSurveyRequestId || key !== viewerKey(context.viewer)) return;
+    if (!response.ok) {
+      if (response.status !== 503) throw new Error(payload?.error || "기존 설문 응답을 불러오지 못했습니다.");
+      return;
+    }
+    if (payload?.survey) {
+      applyMemberBenefitSurvey(payload.survey);
+      setStatus(els.memberBenefitSurveyStatus, "이전에 저장한 응답입니다. 내용을 바꾸면 새 버전으로 저장됩니다.", "success");
+    }
+  } catch (error) {
+    if (requestId === benefitSurveyRequestId) {
+      setStatus(els.memberBenefitSurveyStatus, error.message || "기존 설문 응답을 불러오지 못했습니다.", "error");
+    }
+  }
+}
+
+function applyMemberBenefitSurvey(survey) {
+  if (!survey || !els.memberBenefitSurveyForm) return;
+  if (els.memberBenefitSurveyName) els.memberBenefitSurveyName.value = survey.solutionName || "";
+  if (els.memberBenefitSurveyDetails) els.memberBenefitSurveyDetails.value = survey.solutionDetails || "";
+  if (els.memberBenefitSurveyReason) els.memberBenefitSurveyReason.value = survey.solutionReason || "";
+  if (els.memberBenefitSurveySubmit) els.memberBenefitSurveySubmit.textContent = "혜택 수요 업데이트하기 →";
 }
 
 function configureCommunitySorts() {
   const hotButton = document.querySelector('[data-community-sort="hot"]');
   const newButton = document.querySelector('[data-community-sort="new"]');
-  const topButton = document.querySelector('[data-community-sort="top"]');
+  const needsButton = document.querySelector('[data-community-sort="needs"]');
   if (hotButton) hotButton.textContent = "인기순";
   if (newButton) newButton.textContent = "최신순";
-  if (topButton) {
-    topButton.dataset.communitySort = "needs";
-    topButton.textContent = "답변 필요";
-  }
+  if (needsButton) needsButton.textContent = "댓글 필요";
 }
 
 async function runAgenticDiscovery(event) {
@@ -293,11 +384,12 @@ async function runAgenticDiscovery(event) {
   if (!query || discoveryPending) return;
   const requestId = ++discoveryRequestId;
   const progressToken = startProcessStatus(els.discoveryStatus, DISCOVERY_PROGRESS_STEPS, {
-    announcement: "Spark AI가 파트너 후보 탐색을 시작했습니다.",
+    announcement: "클로이가 파트너 후보 탐색을 시작했습니다.",
     interval: 1650
   });
   els.discoveryResults.hidden = true;
   setDiscoveryPending(true);
+  launchClaweeDiscoveryGuide();
   try {
     const response = await fetch("/api/b2b-match", {
       method: "POST",
@@ -308,11 +400,12 @@ async function runAgenticDiscovery(event) {
     if (!response.ok) throw new Error(discoveryErrorMessage(response.status));
     if (requestId !== discoveryRequestId) return;
     renderAgenticResults(payload.matches || [], payload.source);
+    finishClaweeDiscoveryGuide("success");
     finishProcessStatus(
       els.discoveryStatus,
       progressToken,
       payload.source === "anthropic"
-        ? "Spark AI가 공개 프로필의 근거를 바탕으로 후보를 정리했습니다. 확인되지 않은 정보는 소개 전에 검증합니다."
+        ? "클로이가 공개 프로필의 근거를 바탕으로 후보를 정리했습니다. 확인되지 않은 정보는 소개 전에 검증합니다."
         : "공개 프로필의 구조화된 근거로 후보를 정리했습니다. 확인되지 않은 정보는 소개 전에 검증합니다.",
       "success"
     );
@@ -322,6 +415,7 @@ async function runAgenticDiscovery(event) {
       ? error.message
       : "회사 추천을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
     finishProcessStatus(els.discoveryStatus, progressToken, message, "error");
+    finishClaweeDiscoveryGuide("error");
   } finally {
     if (requestId === discoveryRequestId) setDiscoveryPending(false);
   }
@@ -329,6 +423,7 @@ async function runAgenticDiscovery(event) {
 
 function resetAgenticDiscovery() {
   discoveryRequestId += 1;
+  resetClaweeDiscoveryGuide();
   setDiscoveryPending(false);
   setProcessStatus(els.discoveryStatus);
   if (els.discoveryQuery) {
@@ -339,6 +434,73 @@ function resetAgenticDiscovery() {
     els.discoveryResults.hidden = true;
     els.discoveryResults.replaceChildren();
   }
+}
+
+const CLAWEE_DISCOVERY_GUIDE_STEPS = [
+  "요청을 읽고 필요한 조건을 정리하고 있어요.",
+  "참가기업의 공개 프로필에서 후보를 찾고 있어요.",
+  "역량과 적용 근거를 비교해 추천 순서를 정리하고 있어요."
+];
+
+function launchClaweeDiscoveryGuide() {
+  const guide = els.discoveryFlight;
+  const button = els.discoverySubmit;
+  const section = document.querySelector("#agenticDiscoverySection");
+  if (!guide || !button || !section) return;
+  clearTimeout(discoveryGuideStepTimer);
+  clearTimeout(discoveryGuideHideTimer);
+  guide.hidden = false;
+  guide.className = "clawee-discovery-flight";
+  if (els.discoveryFlightMessage) els.discoveryFlightMessage.textContent = CLAWEE_DISCOVERY_GUIDE_STEPS[0];
+
+  const sectionRect = section.getBoundingClientRect();
+  const buttonRect = button.getBoundingClientRect();
+  const guideRect = guide.getBoundingClientRect();
+  const startX = buttonRect.left + buttonRect.width / 2 - (guideRect.left + guideRect.width / 2);
+  const startY = buttonRect.top + buttonRect.height / 2 - (guideRect.top + guideRect.height / 2);
+  guide.style.setProperty("--clawee-flight-x", `${Math.round(startX)}px`);
+  guide.style.setProperty("--clawee-flight-y", `${Math.round(startY)}px`);
+  guide.style.setProperty("--clawee-section-width", `${Math.round(sectionRect.width)}px`);
+  guide.getBoundingClientRect();
+  requestAnimationFrame(() => guide.classList.add("is-active"));
+
+  let step = 1;
+  const advance = () => {
+    if (guide.hidden || !guide.classList.contains("is-active")) return;
+    if (els.discoveryFlightMessage) els.discoveryFlightMessage.textContent = CLAWEE_DISCOVERY_GUIDE_STEPS[step % CLAWEE_DISCOVERY_GUIDE_STEPS.length];
+    step += 1;
+    discoveryGuideStepTimer = setTimeout(advance, 1250);
+  };
+  discoveryGuideStepTimer = setTimeout(advance, 1250);
+}
+
+function finishClaweeDiscoveryGuide(outcome) {
+  const guide = els.discoveryFlight;
+  if (!guide || guide.hidden) return;
+  clearTimeout(discoveryGuideStepTimer);
+  guide.classList.toggle("is-complete", outcome === "success");
+  guide.classList.toggle("is-error", outcome === "error");
+  if (els.discoveryFlightMessage) {
+    els.discoveryFlightMessage.textContent = outcome === "success"
+      ? "후보 정리가 끝났어요. 아래 추천 기업을 확인해 보세요."
+      : "잠시 문제가 생겼어요. 조건을 확인한 뒤 다시 불러 주세요.";
+  }
+  discoveryGuideHideTimer = setTimeout(() => {
+    guide.classList.add("is-leaving");
+    discoveryGuideHideTimer = setTimeout(() => resetClaweeDiscoveryGuide(), 520);
+  }, 1150);
+}
+
+function resetClaweeDiscoveryGuide() {
+  clearTimeout(discoveryGuideStepTimer);
+  clearTimeout(discoveryGuideHideTimer);
+  discoveryGuideStepTimer = null;
+  discoveryGuideHideTimer = null;
+  if (!els.discoveryFlight) return;
+  els.discoveryFlight.hidden = true;
+  els.discoveryFlight.className = "clawee-discovery-flight";
+  els.discoveryFlight.style.removeProperty("--clawee-flight-x");
+  els.discoveryFlight.style.removeProperty("--clawee-flight-y");
 }
 
 function renderAgenticResults(matches, source) {
@@ -353,7 +515,7 @@ function renderAgenticResults(matches, source) {
   els.discoveryResults.hidden = false;
   els.discoveryResults.innerHTML = uniqueMatches.length
     ? `<div class="agentic-results-head">
-         <div><strong>추천 기업</strong><span>${escapeHtml(source === "anthropic" ? "Spark AI가 기업별 차별 근거를 정리했습니다." : "기업별 공개 프로필 차이를 기준으로 정리했습니다.")}</span></div>
+         <div><strong>추천 기업</strong><span>${escapeHtml(source === "anthropic" ? "클로이가 기업별 차별 근거를 정리했습니다." : "기업별 공개 프로필 차이를 기준으로 정리했습니다.")}</span></div>
          <p class="agentic-results-policy">대상 스타트업이 My Log에서 요청을 승인한 뒤 SparkLabs가 소개를 진행합니다.</p>
        </div>
        <div class="agentic-result-grid">${uniqueMatches.map((match, index) => agenticResultMarkup(match, index)).join("")}</div>`
@@ -462,7 +624,8 @@ async function loadForum(force = false) {
     forumViewerKey = viewerKey(forum.viewer);
     publishCommunityActivity();
     populateThreadCategories();
-    renderCategories();
+    renderFlexibleCategories();
+    configureChannelCreator();
     renderThreads();
     syncAnnouncementsFromForum();
     renderCommunityLive();
@@ -493,7 +656,8 @@ function resetForumForViewerChange() {
   arenaAnnouncementRequestId += 1;
   arenaAnnouncements = [];
   resetThreadComposer();
-  resetMemberPerkRequest();
+  resetMemberBenefitSurvey();
+  toggleCreateChannelForm(false);
   publishCommunityActivity();
   if (els.categories) els.categories.innerHTML = "";
   if (els.threadList) els.threadList.innerHTML = "";
@@ -510,9 +674,15 @@ function publishCommunityActivity() {
   window.dispatchEvent(new CustomEvent("spark-arena:community-activity", { detail: activity }));
 }
 
-function resetMemberPerkRequest() {
-  els.memberPerkRequestForm?.reset();
-  setStatus(els.memberPerkRequestStatus);
+function resetMemberBenefitSurvey() {
+  benefitSurveyRequestId += 1;
+  benefitSurveyViewerKey = "";
+  benefitSurveyPending = false;
+  els.memberBenefitSurveyForm?.reset();
+  if (els.memberBenefitSurveySubmit) {
+    els.memberBenefitSurveySubmit.textContent = els.memberBenefitSurveySubmit.dataset.idleLabel || "혜택 수요 저장하기 →";
+  }
+  setStatus(els.memberBenefitSurveyStatus);
 }
 
 function renderCommunityLive(options = {}) {
@@ -557,9 +727,21 @@ function populateThreadCategories() {
   const previous = els.threadCategory.value;
   els.threadCategory.innerHTML = allowed
     .map((category) => `<option value="${escapeHtml(category.slug)}">${escapeHtml(category.label || category.name || category.slug)}</option>`)
-    .join("");
-  if (allowed.some((category) => category.slug === previous)) els.threadCategory.value = previous;
+    .join("") + (canCreateForumChannel() ? `<option value="${CUSTOM_CHANNEL_VALUE}">＋ 새 채널 직접 입력</option>` : "");
+  if (allowed.some((category) => category.slug === previous) || (previous === CUSTOM_CHANNEL_VALUE && canCreateForumChannel())) {
+    els.threadCategory.value = previous;
+  }
+  syncCustomThreadCategory();
   populateThreadVisibilities();
+}
+
+function syncCustomThreadCategory({ focus = false } = {}) {
+  const customSelected = els.threadCategory?.value === CUSTOM_CHANNEL_VALUE && canCreateForumChannel();
+  if (els.customChannelField) els.customChannelField.hidden = !customSelected;
+  if (els.customChannelName) {
+    els.customChannelName.required = customSelected;
+    if (focus && customSelected) requestAnimationFrame(() => els.customChannelName?.focus());
+  }
 }
 
 function populateThreadVisibilities() {
@@ -573,13 +755,129 @@ function populateThreadVisibilities() {
   els.threadVisibility.value = options.some((option) => option.value === previous) ? previous : "public";
 }
 
-function renderCategories() {
+function activeForumCategories() {
+  return (forum.categories || []).filter((category) => category.slug !== "staff" && Number(category.threadCount || 0) > 0);
+}
+
+function suggestedForumCategories() {
+  return (forum.categories || []).filter((category) => category.slug !== "staff" && Number(category.threadCount || 0) === 0 && category.canPost !== false);
+}
+
+function renderCategoryButton(category, isSuggested = false) {
+  return `<button class="${selectedCategory === category.slug ? "is-active" : ""}${isSuggested ? " is-suggested" : ""}" data-community-category="${escapeHtml(category.slug)}" type="button"${isSuggested ? ` title="아직 대화가 없는 추천 채널입니다. 첫 글을 시작해 보세요."` : ""}><span>${escapeHtml(category.label || category.name || category.slug)}</span><strong>${isSuggested ? "추천" : formatNumber(category.threadCount || 0)}</strong></button>`;
+}
+
+function renderFlexibleCategories() {
   if (!els.categories) return;
-  const categories = forum.categories || [];
-  els.categories.innerHTML = `<button class="${selectedCategory ? "" : "is-active"}" data-community-category="" type="button"><span>전체 대화</span><strong>${formatNumber((forum.threads || []).length)}</strong></button>${categories
-    .filter((category) => category.slug !== "staff")
-    .map((category) => `<button class="${selectedCategory === category.slug ? "is-active" : ""}" data-community-category="${escapeHtml(category.slug)}" type="button"><span>${escapeHtml(category.label || category.name || category.slug)}</span><strong>${formatNumber(category.threadCount || 0)}</strong></button>`)
-    .join("")}`;
+  const available = activeForumCategories();
+  const suggested = suggestedForumCategories();
+  const suggestedSelected = suggested.some((category) => category.slug === selectedCategory);
+  els.categories.innerHTML = `<button class="${selectedCategory ? "" : "is-active"}" data-community-category="" type="button"><span>전체 대화</span><strong>${formatNumber((forum.threads || []).length)}</strong></button>${available.map((category) => renderCategoryButton(category)).join("")}${suggested.length ? `<details class="community-suggested-channels"${suggestedSelected ? " open" : ""}><summary><span>추천 채널</span><strong>${formatNumber(suggested.length)}</strong></summary><p>아직 대화가 없습니다. 필요한 주제라면 첫 글을 시작해 보세요.</p>${suggested.map((category) => renderCategoryButton(category, true)).join("")}</details>` : ""}`;
+}
+
+function canCreateForumChannel() {
+  return ["member", "human_validator", "b2b_partner", "sparklabs"].includes(String(forum.viewer?.role || ""));
+}
+
+function configureChannelCreator() {
+  const allowed = canCreateForumChannel();
+  if (els.createChannelToggle) els.createChannelToggle.hidden = !allowed;
+  if (!allowed) toggleCreateChannelForm(false);
+  const privateOption = els.createChannelVisibility?.querySelector('option[value="members_only"]');
+  if (privateOption) privateOption.hidden = forum.viewer?.role === "b2b_partner";
+  if (forum.viewer?.role === "b2b_partner" && els.createChannelVisibility) els.createChannelVisibility.value = "public";
+}
+
+function toggleCreateChannelForm(force) {
+  if (!els.createChannelForm || !els.createChannelToggle) return;
+  const open = typeof force === "boolean" ? force : els.createChannelForm.hidden;
+  els.createChannelForm.hidden = !open;
+  els.createChannelToggle.setAttribute("aria-expanded", String(open));
+  els.createChannelToggle.classList.toggle("is-active", open);
+  if (open) requestAnimationFrame(() => els.createChannelName?.focus());
+  else {
+    els.createChannelForm.reset();
+    if (els.createChannelStatus) els.createChannelStatus.hidden = true;
+  }
+}
+
+async function createForumCategory(event) {
+  event.preventDefault();
+  const label = String(els.createChannelName?.value || "").trim();
+  if (label.length < 2) {
+    setStatus(els.createChannelStatus, "채널 이름을 2자 이상 입력해 주세요.", "error");
+    els.createChannelName?.focus();
+    return;
+  }
+  const payload = {
+    label,
+    description: String(els.createChannelDescription?.value || "").trim(),
+    visibility: String(els.createChannelVisibility?.value || "public")
+  };
+  setFormPending(els.createChannelForm, true);
+  setStatus(els.createChannelStatus, "새 채널을 만들고 있습니다.", "loading");
+  try {
+    const result = await requestForumCategoryCreation(payload);
+    applyCreatedForumCategory(result);
+    toggleCreateChannelForm(false);
+    els.composer?.scrollIntoView({ behavior: "smooth", block: "start" });
+    els.threadBody?.focus();
+  } catch (error) {
+    setStatus(els.createChannelStatus, error.message || "채널을 만들지 못했습니다.", "error");
+  } finally {
+    setFormPending(els.createChannelForm, false);
+  }
+}
+
+async function requestForumCategoryCreation(payload) {
+  const response = await fetch("/api/forum", {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ action: "createForumCategory", payload })
+  });
+  const result = await safeJson(response);
+  if (!response.ok) throw new Error(result?.error || "채널을 만들지 못했습니다.");
+  return result;
+}
+
+function applyCreatedForumCategory(result) {
+  forum = result.snapshot;
+  forumLoaded = true;
+  selectedCategory = result.event?.category?.slug || "";
+  preferredDraftCategorySlug = selectedCategory;
+  populateThreadCategories();
+  renderFlexibleCategories();
+  renderThreads();
+  if (els.threadCategory && selectedCategory) els.threadCategory.value = selectedCategory;
+  if (els.customChannelName) els.customChannelName.value = "";
+  syncCustomThreadCategory();
+}
+
+async function resolveThreadCategory(payload) {
+  if (payload.categorySlug !== CUSTOM_CHANNEL_VALUE) return payload.categorySlug;
+  const label = String(payload.customCategoryLabel || "").trim();
+  if (label.length < 2 || label.length > 40) {
+    const error = new Error("새 채널 이름을 2~40자로 입력해 주세요.");
+    error.focusTarget = els.customChannelName;
+    throw error;
+  }
+  const existing = (forum.categories || []).find(
+    (category) => category.canPost !== false && String(category.label || "").trim().toLocaleLowerCase() === label.toLocaleLowerCase()
+  );
+  if (existing) {
+    preferredDraftCategorySlug = existing.slug;
+    if (els.threadCategory) els.threadCategory.value = existing.slug;
+    if (els.customChannelName) els.customChannelName.value = "";
+    syncCustomThreadCategory();
+    return existing.slug;
+  }
+  const result = await requestForumCategoryCreation({
+    label,
+    description: `${label} 주제에 관한 대화`,
+    visibility: String(payload.visibility || "public")
+  });
+  applyCreatedForumCategory(result);
+  return result.event?.category?.slug || "";
 }
 
 function renderThreads() {
@@ -690,11 +988,12 @@ function renderThreadDialog() {
   const comments = commentsForThread(thread.id);
   const access = commentAccessForThread(thread);
 
+  const threadEdited = Date.parse(thread.updatedAt || 0) > Date.parse(thread.createdAt || 0);
   if (els.threadDetail) {
     els.threadDetail.innerHTML = `<div class="thread-meta"><span>${escapeHtml(type.label || thread.categoryLabel || "커뮤니티")}</span>${visibilityBadge}${thread.official && thread.categorySlug === "announcements" ? "<b>OFFICIAL NOTICE</b>" : thread.staffPick ? "<b>SPARKLABS PICK</b>" : ""}<time>${escapeHtml(relativeDate(thread.lastActivityAt || thread.createdAt))}</time></div>
       <h2 id="communityThreadDialogTitle">${escapeHtml(thread.title)}</h2>
       <p class="community-thread-body">${escapeHtml(thread.bodyMarkdown || thread.body || "")}</p>
-      <div class="community-thread-detail-footer"><span>${escapeHtml(thread.authorDisplayName || "Arena 회원")}</span><span>댓글 ${formatNumber(comments.length)}개</span><span>${escapeHtml(response.detail)}</span>${thread.locked ? "<span>댓글 작성 종료</span>" : ""}</div>`;
+      <div class="community-thread-detail-footer"><span>${escapeHtml(thread.authorDisplayName || "Arena 회원")}</span><span>댓글 ${formatNumber(comments.length)}개</span><span>${escapeHtml(response.detail)}</span>${threadEdited ? "<span>수정됨</span>" : ""}${thread.locked ? "<span>댓글 작성 종료</span>" : ""}${thread.canEdit ? `<button class="community-content-edit" data-community-edit-thread="${escapeHtml(thread.id)}" type="button">글 수정</button>` : ""}</div>`;
   }
 
   if (els.commentCount) els.commentCount.textContent = formatNumber(comments.length);
@@ -733,17 +1032,114 @@ function commentTreeMarkup(comments, canReply) {
   const renderBranch = (parentId, level = 0) => (children.get(parentId) || []).map((comment) => {
     const depth = Math.min(5, Math.max(level, Number(comment.depth || 0)));
     const deleted = comment.status === "deleted";
+    const edited = Date.parse(comment.updatedAt || 0) > Date.parse(comment.createdAt || 0);
     const nested = renderBranch(comment.id, depth + 1);
     return `<li class="community-comment-item" data-comment-id="${escapeHtml(comment.id)}" data-depth="${depth}" style="--comment-depth:${depth}" tabindex="-1">
       <article class="community-comment-card">
-        <div class="community-comment-meta"><strong>${escapeHtml(deleted ? "삭제된 댓글" : comment.authorDisplayName || "Arena 회원")}</strong><time>${escapeHtml(relativeDate(comment.createdAt))}</time>${depth ? `<span>답글 ${depth}단계</span>` : ""}</div>
+        <div class="community-comment-meta"><strong>${escapeHtml(deleted ? "삭제된 댓글" : comment.authorDisplayName || "Arena 회원")}</strong><time>${escapeHtml(relativeDate(comment.createdAt))}</time>${edited && !deleted ? "<span>수정됨</span>" : ""}${depth ? `<span>답글 ${depth}단계</span>` : ""}</div>
         <p class="community-comment-body">${escapeHtml(deleted ? "삭제된 댓글입니다." : comment.bodyMarkdown || "")}</p>
-        ${canReply && !deleted && depth < 5 ? `<button class="community-comment-reply" data-community-reply="${escapeHtml(comment.id)}" type="button">답글 달기</button>` : ""}
+        <div class="community-comment-controls">${canReply && !deleted && depth < 5 ? `<button class="community-comment-reply" data-community-reply="${escapeHtml(comment.id)}" type="button">답글 달기</button>` : ""}${comment.canEdit && !deleted ? `<button class="community-content-edit" data-community-edit-comment="${escapeHtml(comment.id)}" type="button">댓글 수정</button>` : ""}</div>
       </article>
       ${nested ? `<ol class="community-comment-children">${nested}</ol>` : ""}
     </li>`;
   }).join("");
   return renderBranch("root");
+}
+
+function beginThreadEdit(threadId) {
+  const thread = (forum.threads || []).find((item) => item.id === threadId);
+  if (!thread?.canEdit || !els.threadDetail) return;
+  els.threadDetail.innerHTML = `<form class="community-inline-edit community-thread-edit-form" data-community-thread-edit-form>
+    <span class="section-kicker">내 글 수정</span>
+    <label><span>제목</span><input name="title" maxlength="120" value="${escapeHtml(thread.title || "")}" required></label>
+    <label><span>내용</span><textarea name="bodyMarkdown" rows="8" maxlength="20000" required>${escapeHtml(thread.bodyMarkdown || "")}</textarea></label>
+    <div class="community-inline-edit-actions"><button class="secondary-button compact" data-community-cancel-thread-edit type="button">취소</button><button class="primary-button compact" type="submit">수정 내용 저장</button></div>
+    <p class="form-status" role="status" aria-live="polite" hidden></p>
+  </form>`;
+  const form = els.threadDetail.querySelector("[data-community-thread-edit-form]");
+  form?.addEventListener("submit", (event) => updateOwnThread(event, thread.id));
+  form?.elements.namedItem("title")?.focus();
+}
+
+function beginCommentEdit(commentId) {
+  const comment = commentsForThread(selectedThreadId).find((item) => item.id === commentId);
+  if (!comment?.canEdit || !els.commentList) return;
+  const item = els.commentList.querySelector(`[data-comment-id="${CSS.escape(comment.id)}"]`);
+  const card = item?.querySelector(":scope > .community-comment-card");
+  if (!card) return;
+  card.innerHTML = `<form class="community-inline-edit community-comment-edit-form" data-community-comment-edit-form>
+    <label><span>댓글 수정</span><textarea name="bodyMarkdown" rows="4" maxlength="20000" required>${escapeHtml(comment.bodyMarkdown || "")}</textarea></label>
+    <div class="community-inline-edit-actions"><button class="secondary-button compact" data-community-cancel-comment-edit type="button">취소</button><button class="primary-button compact" type="submit">댓글 저장</button></div>
+    <p class="form-status" role="status" aria-live="polite" hidden></p>
+  </form>`;
+  const form = card.querySelector("[data-community-comment-edit-form]");
+  form?.addEventListener("submit", (event) => updateOwnComment(event, comment.id));
+  form?.elements.namedItem("bodyMarkdown")?.focus();
+}
+
+async function updateOwnThread(event, threadId) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = form.querySelector(".form-status");
+  const data = new FormData(form);
+  await updateOwnForumContent({
+    form,
+    status,
+    action: "updateOwnForumThread",
+    payload: { threadId, title: String(data.get("title") || "").trim(), bodyMarkdown: String(data.get("bodyMarkdown") || "").trim() },
+    successMessage: "글을 수정했습니다."
+  });
+}
+
+async function updateOwnComment(event, commentId) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = form.querySelector(".form-status");
+  const data = new FormData(form);
+  await updateOwnForumContent({
+    form,
+    status,
+    action: "updateOwnForumComment",
+    payload: { commentId, bodyMarkdown: String(data.get("bodyMarkdown") || "").trim() },
+    successMessage: "댓글을 수정했습니다."
+  });
+}
+
+async function updateOwnForumContent({ form, status, action, payload, successMessage }) {
+  if (!payload.bodyMarkdown || (action === "updateOwnForumThread" && !payload.title)) {
+    setStatus(status, "제목과 내용을 모두 입력해 주세요.", "error");
+    return;
+  }
+  setFormPending(form, true);
+  setStatus(status, "수정 권한을 확인하고 저장하고 있습니다.", "progress");
+  try {
+    const response = await fetch("/api/forum", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ action, payload })
+    });
+    const result = await safeJson(response);
+    if (!response.ok) throw new Error(forumEditErrorMessage(response.status, result?.error));
+    forum = result.snapshot;
+    forumLoaded = true;
+    renderFlexibleCategories();
+    renderThreads();
+    syncAnnouncementsFromForum();
+    renderThreadDialog();
+    setStatus(els.commentStatus, successMessage, "success");
+  } catch (error) {
+    setStatus(status, error.message || "수정 내용을 저장하지 못했습니다.", "error");
+  } finally {
+    setFormPending(form, false);
+  }
+}
+
+function forumEditErrorMessage(status, serverMessage = "") {
+  if (status === 401) return "수정하려면 다시 로그인해 주세요.";
+  if (status === 403) return "본인이 작성한 글과 댓글만 수정할 수 있습니다.";
+  if (status === 404) return "수정할 글이나 댓글을 찾을 수 없습니다.";
+  if (status === 429) return "수정 요청이 많습니다. 잠시 후 다시 시도해 주세요.";
+  return serverMessage || "수정 내용을 저장하지 못했습니다.";
 }
 
 function commentAccessForThread(thread) {
@@ -811,7 +1207,7 @@ async function createComment(event) {
     const createdCommentId = result.event?.comment?.id || "";
     els.commentForm.reset();
     clearCommentReply();
-    renderCategories();
+    renderFlexibleCategories();
     renderThreads();
     renderThreadDialog();
     finishProcessStatus(els.commentStatus, progressToken, "댓글을 등록했습니다.", "success");
@@ -848,7 +1244,7 @@ async function analyzeThreadDraft() {
   invalidateThreadAnalysis({ preserveStatus: true });
   setThreadAnalysisPending(true);
   const progressToken = startProcessStatus(els.threadStatus, COMMUNITY_DRAFT_PROGRESS_STEPS, {
-    announcement: "Spark AI가 게시글 내용을 분석하고 있습니다.",
+    announcement: "클로이가 게시글 내용을 분석하고 있습니다.",
     interval: 1500
   });
   try {
@@ -860,7 +1256,13 @@ async function analyzeThreadDraft() {
     const result = await safeJson(response);
     if (!response.ok) throw new Error(draftAnalysisErrorMessage(response.status, result?.error));
     const analysis = result?.analysis || {};
-    const suggestedCategory = announcementDraftMode ? "announcements" : analysis.categorySlug;
+    const preferredCategoryAvailable = preferredDraftCategorySlug
+      && Array.from(els.threadCategory?.options || []).some((option) => option.value === preferredDraftCategorySlug);
+    const suggestedCategory = announcementDraftMode
+      ? "announcements"
+      : preferredCategoryAvailable
+        ? preferredDraftCategorySlug
+        : analysis.categorySlug;
     const suggestedVisibility = announcementDraftMode ? "public" : analysis.visibility;
     const categoryAvailable = Array.from(els.threadCategory?.options || []).some((option) => option.value === suggestedCategory);
     const visibilityAvailable = Array.from(els.threadVisibility?.options || []).some((option) => option.value === suggestedVisibility);
@@ -868,17 +1270,21 @@ async function analyzeThreadDraft() {
 
     els.threadTitle.value = analysis.title;
     els.threadCategory.value = suggestedCategory;
+    syncCustomThreadCategory();
     els.threadVisibility.value = suggestedVisibility;
     lastAnalyzedBody = bodyMarkdown;
     if (els.threadReason) {
       els.threadReason.textContent = brandSafeDisplayText([analysis.reason, analysis.warning].filter(Boolean).join(" "));
     }
     if (els.threadMetadata) els.threadMetadata.hidden = false;
+    document.dispatchEvent(new CustomEvent("arena:community-draft-ready", {
+      detail: { targetId: "communityDraftMetadata" }
+    }));
     finishProcessStatus(
       els.threadStatus,
       progressToken,
       analysis.source === "spark_ai"
-        ? "Spark AI가 제목·채널·공개 범위를 제안했습니다. 확인하거나 수정한 뒤 게시해 주세요."
+        ? "클로이가 제목·채널·공개 범위를 제안했습니다. 확인하거나 수정한 뒤 게시해 주세요."
         : "내용 기반 게시 설정을 제안했습니다. 확인하거나 수정한 뒤 게시해 주세요.",
       "success"
     );
@@ -896,21 +1302,11 @@ async function createThread(event) {
   if (!els.threadForm) return;
   const bodyMarkdown = String(els.threadBody?.value || "").trim();
   if (!lastAnalyzedBody || bodyMarkdown !== lastAnalyzedBody) {
-    setStatus(els.threadStatus, "먼저 본문을 Spark AI로 분석해 제목·채널·공개 범위를 만들어 주세요.", "error");
+    setStatus(els.threadStatus, "먼저 본문을 클로이로 분석해 제목·채널·공개 범위를 만들어 주세요.", "error");
     els.threadAnalyze?.focus();
     return;
   }
   const payload = Object.fromEntries(new FormData(els.threadForm).entries());
-  const type = postTypeForCategory(payload.categorySlug);
-  if (type) payload.threadType = type.key;
-  const isAnnouncement = payload.categorySlug === "announcements";
-  if (isAnnouncement) {
-    payload.threadType = "announcement";
-    payload.linkedLabel = "arena_announcement";
-    payload.pinned = true;
-    payload.staffPick = true;
-    payload.official = true;
-  }
   if (!payload.title || !payload.categorySlug || !payload.visibility) {
     setStatus(els.threadStatus, "제안된 제목·채널·공개 범위를 확인해 주세요.", "error");
     return;
@@ -921,7 +1317,22 @@ async function createThread(event) {
     ["제목·채널·공개 범위를 최종 확인하고 있습니다.", "Community에 내용을 안전하게 등록하고 있습니다.", "최신 피드에 반영하고 있습니다."],
     { announcement: "대화를 등록하고 있습니다." }
   );
+  let type = null;
+  let isAnnouncement = false;
   try {
+    payload.categorySlug = await resolveThreadCategory(payload);
+    delete payload.customCategoryLabel;
+    if (!payload.categorySlug) throw new Error("사용할 채널을 확인하지 못했습니다.");
+    type = postTypeForCategory(payload.categorySlug);
+    if (type) payload.threadType = type.key;
+    isAnnouncement = payload.categorySlug === "announcements";
+    if (isAnnouncement) {
+      payload.threadType = "announcement";
+      payload.linkedLabel = "arena_announcement";
+      payload.pinned = true;
+      payload.staffPick = true;
+      payload.official = true;
+    }
     const response = await fetch("/api/forum", {
       method: "POST",
       headers: { "content-type": "application/json", ...authHeaders() },
@@ -933,7 +1344,7 @@ async function createThread(event) {
     forumLoaded = true;
     resetThreadComposer();
     populateThreadCategories();
-    renderCategories();
+    renderFlexibleCategories();
     renderThreads();
     syncAnnouncementsFromForum();
     finishProcessStatus(
@@ -950,6 +1361,7 @@ async function createThread(event) {
     );
   } catch (error) {
     finishProcessStatus(els.threadStatus, progressToken, error.message || "대화를 등록하지 못했습니다.", "error");
+    error.focusTarget?.focus();
   } finally {
     setFormPending(els.threadForm, false);
     updateThreadSubmitState();
@@ -972,7 +1384,7 @@ async function voteThread(threadId) {
     const result = await safeJson(response);
     if (!response.ok) throw new Error(result?.error || "공감을 기록하지 못했습니다.");
     forum = result.snapshot;
-    renderCategories();
+    renderFlexibleCategories();
     renderThreads();
     finishProcessStatus(els.threadStatus, progressToken);
   } catch (error) {
@@ -984,7 +1396,6 @@ function renderConversationPrompts() {
   const profile = communityPromptProfile(context);
   activeCommunityPrompts = personalizedCommunityPrompts(context);
   const organizationName = communityPromptOrganizationName();
-  const preOtGuided = activeCommunityPrompts.some((prompt) => prompt.origin?.includes("PRE-OT"));
   const railCopy = communityPromptRailCopy(profile.kind);
   if (els.promptKicker) els.promptKicker.textContent = railCopy.kicker;
   if (els.promptTitle) els.promptTitle.textContent = railCopy.title;
@@ -993,17 +1404,15 @@ function renderConversationPrompts() {
       ? `${organizationName} 파트너 프로필 맞춤 · 협업 수요와 제공 가치를 구체화하도록 구성한 작성 가이드입니다. 아직 게시된 글이 아닙니다.`
       : profile.kind === "staff"
         ? `${organizationName} 운영 계정 맞춤 · 회원 간 수요와 연결 신호를 확인하기 위한 작성 가이드입니다. 아직 게시된 글이 아닙니다.`
-        : preOtGuided
-          ? `${organizationName} 프로필 맞춤 · 프리 OT에서 확인한 공통 수요를 운영진 질문으로 정리했습니다. 아직 게시된 글이 아닙니다.`
-          : `${organizationName} 프로필 맞춤 작성 가이드입니다. 아직 게시된 글이 아닙니다.`;
+        : `${organizationName} 프로필 맞춤 · 질문을 누르면 왼쪽 내용 칸에 바로 편집할 수 있는 초안이 들어갑니다.`;
   }
   if (!els.promptList) return;
   els.promptList.innerHTML = activeCommunityPrompts.map((prompt) => `
-    <button type="button" data-community-prompt="${escapeHtml(prompt.id)}" aria-label="${escapeHtml(prompt.label)} 작성 가이드 열기">
+    <button type="button" data-community-prompt="${escapeHtml(prompt.id)}" aria-label="${escapeHtml(prompt.label)} 질문을 왼쪽 내용 칸에 적용">
       <small>${escapeHtml(prompt.origin || "운영진 작성 가이드")}</small>
       <strong>${escapeHtml(prompt.label)}</strong>
       <span>${escapeHtml(prompt.hint)}</span>
-      <i aria-hidden="true">→</i>
+      <i aria-hidden="true">←</i>
     </button>
   `).join("");
 }
@@ -1015,7 +1424,7 @@ function communityPromptRailCopy(kind) {
   if (kind === "staff") {
     return { kicker: "COMMUNITY OPERATIONS", title: "운영진이 대화를 여는 질문" };
   }
-  return { kicker: "PRE-OT NETWORKING NEEDS", title: "먼저 꺼내볼 운영 질문" };
+  return { kicker: "DRAFT STARTERS", title: "막힐 때 꺼내 쓰는 질문" };
 }
 
 function communityPromptOrganizationName() {
@@ -1033,6 +1442,11 @@ function hydrateConversationPrompt(promptId) {
   if (!els.threadBody) return;
   const prompt = activeCommunityPrompts.find((item) => item.id === promptId);
   if (!prompt) return;
+  const promptButton = Array.from(els.promptList?.querySelectorAll("[data-community-prompt]") || [])
+    .find((button) => button.dataset.communityPrompt === promptId);
+  promptButton?.classList.remove("is-transferring");
+  window.requestAnimationFrame(() => promptButton?.classList.add("is-transferring"));
+  window.setTimeout(() => promptButton?.classList.remove("is-transferring"), 760);
   if (els.threadLinkedLabel) els.threadLinkedLabel.value = "";
   els.threadBody.value = prompt.template.trim();
   invalidateThreadAnalysis();
@@ -1058,13 +1472,16 @@ function invalidateThreadAnalysis({ preserveStatus = false } = {}) {
   if (els.threadReason) els.threadReason.textContent = "";
   updateThreadSubmitState();
   if (!preserveStatus && els.threadStatus && !els.threadStatus.classList.contains("is-loading")) {
-    setStatus(els.threadStatus, "내용을 작성한 뒤 Spark AI로 게시 설정을 만들어 주세요.");
+    setStatus(els.threadStatus, "내용을 작성한 뒤 클로이로 게시 설정을 만들어 주세요.");
   }
 }
 
 function resetThreadComposer() {
   els.threadForm?.reset();
   resetAnnouncementDraftMode();
+  preferredDraftCategorySlug = "";
+  if (els.customChannelName) els.customChannelName.value = "";
+  syncCustomThreadCategory();
   lastAnalyzedBody = "";
   if (els.promptGuide) els.promptGuide.hidden = true;
   if (els.threadMetadata) els.threadMetadata.hidden = true;
@@ -1221,7 +1638,10 @@ async function loadArenaAnnouncements(force = false) {
     return;
   }
   try {
-    const response = await fetch("/api/arena-announcements", { headers: { Accept: "application/json", ...authHeaders() } });
+    const response = await fetch("/api/arena-announcements", {
+      cache: "no-store",
+      headers: { Accept: "application/json", ...authHeaders() }
+    });
     const payload = await safeJson(response);
     if (!response.ok || requestId !== arenaAnnouncementRequestId) return;
     arenaAnnouncements = Array.isArray(payload.announcements) ? payload.announcements : [];
@@ -1240,6 +1660,9 @@ function syncAnnouncementsFromForum() {
     .slice(0, 5);
   renderFeaturedNews(communityHighlightItems(context.hub || {}));
   renderAnnouncementBoard();
+  window.dispatchEvent(new CustomEvent("spark-arena:announcements-updated", {
+    detail: { announcements: arenaAnnouncements }
+  }));
 }
 
 function renderAnnouncementBoard() {
@@ -1258,7 +1681,7 @@ function handleAnnouncementOpen(event) {
   document.querySelector('[data-go-page="community"]')?.click();
   selectedCategory = "announcements";
   if (forumLoaded) {
-    renderCategories();
+    renderFlexibleCategories();
     renderThreads();
     openThreadDialog(threadId);
   } else {
@@ -1294,17 +1717,7 @@ async function refineFeaturedNews(items) {
 }
 
 function sortThreads(items) {
-  const copy = [...items];
-  if (selectedSort === "new") return copy.sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
-  if (selectedSort === "needs") {
-    const priority = { needs_attention: 0, awaiting_response: 1, open_discussion: 2, response_received: 3, outcome_recorded: 4 };
-    return copy.sort((a, b) => {
-      const statusDifference = (priority[a.responseStatus] ?? 5) - (priority[b.responseStatus] ?? 5);
-      if (statusDifference) return statusDifference;
-      return Date.parse(a.responseDueAt || a.createdAt || 0) - Date.parse(b.responseDueAt || b.createdAt || 0);
-    });
-  }
-  return copy.sort((a, b) => Number(b.hotScore || b.score || 0) - Number(a.hotScore || a.score || 0));
+  return sortCommunityThreads(items, selectedSort);
 }
 
 function authHeaders() {
@@ -1333,7 +1746,7 @@ function setDiscoveryPending(pending) {
   els.discoveryForm?.setAttribute("aria-busy", String(pending));
   if (els.discoverySubmit) {
     els.discoverySubmit.classList.toggle("is-searching", pending);
-    els.discoverySubmit.textContent = pending ? "찾는 중…" : els.discoverySubmit.dataset.idleLabel || "Spark AI에게 묻기 →";
+    els.discoverySubmit.textContent = pending ? "클로이가 찾는 중…" : els.discoverySubmit.dataset.idleLabel || "Clawee 클로이에게 물어보기 →";
   }
   setFormPending(els.discoveryForm, pending);
 }

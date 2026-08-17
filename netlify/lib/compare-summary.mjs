@@ -9,7 +9,7 @@ export async function buildComparisonSummary(teams, options = {}) {
   const env = options.env || process.env;
   const apiKey = String(env.GEMINI_API_KEY || env.GOOGLE_API_KEY || "").trim();
   const model = String(env.GEMINI_COMPARE_MODEL || DEFAULT_GEMINI_MODEL).trim();
-  if (!apiKey) return { ...fallback, source: "profile_fallback", model: null, warning: "Spark AI 연결이 설정되지 않아 공개 프로필 요약을 표시합니다." };
+  if (!apiKey) return { ...fallback, source: "profile_fallback", model: null, warning: "클로이 연결이 설정되지 않아 공개 프로필 요약을 표시합니다." };
 
   try {
     const generated = await callGeminiComparison({
@@ -21,11 +21,11 @@ export async function buildComparisonSummary(teams, options = {}) {
     });
     return { ...validateGeneratedSummary(generated, safeTeams, fallback), source: "spark_ai", model: null, warning: "" };
   } catch (error) {
-    console.warn("[compare-summary] Spark AI provider request failed", {
+    console.warn("[compare-summary] Clawee provider request failed", {
       model,
       message: bounded(error?.message || "Unknown AI provider error", 320)
     });
-    return { ...fallback, source: "profile_fallback", model: null, warning: "Spark AI 요약을 불러오지 못해 공개 프로필 근거로 정리했습니다." };
+    return { ...fallback, source: "profile_fallback", model: null, warning: "클로이 요약을 불러오지 못해 공개 프로필 근거로 정리했습니다." };
   }
 }
 

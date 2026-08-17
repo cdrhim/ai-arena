@@ -1,0 +1,32 @@
+{
+  "a079253b-fccc-45e1-8844-798edf427235": [
+    {
+      "kind": "apple_app_store",
+      "label": "App Store",
+      "url": "https://apps.apple.com/us/app/oing/id6756283759",
+      "sourceUrl": "https://apps.apple.com/us/app/oing/id6756283759"
+    }
+  ],
+  "88387f03-1406-4db4-83c7-c1ae795a4bf5": [
+    {
+      "kind": "google_play",
+      "label": "Google Play",
+      "url": "https://play.google.com/store/apps/details?id=com.storyweaver.callva",
+      "sourceUrl": "https://play.google.com/store/apps/details?id=com.storyweaver.callva"
+    },
+    {
+      "kind": "apple_app_store",
+      "label": "App Store",
+      "url": "https://apps.apple.com/kr/app/callva/id6758038393",
+      "sourceUrl": "https://apps.apple.com/kr/app/callva/id6758038393"
+    }
+  ],
+  "4c296aba-a62e-4475-8195-163a814d1901": [
+    {
+      "kind": "apple_app_store",
+      "label": "App Store",
+      "url": "https://apps.apple.com/kr/app/viecoday/id6472217370",
+      "sourceUrl": "https://apps.apple.com/kr/app/viecoday/id6472217370"
+    }
+  ]
+}

@@ -8,9 +8,11 @@ import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
 const MAX_BODY_BYTES = 128 * 1024;
 
-export default function externalPartners(req) {
+function externalPartners(req) {
   return handleExternalPartnersRequest(req);
 }
+
+export default withScArenaDevelopmentLogging("external-partners", externalPartners);
 
 export async function handleExternalPartnersRequest(req, options = {}) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
@@ -118,3 +120,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

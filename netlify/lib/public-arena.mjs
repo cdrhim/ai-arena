@@ -1,4 +1,5 @@
 import { plainEventDescription } from "../../public/arena/event-copy.js";
+import { isCommunityEventFromOrientation } from "../../public/arena/event-timeline.js";
 
 const PUBLIC_LINK_TYPES = new Set(["website", "demo", "docs", "video", "app", "product"]);
 const PUBLIC_EVENT_PATTERN = /(^|\b)(public|open|all|anyone)(\b|$)|외부|전체|누구나/i;
@@ -25,6 +26,7 @@ export function buildPublicArenaSnapshot({
 
   const events = (Array.isArray(program?.events) ? program.events : [])
     .filter((event) => isPublicEvent(event, allowedEventIds))
+    .filter(isCommunityEventFromOrientation)
     .map(publicEvent)
     .sort((left, right) => String(left.date || "").localeCompare(String(right.date || "")));
   const benefits = (Array.isArray(program?.benefits) ? program.benefits : [])

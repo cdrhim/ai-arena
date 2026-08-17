@@ -26,6 +26,7 @@ test("public snapshot exposes only explicitly public events and confirmed benefi
   const snapshot = buildPublicArenaSnapshot({
     program: {
       events: [
+        { id: "old-open", title: "Old Open Event", targetGroup: "Public", date: "2026-08-12" },
         {
           id: "open",
           title: "Open Demo Day",

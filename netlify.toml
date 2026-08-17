@@ -67,6 +67,11 @@ to = "/.netlify/functions/arena-announcements"
 status = 200
 
 [[redirects]]
+from = "/api/arena-guide"
+to = "/.netlify/functions/arena-guide"
+status = 200
+
+[[redirects]]
 from = "/api/featured-keywords"
 to = "/.netlify/functions/featured-keywords"
 status = 200
@@ -101,12 +106,22 @@ from = "/api/my-log"
 to = "/.netlify/functions/my-log"
 status = 200
 
+[[redirects]]
+from = "/api/arena-activity"
+to = "/.netlify/functions/arena-activity"
+status = 200
+
+[[redirects]]
+from = "/api/benefit-needs-survey"
+to = "/.netlify/functions/benefit-needs-survey"
+status = 200
+
 [functions."sparkclaw-applicants-export"]
 included_files = ["netlify/data/sparkclaw-applicants/**"]
 
 [[redirects]]
 from = "/"
-to = "/arena/index.html"
+to = "/index.html"
 status = 200
 force = true
 

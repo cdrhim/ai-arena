@@ -98,6 +98,63 @@ test("My Log API accepts only GET and advertises the read-only CORS contract", a
   assert.equal(optionsResponse.headers.get("access-control-allow-methods"), "GET, OPTIONS");
 });
 
+test("SparkLabs My Log receives a privacy-bounded public discovery Brief monitor", async () => {
+  const staff = {
+    id: "33333333-3333-4333-8333-333333333333",
+    email: "operator@sparklabs.co.kr",
+    role: "sparklabs",
+    organization: "SparkLabs"
+  };
+  const response = await myLog(new Request("https://example.test/api/my-log", {
+    headers: { Authorization: "Bearer staff-session" }
+  }), {
+    verifyRequest: async () => ({ ok: true, viewer: staff }),
+    loadMyLog: async () => ({ available: true, events: [], nextCursor: null }),
+    loadPublicBriefMonitor: async () => ({
+      available: true,
+      totalCount: 123,
+      items: [{
+        id: "public_brief_123",
+        organization: "New Partner",
+        problemSummary: "Need a governed AI workflow",
+        status: "received",
+        createdAt: "2026-08-17T01:00:00.000Z",
+        updatedAt: "2026-08-17T01:00:00.000Z",
+        deadline: "2026-09-01",
+        email: "must-not-leak@example.com",
+        contactName: "Must Not Leak"
+      }]
+    })
+  });
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.publicBriefMonitor.available, true);
+  assert.equal(payload.publicBriefMonitor.totalCount, 123);
+  assert.equal(payload.publicBriefMonitor.items[0].organization, "New Partner");
+  assert.equal(Object.hasOwn(payload.publicBriefMonitor.items[0], "email"), false);
+  assert.equal(Object.hasOwn(payload.publicBriefMonitor.items[0], "contactName"), false);
+});
+
+test("member My Log never reads or exposes the public Brief monitor", async () => {
+  let monitorLoaded = false;
+  const response = await myLog(new Request("https://example.test/api/my-log", {
+    headers: { Authorization: "Bearer member-session" }
+  }), {
+    verifyRequest: async () => ({ ok: true, viewer: MEMBER }),
+    resolveDirectoryContext: async () => ({ viewer: MEMBER, viewerTeamId: "team-9", directory: [] }),
+    loadMyLog: async () => ({ available: true, events: [], nextCursor: null }),
+    loadPublicBriefMonitor: async () => {
+      monitorLoaded = true;
+      return { available: true, items: [] };
+    }
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(monitorLoaded, false);
+  assert.equal(Object.hasOwn(await response.json(), "publicBriefMonitor"), false);
+});
+
 test("My Log API skips program lookup for partners and normalizes unsupported query values", async () => {
   const partner = {
     id: "22222222-2222-4222-8222-222222222222",

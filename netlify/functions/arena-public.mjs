@@ -13,7 +13,7 @@ const PUBLIC_VIEWER = Object.freeze({ role: "public", roleLabel: "Public visitor
 const PUBLIC_CATALOG_PROJECTOR = Object.freeze({ role: "sparklabs", roleLabel: "Public catalog projector", canScore: true });
 const MAX_PUBLIC_BRIEF_BODY_BYTES = 64 * 1024;
 
-export default async function arenaPublic(req) {
+async function arenaPublic(req) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (!['GET', 'POST'].includes(req.method)) return json({ error: "Method not allowed" }, 405);
   try {
@@ -44,6 +44,8 @@ export default async function arenaPublic(req) {
     return json({ error: error.message }, error.status || 400, error.headers || {});
   }
 }
+
+export default withScArenaDevelopmentLogging("arena-public", arenaPublic);
 
 async function submitBrief(req) {
   const limit = await consumeRateLimit(`public-brief:${clientKey(req)}`, {
@@ -164,3 +166,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

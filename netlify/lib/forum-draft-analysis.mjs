@@ -17,7 +17,7 @@ export async function analyzeForumDraft(input = {}, options = {}) {
       ...fallback,
       source: "deterministic_fallback",
       model: null,
-      warning: "Spark AI 연결 전에도 게시할 수 있도록 내용 기반 기본 제안을 만들었습니다."
+      warning: "클로이 연결 전에도 게시할 수 있도록 내용 기반 기본 제안을 만들었습니다."
     };
   }
 
@@ -38,7 +38,7 @@ export async function analyzeForumDraft(input = {}, options = {}) {
       warning: ""
     };
   } catch (error) {
-    console.warn("[forum-draft-analysis] Spark AI provider request failed", {
+    console.warn("[forum-draft-analysis] Clawee provider request failed", {
       model,
       message: bounded(error?.message || "Unknown AI provider error", 320)
     });
@@ -46,7 +46,7 @@ export async function analyzeForumDraft(input = {}, options = {}) {
       ...fallback,
       source: "deterministic_fallback",
       model: null,
-      warning: "Spark AI 응답을 불러오지 못해 내용 기반 기본 제안을 만들었습니다. 게시 전에 설정을 확인해 주세요."
+      warning: "클로이 응답을 불러오지 못해 내용 기반 기본 제안을 만들었습니다. 게시 전에 설정을 확인해 주세요."
     };
   }
 }

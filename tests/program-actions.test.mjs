@@ -12,6 +12,47 @@ const GAMMA = { id: 3, name: "Gamma", companyName: "Gamma Inc.", group: "Discove
 const T1 = "2026-08-04T01:00:00.000Z";
 const T2 = "2026-08-04T02:00:00.000Z";
 
+test("only a linked member can update its own team card visibility", () => {
+  const initial = buildProgramActionSnapshot(makeHub(), [], MEMBER);
+  const updated = createProgramActionEvent(
+    "updateTeamCardVisibility",
+    {
+      fields: {
+        introduction: "private",
+        achievements: "public",
+        capabilities: "private",
+        aiIdea: "private",
+        website: "public"
+      },
+      teamId: BETA.id
+    },
+    initial,
+    MEMBER,
+    T1
+  );
+
+  assert.equal(updated.type, "team_card_visibility_updated");
+  assert.equal(updated.visibility.teamId, String(ALPHA.id));
+  assert.equal(updated.visibility.fields.introduction, "private");
+  assert.equal(updated.visibility.updatedByUserId, MEMBER.id);
+  assert.equal(Object.hasOwn(updated.visibility, "updatedByEmail"), false);
+
+  const ownerView = buildProgramActionSnapshot(makeHub(), [updated], MEMBER);
+  assert.equal(ownerView.viewerTeam.cardVisibility.canEdit, true);
+  assert.equal(ownerView.viewerTeam.cardVisibility.fields.capabilities, "private");
+
+  assert.throws(
+    () => createProgramActionEvent(
+      "updateTeamCardVisibility",
+      { fields: { introduction: "private" } },
+      makeHub({ viewer: STAFF, team: null }),
+      STAFF,
+      T2
+    ),
+    (error) => error.status === 403
+  );
+});
+
 test("benefit applications derive the linked team and reject an active duplicate", () => {
   const initial = buildProgramActionSnapshot(makeHub(), [], MEMBER);
   const created = createProgramActionEvent(

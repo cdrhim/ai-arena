@@ -13,7 +13,7 @@ import { loadProgramDirectoryContext } from "../lib/program-hub.mjs";
 import { consumeRateLimit } from "../lib/rate-limit.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
-export default async function b2bMatch(req) {
+async function b2bMatch(req) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (!["GET", "POST"].includes(req.method)) return json({ error: "지원하지 않는 요청 방식입니다." }, 405);
 
@@ -99,6 +99,8 @@ export default async function b2bMatch(req) {
     );
   }
 }
+
+export default withScArenaDevelopmentLogging("b2b-match", b2bMatch);
 
 export function partnerVisibleDirectory(directory = [], viewer, env = process.env) {
   const rows = Array.isArray(directory) ? directory : [];
@@ -188,3 +190,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

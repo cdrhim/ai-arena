@@ -167,3 +167,23 @@ test("reduced-motion users get a stable first stage without a rotating timer", (
   assert.equal(element.dataset.processStep, "1");
   finishProcessStatus(element, token);
 });
+
+test("elapsed process status keeps confirming a long request is still active", () => {
+  const { element, clock } = fixture();
+  const token = startProcessStatus(element, ["요청 정리", "저장 중", "응답 대기"], {
+    clock,
+    interval: 1000,
+    showElapsed: true
+  });
+
+  clock.tick();
+  assert.equal(element.dataset.processStep, "2");
+  assert.equal(element.children[2].textContent, "2/3 · 1초");
+  clock.tick();
+  clock.tick();
+  assert.equal(element.dataset.processStep, "3");
+  assert.equal(element.children[2].textContent, "3/3 · 3초");
+  assert.equal(clock.size, 1);
+  finishProcessStatus(element, token, "저장 완료", "success");
+  assert.equal(clock.size, 0);
+});

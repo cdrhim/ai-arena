@@ -87,7 +87,12 @@ const COPY = Object.freeze({
       email: "이메일",
       password: "비밀번호",
       passwordPlaceholder: "비밀번호 입력",
-      submit: "로그인",
+        submit: "로그인",
+        googleAdmin: "SparkLabs 관리자 Google 로그인",
+        googleAdminNote: "@sparklabs.co.kr 업무용 Google 계정만 로그인할 수 있습니다.",
+        googleNotReady: "Google 관리자 로그인이 아직 활성화되지 않았습니다.",
+        googleStarting: "Google 보안 로그인으로 이동합니다.",
+        googleDomainRequired: "sparklabs.co.kr 업무용 Google 계정만 사용할 수 있습니다.",
       trustLabel: "접근 원칙",
       trust: ["권한 기반 접근", "Double opt-in"],
       notReady: "로그인 설정이 준비되지 않았습니다.",
@@ -187,7 +192,12 @@ const COPY = Object.freeze({
       email: "Email",
       password: "Password",
       passwordPlaceholder: "Enter your password",
-      submit: "Log in",
+        submit: "Log in",
+        googleAdmin: "SparkLabs admin Google login",
+        googleAdminNote: "Only @sparklabs.co.kr Google Workspace accounts can sign in.",
+        googleNotReady: "Google admin login is not enabled yet.",
+        googleStarting: "Opening secure Google sign-in.",
+        googleDomainRequired: "Only a sparklabs.co.kr Google Workspace account can be used here.",
       trustLabel: "Access principles",
       trust: ["Role-based access", "Double opt-in"],
       notReady: "Member login is not available yet.",
@@ -200,17 +210,222 @@ const COPY = Object.freeze({
       ],
       failure: "Login failed."
     }
+  }),
+  ar: Object.freeze({
+    htmlLang: "ar",
+    direction: "rtl",
+    languageLabel: "لغة الصفحة",
+    homeLabel: "الصفحة الرئيسية لـ SparkLabs وSparkClaw AI Arena",
+    gateLabel: "طلب شريك ذكاء اصطناعي عام",
+    memberLogin: "دخول الأعضاء",
+    kicker: "اكتشاف ذكي · تحقق بشري نهائي",
+    titleHtml: "ابدأ بالتقنية التي تبحث عنها—<br>أو بالمشكلة التي تريد حلها.",
+    description: "كلما كانت مسؤولية المشكلة ومعايير النجاح أوضح، استطعنا العثور على مرشحين أفضل. يراجع SparkLabs موجزك ويوجهك إلى الخطوة المناسبة التالية.",
+    agentStatus: "وكيل SPARK جاهز",
+    agentCaption: "من صياغة المشكلة إلى مرشحين موثّقين",
+    orchestrator: "المنسّق",
+    nodes: [["المشكلة", "صياغة"], ["المرشحون", "اكتشاف"], ["الأدلة", "تحقق"], ["الطرفان", "ربط"]],
+    telemetry: ["تضمين القيود", "فحص الأدلة العامة", "حماية بيانات التواصل"],
+    processLabel: "آلية معالجة الموجز",
+    steps: [
+      { title: "تحديد المشكلة والقيود", description: "تنظيم الأهداف والبيانات والأمن وظروف التشغيل", status: "تحديد" },
+      { title: "اختيار مرشحين مبني على الأدلة", description: "مراجعة القدرات وأدلة التطبيق الفعلي", status: "تحقق" },
+      { title: "التعريف بعد موافقة الطرفين", description: "يجري SparkLabs الربط فقط بعد موافقة الشركة الناشئة في My Log", status: "ربط" }
+    ],
+    memberPrompt: "هل أنت عضو في AI Arena؟",
+    formKicker: "مدخلات الوكيل",
+    formTitle: "إنشاء موجز اكتشاف",
+    secure: "استلام آمن",
+    fields: {
+      organization: "اسم المؤسسة", website: "الموقع الإلكتروني", contactName: "اسم المسؤول", email: "البريد المهني",
+      problem: "المشكلة المطلوب حلها", successMetric: "معايير النجاح", constraints: "قيود البيانات والأمن والتكامل",
+      deadline: "موعد اتخاذ القرار", budgetRange: "نطاق الميزانية", procurementPath: "مسار الشراء والشؤون القانونية"
+    },
+    optional: "اختياري",
+    placeholders: {
+      website: "https://",
+      problem: "صف سير العمل الحالي، والاختناق المتكرر، وأثره على الأعمال.",
+      successMetric: "مثال: خفض وقت المعالجة 50% وتحقيق دقة 95%",
+      constraints: "مثال: تشغيل داخلي، بيانات شخصية، تكامل SAP",
+      procurementPath: "مثال: مراجعة المشتريات بعد إثبات المفهوم"
+    },
+    budgets: { "": "تحتاج إلى نقاش", under_10m: "أقل من 10 ملايين وون", "10m_30m": "10–30 مليون وون", "30m_100m": "30–100 مليون وون", over_100m: "100 مليون وون فأكثر" },
+    consent: "أوافق على معالجة SparkLabs للمعلومات المقدمة بهدف مراجعة هذا الموجز والتواصل بشأنه.",
+    privacy: "تُستخدم المعلومات المقدمة فقط للعثور على مرشحين مناسبين والتواصل معهم، وتُراجع ضرورة الاحتفاظ بها بعد 90 يوماً. لا تُدخل شيفرات المصدر أو مفاتيح API أو بيانات العملاء أو شروط العقود السرية.",
+    submit: "طلب مراجعة SparkLabs",
+    honeypot: "رابط الشركة",
+    progress: ["جارٍ فحص الحقول المطلوبة في موجزك.", "جارٍ التحقق من متطلبات الخصوصية والأمن.", "جارٍ إضافة موجزك بأمان إلى قائمة مراجعة SparkLabs."],
+    messages: {
+      consentRequired: "يرجى الموافقة على معالجة المعلومات لمراجعة الموجز.",
+      submitting: "جارٍ إرسال موجزك بأمان.",
+      success: "تم استلام موجزك. سيراجعه SparkLabs خلال يومي عمل، ولن يتم التعريف إلا بعد موافقة الشركة الناشئة المختارة في My Log.",
+      failure: "تعذر إرسال الموجز. يرجى المحاولة مرة أخرى بعد قليل."
+    },
+    login: {
+      close: "إغلاق نافذة الدخول", network: "شبكة أعضاء معتمدة", titleHtml: "سجّل الدخول واكتشف.<br>وتعاون بثقة.",
+      description: "اكتشاف الشركات وCommunity وBounty وMy Log متاحة لأعضاء Arena المعتمدين.",
+      featuresLabel: "مزايا الأعضاء", features: ["اكتشاف شركات الأعضاء", "فرص موثّقة", "سجل نشاط خاص"],
+      routeLabel: "رحلة عضو AI Arena", route: ["اكتشاف", "تحقق", "ربط"], eyebrow: "دخول الأعضاء", title: "دخول أعضاء AI Arena",
+      accessDescription: "دخول آمن لأعضاء Claw وأعضاء Arena المعتمدين وشركاء الشركات وفريق SparkLabs.",
+      email: "البريد الإلكتروني", password: "كلمة المرور", passwordPlaceholder: "أدخل كلمة المرور", submit: "تسجيل الدخول",
+      trustLabel: "مبادئ الوصول", trust: ["صلاحيات حسب الدور", "موافقة مزدوجة"], notReady: "تسجيل دخول الأعضاء غير متاح بعد.",
+      starting: "جارٍ تسجيل الدخول والتحقق من صلاحيات العضوية.",
+      progress: ["جارٍ التحقق الآمن من بيانات الحساب.", "جارٍ تأكيد دور العضو ونطاق الوصول.", "جارٍ مزامنة بيانات AI Arena.", "جارٍ إعداد مساحة العمل المخصصة."],
+      failure: "فشل تسجيل الدخول."
+    }
+  }),
+  ja: Object.freeze({
+    htmlLang: "ja",
+    direction: "ltr",
+    languageLabel: "ページ言語",
+    homeLabel: "SparkLabs・SparkClaw AI Arena ホーム",
+    gateLabel: "公開AIパートナー探索依頼",
+    memberLogin: "会員ログイン",
+    kicker: "エージェント探索 · 人による最終検証",
+    titleHtml: "探している技術、または<br>解決したい課題から教えてください。",
+    description: "課題の責任者と成功基準が明確なほど、より適切な候補を見つけられます。SparkLabsがBriefを確認し、次のステップをご案内します。",
+    agentStatus: "SPARKエージェント準備完了",
+    agentCaption: "課題入力から候補接続まで",
+    orchestrator: "オーケストレーター",
+    nodes: [["課題", "構造化"], ["候補", "探索"], ["根拠", "検証"], ["双方", "接続"]],
+    telemetry: ["制約を反映", "公開根拠を確認", "連絡先を保護"],
+    processLabel: "Briefの処理プロセス",
+    steps: [
+      { title: "課題と制約を整理", description: "目標・データ・セキュリティ・運用条件を構造化", status: "定義" },
+      { title: "根拠に基づき候補を選定", description: "能力と導入実績を照合", status: "検証" },
+      { title: "双方の同意後に紹介", description: "スタートアップがMy Logで承認した後にSparkLabsが接続", status: "接続" }
+    ],
+    memberPrompt: "すでにAI Arena会員ですか？",
+    formKicker: "エージェント入力",
+    formTitle: "探索Briefを作成",
+    secure: "安全な受付",
+    fields: {
+      organization: "組織名", website: "ウェブサイト", contactName: "担当者名", email: "業務用メール",
+      problem: "解決したい課題", successMetric: "成功基準", constraints: "データ・セキュリティ・連携上の制約",
+      deadline: "意思決定時期", budgetRange: "予算範囲", procurementPath: "購買・法務プロセス"
+    },
+    optional: "任意",
+    placeholders: {
+      website: "https://", problem: "現在の業務フロー、繰り返すボトルネック、事業への影響を具体的にご記入ください。",
+      successMetric: "例：処理時間を50%短縮、精度95%以上", constraints: "例：オンプレミス、個人情報、SAP連携",
+      procurementPath: "例：PoC後に購買委員会で審査"
+    },
+    budgets: { "": "要相談", under_10m: "1,000万ウォン未満", "10m_30m": "1,000万～3,000万ウォン", "30m_100m": "3,000万～1億ウォン", over_100m: "1億ウォン以上" },
+    consent: "Briefの審査と連絡のため、SparkLabsが入力情報を処理することに同意します。",
+    privacy: "入力情報は候補探索と連絡の目的にのみ使用し、受付から90日後に保管の必要性を再確認します。ソースコード、APIキー、顧客データ、機密契約条件は入力しないでください。",
+    submit: "SparkLabsに審査を依頼",
+    honeypot: "会社URL",
+    progress: ["Briefの必須項目を確認しています。", "プライバシーとセキュリティ要件を検証しています。", "SparkLabsの審査キューへ安全に登録しています。"],
+    messages: {
+      consentRequired: "Brief審査のための情報処理に同意してください。", submitting: "Briefを安全に送信しています。",
+      success: "受け付けました。SparkLabsが2営業日以内に審査し、対象スタートアップがMy Logで承認した場合にのみ紹介します。",
+      failure: "Briefを送信できませんでした。しばらくしてからもう一度お試しください。"
+    },
+    login: {
+      close: "ログイン画面を閉じる", network: "承認済み会員ネットワーク", titleHtml: "ログインして発見し、<br>安心して協業しましょう。",
+      description: "企業探索、Community、Bounty、My Logは承認済みArena会員のみ利用できます。",
+      featuresLabel: "会員限定機能", features: ["会員企業の探索", "検証済み機会", "非公開アクティビティログ"],
+      routeLabel: "AI Arena会員ジャーニー", route: ["発見", "検証", "接続"], eyebrow: "会員ログイン", title: "AI Arena会員ログイン",
+      accessDescription: "Clawメンバー、承認済みArena会員、企業パートナー、SparkLabs運営チーム向けの安全なアクセスです。",
+      email: "メール", password: "パスワード", passwordPlaceholder: "パスワードを入力", submit: "ログイン",
+      trustLabel: "アクセス原則", trust: ["ロールベースアクセス", "双方同意"], notReady: "会員ログインはまだ利用できません。",
+      starting: "ログインし、会員アクセスを確認しています。",
+      progress: ["アカウント情報を安全に確認しています。", "会員ロールとアクセス範囲を確認しています。", "AI Arenaデータを同期しています。", "パーソナライズされたワークスペースを準備しています。"],
+      failure: "ログインに失敗しました。"
+    }
+  }),
+  zh: Object.freeze({
+    htmlLang: "zh-CN",
+    direction: "ltr",
+    languageLabel: "页面语言",
+    homeLabel: "SparkLabs·SparkClaw AI Arena 首页",
+    gateLabel: "公开AI合作伙伴需求",
+    memberLogin: "会员登录",
+    kicker: "智能代理探索 · 人工最终验证",
+    titleHtml: "请从您需要的技术，或<br>希望解决的问题开始。",
+    description: "问题负责人和成功标准越清晰，我们越能找到合适的候选团队。SparkLabs将审核您的Brief，并指引下一步。",
+    agentStatus: "SPARK智能代理已就绪",
+    agentCaption: "从问题输入到候选团队连接",
+    orchestrator: "编排器",
+    nodes: [["问题", "结构化"], ["候选", "探索"], ["证据", "验证"], ["双方", "连接"]],
+    telemetry: ["纳入约束", "核验公开证据", "保护联系方式"],
+    processLabel: "Brief处理流程",
+    steps: [
+      { title: "梳理问题与约束", description: "结构化目标、数据、安全与运营条件", status: "定义" },
+      { title: "基于证据筛选候选", description: "交叉核验能力与落地案例", status: "验证" },
+      { title: "双方同意后介绍", description: "初创公司在My Log批准后，由SparkLabs安全连接", status: "连接" }
+    ],
+    memberPrompt: "已经是AI Arena会员？",
+    formKicker: "智能代理输入",
+    formTitle: "创建探索Brief",
+    secure: "安全提交",
+    fields: {
+      organization: "组织名称", website: "网站", contactName: "联系人姓名", email: "工作邮箱", problem: "希望解决的问题",
+      successMetric: "成功标准", constraints: "数据、安全与集成约束", deadline: "决策时间", budgetRange: "预算范围", procurementPath: "采购与法务流程"
+    },
+    optional: "可选",
+    placeholders: {
+      website: "https://", problem: "请具体描述当前工作流程、反复出现的瓶颈及其业务影响。",
+      successMetric: "例如：处理时间缩短50%，准确率达到95%以上", constraints: "例如：本地部署、个人信息、SAP集成",
+      procurementPath: "例如：PoC后进入采购委员会评审"
+    },
+    budgets: { "": "需要讨论", under_10m: "低于1,000万韩元", "10m_30m": "1,000万–3,000万韩元", "30m_100m": "3,000万–1亿韩元", over_100m: "1亿韩元以上" },
+    consent: "我同意SparkLabs为审核并回复此Brief而处理所提交的信息。",
+    privacy: "提交的信息仅用于寻找合适候选团队和后续联系，并将在提交90天后重新评估保留必要性。请勿输入源代码、API密钥、客户原始数据或机密合同条款。",
+    submit: "请求SparkLabs审核",
+    honeypot: "公司网址",
+    progress: ["正在检查Brief的必填项。", "正在验证隐私与安全输入要求。", "正在将Brief安全加入SparkLabs审核队列。"],
+    messages: {
+      consentRequired: "请同意为Brief审核处理您的信息。", submitting: "正在安全提交您的Brief。",
+      success: "已成功提交。SparkLabs将在两个工作日内审核，只有目标初创公司在My Log批准后才会进行介绍。",
+      failure: "Brief提交失败，请稍后重试。"
+    },
+    login: {
+      close: "关闭登录窗口", network: "已批准会员网络", titleHtml: "登录并发现机会。<br>安心开展合作。",
+      description: "企业探索、Community、Bounty和My Log仅向获批Arena会员开放。",
+      featuresLabel: "会员专属功能", features: ["会员企业探索", "已验证机会", "私密活动记录"],
+      routeLabel: "AI Arena会员路径", route: ["发现", "验证", "连接"], eyebrow: "会员登录", title: "AI Arena会员登录",
+      accessDescription: "为Claw成员、获批Arena会员、企业合作伙伴和SparkLabs运营团队提供安全访问。",
+      email: "邮箱", password: "密码", passwordPlaceholder: "请输入密码", submit: "登录",
+      trustLabel: "访问原则", trust: ["基于角色的访问", "双方同意"], notReady: "会员登录尚未开放。",
+      starting: "正在登录并检查会员权限。",
+      progress: ["正在安全核验账户信息。", "正在确认会员角色与访问范围。", "正在同步AI Arena数据。", "正在准备个性化工作空间。"],
+      failure: "登录失败。"
+    }
   })
 });
 
-export function normalizePublicBriefLanguage(value) {
-  return String(value || "").trim().toLowerCase() === "en" ? "en" : "ko";
+export const PUBLIC_BRIEF_LANGUAGES = Object.freeze(["ko", "en", "ar", "ja", "zh"]);
+
+export function isPublicBriefLanguage(value) {
+  return PUBLIC_BRIEF_LANGUAGES.includes(String(value || "").trim().toLowerCase());
 }
 
-export function resolvePublicBriefLanguage({ search = "", stored = "" } = {}) {
+export function normalizePublicBriefLanguage(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["zh-cn", "zh-sg", "zh-hans", "zh-tw", "zh-hk", "zh-hant"].includes(normalized)) return "zh";
+  if (normalized.startsWith("ar-")) return "ar";
+  if (normalized.startsWith("ja-")) return "ja";
+  if (normalized.startsWith("ko-")) return "ko";
+  if (normalized.startsWith("en-")) return "en";
+  return isPublicBriefLanguage(normalized) ? normalized : "ko";
+}
+
+export function resolvePublicBriefLanguage({ search = "", stored = "", recommended = "", browserLanguages = [] } = {}) {
   const requested = new URLSearchParams(String(search || "")).get("lang");
-  if (requested === "en" || requested === "ko") return requested;
-  return normalizePublicBriefLanguage(stored);
+  if (isPublicBriefLanguage(requested)) return normalizePublicBriefLanguage(requested);
+  if (isPublicBriefLanguage(stored)) return normalizePublicBriefLanguage(stored);
+  if (isPublicBriefLanguage(recommended)) return normalizePublicBriefLanguage(recommended);
+  for (const candidate of (Array.isArray(browserLanguages) ? browserLanguages : [browserLanguages])) {
+    const raw = String(candidate || "").trim().toLowerCase();
+    if (isPublicBriefLanguage(raw) || /^(ko|en|ar|ja|zh)(-|$)/.test(raw)) return normalizePublicBriefLanguage(raw);
+  }
+  return "ko";
+}
+
+export function hasExplicitPublicBriefLanguage({ search = "", stored = "" } = {}) {
+  const requested = new URLSearchParams(String(search || "")).get("lang");
+  return isPublicBriefLanguage(requested) || isPublicBriefLanguage(stored);
 }
 
 export function publicBriefCopy(language) {
@@ -219,7 +434,8 @@ export function publicBriefCopy(language) {
 
 export function publicBriefUrl(value, language) {
   const url = new URL(value);
-  if (normalizePublicBriefLanguage(language) === "en") url.searchParams.set("lang", "en");
-  else url.searchParams.delete("lang");
+  const normalized = normalizePublicBriefLanguage(language);
+  if (normalized === "ko") url.searchParams.delete("lang");
+  else url.searchParams.set("lang", normalized);
   return url.toString();
 }

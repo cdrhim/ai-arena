@@ -71,11 +71,15 @@ test("arena snapshot applies connection events without creating peer votes", () 
   const updated = snapshot.startups.find((startup) => startup.id === targetStartup.id);
 
   assert.equal(updated.products[0].upvotes, previousUpvotes);
-  assert.equal(snapshot.connectionRequests.length, 2);
-  assert.equal(snapshot.metrics.connectionRequests, 2);
+  assert.equal(snapshot.connectionRequests.length, 1);
+  assert.equal(snapshot.metrics.connectionRequests, 1);
   assert.equal(request.request.introductionPolicy, "double_opt_in");
   assert.equal(request.request.requesterConsent, "accepted");
   assert.equal(request.request.founderConsent, "pending");
+});
+
+test("Arena seed contains no fabricated company connection requests", () => {
+  assert.deepEqual(ARENA_SEED.connectionRequests, []);
 });
 
 test("member connection response enforces ownership, qualification, and double opt-in", () => {
@@ -110,6 +114,11 @@ test("B2B bounty briefs persist as governed intake records", () => {
       constraints: "Korea region and no training on customer data.",
       budget: "KRW 10M",
       pilotBudget: "KRW 30M",
+      opportunity: "Paid pilot with two selected teams",
+      evaluationMode: "hybrid",
+      evaluationCriteria: "Clause recall, Review time, Data isolation",
+      challengeType: "product_benchmark",
+      rules: "Provide a reproducible product walkthrough.",
       visibility: "invite_only",
       contactName: "Buyer One"
     },
@@ -121,8 +130,58 @@ test("B2B bounty briefs persist as governed intake records", () => {
 
   assert.equal(request.requesterEmail, viewer.email);
   assert.equal(request.status, "intake");
+  assert.deepEqual(request.evaluationCriteria, ["Clause recall", "Review time", "Data isolation"]);
+  assert.equal(request.evaluationMode, "hybrid");
+  assert.equal(request.opportunity, "Paid pilot with two selected teams");
   assert.equal(snapshot.bountyRequests.length, 1);
   assert.equal(snapshot.metrics.bountyRequests, 1);
+});
+
+test("SparkLabs staff can register a partner Brief on behalf and edit the same governed record", () => {
+  const staff = { id: "staff_1", email: "ops@sparklabs.co.kr", role: "sparklabs", organization: "SparkLabs", canScore: true };
+  const created = createArenaEvent(
+    "requestBounty",
+    {
+      problemTitle: "Automate quality inspection",
+      problem: "The partner manually inspects every unit.",
+      targetKpi: "Reduce inspection time by 60%.",
+      contactName: "Partner Lead",
+      requesterEmail: "lead@partner.example",
+      organization: "Partner Manufacturing",
+      evaluationMode: "automatic",
+      evaluationCriteria: "Defect recall, False positive rate"
+    },
+    "2026-08-17T01:00:00.000Z",
+    staff
+  );
+  const updated = createArenaEvent(
+    "updateBountyRequest",
+    {
+      requestId: created.request.id,
+      status: "published",
+      problemTitle: "Automate visual quality inspection",
+      problem: "The partner manually inspects every production unit.",
+      targetKpi: "Reduce inspection time by 70% with 95% defect recall.",
+      contactName: "Partner Lead",
+      requesterEmail: "lead@partner.example",
+      organization: "Partner Manufacturing",
+      visibility: "public",
+      evaluationMode: "hybrid",
+      evaluationCriteria: "Defect recall, False positive rate, Throughput"
+    },
+    "2026-08-17T02:00:00.000Z",
+    staff
+  );
+  const snapshot = buildArenaSnapshot([created, updated], "2026-08-17T02:01:00.000Z");
+  const [brief] = snapshot.bountyRequests;
+
+  assert.equal(brief.requesterEmail, "lead@partner.example");
+  assert.equal(brief.requesterUserId, null);
+  assert.equal(brief.submittedByEmail, staff.email);
+  assert.equal(brief.status, "published");
+  assert.equal(brief.problemTitle, "Automate visual quality inspection");
+  assert.equal(brief.evaluationMode, "hybrid");
+  assert.deepEqual(brief.evaluationCriteria, ["Defect recall", "False positive rate", "Throughput"]);
 });
 
 test("tech stack extraction structures evidence without inventing a global score", () => {

@@ -421,13 +421,14 @@ textarea:focus {
 }
 
 .partner-callout label,
-.member-perk-request label,
-.member-perk-request-actions small,
+.member-benefit-survey label,
+.member-benefit-survey-actions small,
 .partner-logo-rail span {
   color: #fff0eb;
 }
 
-.member-perk-request textarea {
+.member-benefit-survey textarea,
+.member-benefit-survey select {
   color: #4f211d;
 }
 

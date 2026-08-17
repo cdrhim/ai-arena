@@ -14,7 +14,7 @@ import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 const PUBLIC_VIEWER = Object.freeze({ role: "public", roleLabel: "Public visitor", canScore: false });
 const PUBLIC_CATALOG_PROJECTOR = Object.freeze({ role: "sparklabs", roleLabel: "Public catalog projector", canScore: true });
 
-export default async function eventRecommendations(req, options = {}) {
+async function eventRecommendations(req, options = {}) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (req.method !== "POST") return json({ error: "지원하지 않는 요청 방식입니다." }, 405);
 
@@ -52,6 +52,8 @@ export default async function eventRecommendations(req, options = {}) {
     return json({ error: "현재 맞춤 이벤트 추천을 계산하지 못했습니다. 잠시 후 다시 시도해 주세요." }, error.status || 500);
   }
 }
+
+export default withScArenaDevelopmentLogging("event-recommendations", eventRecommendations);
 
 export async function loadPublicRecommendationCatalog(options = {}) {
   const env = options.env || process.env;
@@ -112,3 +114,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

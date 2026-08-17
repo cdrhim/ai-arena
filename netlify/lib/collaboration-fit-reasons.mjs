@@ -33,7 +33,7 @@ export async function buildCollaborationFitReasons(input = {}, options = {}) {
       model: null
     };
   } catch (error) {
-    console.warn("[collaboration-fit-reasons] Spark AI provider request failed", {
+    console.warn("[collaboration-fit-reasons] Clawee provider request failed", {
       model,
       message: bounded(error?.message || "Unknown AI provider error", 220)
     });
@@ -190,7 +190,7 @@ function meaningfulTokens(value) {
 function oneSentence(value) {
   const providerName = ["g", "e", "m", "i", "n", "i"].join("");
   let result = plain(value, 130)
-    .replace(new RegExp(providerName, "giu"), "Spark AI")
+    .replace(new RegExp(providerName, "giu"), "Clawee 클로이")
     .replace(/[\r\n]+/gu, " ")
     .replace(/\s+/gu, " ")
     .trim();

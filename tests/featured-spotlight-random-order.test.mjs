@@ -5,24 +5,33 @@ import { readFileSync } from "node:fs";
 const js = readFileSync("public/arena/arena.js", "utf8");
 const css = readFileSync("public/arena/arena.css", "utf8");
 
-test("Editorial Spotlight shuffles its display order once per access dataset", () => {
-  assert.match(js, /function randomizedFeaturedSpotlightEntries\(entries\)/);
-  assert.match(js, /const orderKey = safeEntries\.map\([\s\S]*?\.sort\(\)\.join\("\|"\)/);
-  assert.match(js, /for \(let index = shuffledIds\.length - 1; index > 0; index -= 1\)/);
-  assert.match(js, /Math\.floor\(Math\.random\(\) \* \(index \+ 1\)\)/);
-  assert.match(js, /shuffledIds\.join\("\|"\) === previousOrder\.join\("\|"\)[\s\S]*?shuffledIds\.push\(shuffledIds\.shift\(\)\)/);
-  assert.match(js, /localStorage\.setItem\(FEATURED_SPOTLIGHT_ORDER_KEY, JSON\.stringify\(ids\)\)/);
-  assert.match(js, /if \(orderKey !== featuredSpotlightOrderKey\)/);
-  assert.match(js, /featuredSpotlightOrderKey = "";[\s\S]*?featuredSpotlightOrderIds = \[\]/);
+test("Editorial Spotlight prioritizes weekly and recent verified achievements", () => {
+  assert.match(js, /function prioritizeFeaturedSpotlightEntries\(entries\)/);
+  assert.match(js, /sourceType === "weekly_program_update"/);
+  assert.match(js, /Date\.parse\(right\.curation\?\.verifiedAt/);
+  assert.doesNotMatch(js, /Math\.random\(\)/);
+  assert.doesNotMatch(js, /FEATURED_SPOTLIGHT_ORDER_KEY/);
 });
 
-test("Spotlight highlights one company at a time and pauses for direct hover or focus", () => {
-  assert.match(js, /data-spotlight-index="\$\{index\}"/);
-  assert.match(js, /button\.addEventListener\("pointerenter", \(\) => \{[\s\S]*?stopFeaturedSpotlightRotation\(\);[\s\S]*?setFeaturedSpotlightActive/);
-  assert.match(js, /button\.addEventListener\("focus", \(\) => \{[\s\S]*?setFeaturedSpotlightActive/);
-  assert.match(js, /window\.setInterval\(\(\) => \{[\s\S]*?featuredSpotlightActiveIndex \+ 1[\s\S]*?\}, 2800\)/);
+test("Spotlight shows one readable slide at a time and keeps rotating through interaction", () => {
+  assert.match(js, /data-featured-slide="\$\{index\}"/);
+  assert.match(js, /data-spotlight-direction/);
+  assert.doesNotMatch(js, /onpointerenter = stopFeaturedSpotlightRotation/);
+  assert.doesNotMatch(js, /onfocusin = stopFeaturedSpotlightRotation/);
+  assert.match(js, /window\.setInterval\(\(\) => \{[\s\S]*?featuredSpotlightActiveIndex \+ 1[\s\S]*?\}, 3800\)/);
+  assert.match(css, /\.featured-spotlight-progress i\.is-running\s*\{[\s\S]*?3\.8s linear/);
   assert.match(js, /window\.matchMedia\?\.\("\(prefers-reduced-motion: reduce\)"\)\.matches/);
-  assert.match(css, /\.featured-spotlight-bubble\.is-spotlight-active \{[\s\S]*?opacity:\s*1;[\s\S]*?transform:\s*translateY\(-3px\) scale\(1\.025\) rotateX\(1deg\)/);
-  assert.match(css, /\.has-spotlight-active \.featured-spotlight-bubble:not\(\.is-spotlight-active\) \{\s*opacity:\s*0\.72;/);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.featured-spotlight-bubble \{\s*transition:\s*none !important;/);
+  assert.match(css, /\.featured-spotlight-slide\[hidden\]\s*\{[\s\S]*?display:\s*none/);
+  assert.match(css, /\.featured-spotlight-progress i\.is-running/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.featured-spotlight-slide/);
+});
+
+test("Spotlight keeps a stable frame and maps wheel gestures to horizontal company navigation", () => {
+  assert.match(js, /addEventListener\("wheel", handleFeaturedSpotlightWheel, \{ passive: false \}\)/);
+  assert.match(js, /const delta = Math\.abs\(event\.deltaX\) > Math\.abs\(event\.deltaY\) \? event\.deltaX : event\.deltaY/);
+  assert.match(js, /event\.preventDefault\(\)/);
+  assert.match(js, /featuredSpotlightActiveIndex \+ \(delta > 0 \? 1 : -1\)/);
+  assert.match(css, /\.featured-spotlight-stage\s*\{[\s\S]*?height:\s*184px;[\s\S]*?min-height:\s*184px;/);
+  assert.match(css, /@media \(min-width: 901px\)[\s\S]*?\.featured-spotlight\s*\{[\s\S]*?min-height:\s*372px;[\s\S]*?grid-template-rows:\s*auto 252px auto;/);
+  assert.match(css, /@media \(min-width: 1121px\)[\s\S]*?\.program-hero-copy\s*\{[\s\S]*?translateX\(-22px\)[\s\S]*?\.hero-orbit\s*\{[\s\S]*?translateX\(-46px\)/);
 });

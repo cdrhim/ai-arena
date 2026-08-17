@@ -53,7 +53,7 @@ test("network-bound login, discovery, loading and action flows share visible pro
 test("instant local filters remain immediate instead of flashing network progress", () => {
   const arena = readFileSync("public/arena/arena.js", "utf8");
   const market = readFileSync("public/arena/market.js", "utf8");
-  const renderTeams = functionSlice(arena, "function renderTeams", "function resetTeamFilters");
+  const renderTeams = functionSlice(arena, "function renderTeams", "function teamCardMarkup");
   const renderDiscover = functionSlice(market, "function renderDiscover", "function marketTeamCardMarkup");
 
   assert.doesNotMatch(renderTeams, /startProcessStatus|fetch\(/);

@@ -144,6 +144,7 @@ const MAX_COMMENT_DEPTH = 5;
 export function buildForumSnapshot(events = [], options = {}) {
   const now = options.now || new Date().toISOString();
   const viewer = options.viewer || null;
+  const authorDisplayNames = options.authorDisplayNames || null;
   // Community content always comes from authenticated human actions. Even explicit
   // preview requests must not manufacture founder conversations.
   const state = initialForumState();
@@ -159,13 +160,14 @@ export function buildForumSnapshot(events = [], options = {}) {
   const visibleThreadRecords = state.threads
     .filter((thread) => visibleCategorySlugs.has(thread.categorySlug))
     .filter((thread) => canViewThread(thread, viewer));
-  const threads = visibleThreadRecords.map((thread) => publicThread(thread, viewer));
+  const categoryLabels = new Map(categoryRecords.map((category) => [category.slug, category.label]));
+  const threads = visibleThreadRecords.map((thread) => publicThread(thread, viewer, categoryLabels, authorDisplayNames));
   const threadCounts = countBy(threads, "categorySlug");
   const categories = categoryRecords.map((category) => publicCategory(category, threadCounts.get(category.slug) || 0, viewer));
   const visibleCommentRecords = state.comments
     .filter((comment) => threads.some((thread) => thread.id === comment.threadId))
     .filter((comment) => canViewComment(comment, viewer));
-  const comments = visibleCommentRecords.map((comment) => publicComment(comment, viewer));
+  const comments = visibleCommentRecords.map((comment) => publicComment(comment, viewer, authorDisplayNames));
 
   return {
     generatedAt: now,
@@ -176,7 +178,15 @@ export function buildForumSnapshot(events = [], options = {}) {
     reports: canModerate(viewer) ? state.reports.map((report) => ({ ...report })) : [],
     moderationActions: canModerate(viewer) ? state.moderationActions.map((action) => ({ ...action })) : [],
     personalActivity: buildPersonalForumActivity(visibleThreadRecords, visibleCommentRecords, ordered, viewer),
-    viewer: viewer ? { id: viewer.id, email: viewer.email, role: viewer.role, roleLabel: viewer.roleLabel } : null,
+    viewer: viewer
+      ? {
+          id: viewer.id,
+          email: viewer.email,
+          role: viewer.role,
+          roleLabel: viewer.roleLabel,
+          displayName: authorDisplayName(viewer)
+        }
+      : null,
     founderCommonsAccess: canViewVisibility("members_only", viewer)
   };
 }
@@ -325,6 +335,7 @@ export function createForumEvent(action, payload, viewer, events = [], now = new
     throw error;
   }
   if (action === "createForumThread") return createThreadEvent(payload, viewer, events, now);
+  if (action === "createForumCategory") return createCategoryEvent(payload, viewer, events, now);
   if (action === "updateOwnForumThread") return updateThreadEvent(payload, viewer, events, now);
   if (action === "deleteOwnForumThread") return deleteThreadEvent(payload, viewer, events, now);
   if (action === "createForumComment") return createCommentEvent(payload, viewer, events, now);
@@ -381,8 +392,8 @@ export function forumCategoryPath(slug) {
 
 function createThreadEvent(payload, viewer, events, now) {
   assertPlainObject(payload, "forum thread");
-  const snapshot = buildForumSnapshot(events, { viewer: { canScore: true }, now });
-  const category = categoryBySlug(payload.categorySlug || payload.categoryId || "general");
+  const state = materializedForumState(events, now);
+  const category = categoryFromState(state, payload.categorySlug || payload.categoryId || "general");
   if (!category) throw userError("category is required.", 400);
   assertCanPostInCategory(category, viewer);
   const title = requiredString(payload, "title", 120);
@@ -390,7 +401,7 @@ function createThreadEvent(payload, viewer, events, now) {
   const url = optionalHttpsUrl(payload.url);
   if (!bodyMarkdown && !url) throw userError("bodyMarkdown is required unless URL is provided.", 400);
   const visibility = allowedThreadVisibility(payload.visibility || category.visibility || "public", category, viewer);
-  const slug = uniqueSlug(slugify(title), snapshot.threads.map((thread) => thread.slug));
+  const slug = uniqueSlug(slugify(title), state.threads.map((thread) => thread.slug));
   const threadType = allowedThreadType(payload.threadType || category.type || "discussion");
   const isStaff = canModerate(viewer);
   const thread = {
@@ -427,18 +438,51 @@ function createThreadEvent(payload, viewer, events, now) {
   return { id: eventId("forum_event", thread.id, now), type: "forum_thread_created", thread, createdAt: now };
 }
 
+function createCategoryEvent(payload, viewer, events, now) {
+  assertPlainObject(payload, "forum category");
+  assertCanCreateCategory(viewer);
+  const label = requiredString(payload, "label", 40);
+  if (label.length < 2) throw userError("Channel name must be at least 2 characters.", 400);
+  const state = materializedForumState(events, now);
+  const normalizedLabel = label.toLocaleLowerCase();
+  if (state.categories.some((category) => String(category.label || "").toLocaleLowerCase() === normalizedLabel)) {
+    throw userError("A channel with this name already exists.", 409);
+  }
+  const requestedSlug = slugify(label).slice(0, 48);
+  const slug = uniqueSlug(requestedSlug || "channel", state.categories.map((category) => category.slug));
+  const visibility = normalizeToken(payload.visibility || "public");
+  if (!new Set(forumComposerVisibilities(viewer)).has(visibility)) {
+    throw userError("This account cannot use the selected channel visibility.", 403);
+  }
+  const category = {
+    id: eventId("forum_cat", `${viewer.id || viewer.email}:${slug}`, now),
+    slug,
+    label,
+    description: optionalString(payload, "description", 180) || `${label} 주제에 관한 대화`,
+    type: "general",
+    visibility,
+    sortOrder: nextCategorySortOrder(state.categories),
+    createdByUserId: viewer.id || null,
+    createdAt: now,
+    updatedAt: now
+  };
+  return { id: eventId("forum_event", category.id, now), type: "forum_category_created", category, createdAt: now };
+}
+
 function updateThreadEvent(payload, viewer, events, now) {
   assertPlainObject(payload, "forum thread update");
   const thread = findThread(events, payload.threadId || payload.id);
   if (!thread) throw userError("Thread not found.", 404);
   assertOwnsOrModerates(thread, viewer);
-  if (!canModerate(viewer) && Date.parse(now) - Date.parse(thread.createdAt || now) > 30 * 60 * 1000) {
-    throw userError("Thread edit window has closed.", 403);
-  }
   const changes = {};
   if (payload.title !== undefined) changes.title = requiredString(payload, "title", 120);
-  if (payload.bodyMarkdown !== undefined || payload.body !== undefined) changes.bodyMarkdown = sanitizeForumMarkdown(payload.bodyMarkdown || payload.body || "");
+  if (payload.bodyMarkdown !== undefined || payload.body !== undefined) {
+    changes.bodyMarkdown = sanitizeForumMarkdown(
+      requiredString({ bodyMarkdown: payload.bodyMarkdown || payload.body }, "bodyMarkdown", 20_000)
+    );
+  }
   if (payload.url !== undefined) changes.url = optionalHttpsUrl(payload.url);
+  if (!Object.keys(changes).length) throw userError("At least one editable thread field is required.", 400);
   return {
     id: eventId("forum_event", `${thread.id}:update`, now),
     type: "forum_thread_updated",
@@ -464,10 +508,11 @@ function deleteThreadEvent(payload, viewer, events, now) {
 
 function createCommentEvent(payload, viewer, events, now) {
   assertPlainObject(payload, "forum comment");
+  const state = materializedForumState(events, now);
   const snapshot = buildForumSnapshot(events, { viewer, now });
   const thread = snapshot.threads.find((item) => item.id === payload.threadId || item.slug === payload.threadSlug);
   if (!thread) throw userError("Thread not found.", 404);
-  assertCanComment(viewer, categoryBySlug(thread.categorySlug));
+  assertCanComment(viewer, categoryFromState(state, thread.categorySlug));
   if (thread.locked && !canModerate(viewer)) throw userError("This thread is locked.", 403);
   const parent = payload.parentCommentId ? snapshot.comments.find((comment) => comment.id === payload.parentCommentId) : null;
   if (payload.parentCommentId && !parent) throw userError("Parent comment not found.", 404);
@@ -498,9 +543,6 @@ function updateCommentEvent(payload, viewer, events, now) {
   const comment = findComment(events, payload.commentId || payload.id);
   if (!comment) throw userError("Comment not found.", 404);
   assertOwnsOrModerates(comment, viewer);
-  if (!canModerate(viewer) && Date.parse(now) - Date.parse(comment.createdAt || now) > 30 * 60 * 1000) {
-    throw userError("Comment edit window has closed.", 403);
-  }
   return {
     id: eventId("forum_event", `${comment.id}:update`, now),
     type: "forum_comment_updated",
@@ -611,7 +653,11 @@ function moderationEvent(targetType, payload, viewer, events, now) {
 
 function applyForumEvent(state, event) {
   if (!event || typeof event !== "object") return state;
-  if (event.type === "forum_thread_created" && event.thread) {
+  if (event.type === "forum_category_created" && event.category) {
+    if (!state.categories.some((category) => category.id === event.category.id || category.slug === event.category.slug)) {
+      state.categories.push({ ...event.category });
+    }
+  } else if (event.type === "forum_thread_created" && event.thread) {
     if (!state.threads.some((thread) => thread.id === event.thread.id)) state.threads.push({ ...event.thread });
   } else if (event.type === "forum_thread_updated") {
     const thread = state.threads.find((item) => item.id === event.threadId);
@@ -735,6 +781,12 @@ function assertCanPostInCategory(category, viewer) {
   throw userError("Approved member, B2B partner, or SparkLabs staff access is required to post.", viewer?.email ? 403 : 401);
 }
 
+function assertCanCreateCategory(viewer) {
+  if (canModerate(viewer)) return;
+  if (["member", "human_validator", "b2b_partner"].includes(viewer?.role)) return;
+  throw userError("Approved members and partners can create Community channels.", viewer?.email ? 403 : 401);
+}
+
 function assertCanComment(viewer, category) {
   if (canModerate(viewer)) return;
   if (viewer?.role === "b2b_partner") {
@@ -779,7 +831,7 @@ function canPostInCategory(category, viewer) {
   }
 }
 
-function publicThread(thread, viewer) {
+function publicThread(thread, viewer, categoryLabels = new Map(), authorDisplayNames = null) {
   return {
     id: thread.id,
     slug: thread.slug,
@@ -787,8 +839,8 @@ function publicThread(thread, viewer) {
     categoryId: thread.categoryId,
     categorySlug: thread.categorySlug,
     categoryPath: forumCategoryPath(thread.categorySlug),
-    categoryLabel: categoryBySlug(thread.categorySlug)?.label || thread.categorySlug,
-    authorDisplayName: thread.authorDisplayName,
+    categoryLabel: categoryLabels.get(thread.categorySlug) || categoryBySlug(thread.categorySlug)?.label || thread.categorySlug,
+    authorDisplayName: forumAuthorDisplayName(thread, viewer, authorDisplayNames),
     title: thread.title,
     bodyMarkdown: thread.bodyMarkdown,
     url: thread.url || null,
@@ -817,12 +869,12 @@ function publicThread(thread, viewer) {
     locked: Boolean(thread.locked),
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
-    canEdit: Boolean(viewer?.email && (canModerate(viewer) || thread.authorEmail === viewer.email)),
+    canEdit: Boolean(canModerate(viewer) || forumItemBelongsToViewer(thread, viewer)),
     canModerate: canModerate(viewer)
   };
 }
 
-function publicComment(comment, viewer) {
+function publicComment(comment, viewer, authorDisplayNames = null) {
   if (comment.status === "deleted") {
     return {
       id: comment.id,
@@ -844,7 +896,7 @@ function publicComment(comment, viewer) {
     id: comment.id,
     threadId: comment.threadId,
     parentCommentId: comment.parentCommentId || null,
-    authorDisplayName: comment.authorDisplayName,
+    authorDisplayName: forumAuthorDisplayName(comment, viewer, authorDisplayNames),
     bodyMarkdown: comment.bodyMarkdown,
     status: comment.status,
     score: Number(comment.score || 0),
@@ -852,7 +904,7 @@ function publicComment(comment, viewer) {
     depth: Number(comment.depth || 0),
     createdAt: comment.createdAt,
     updatedAt: comment.updatedAt,
-    canEdit: Boolean(viewer?.email && (canModerate(viewer) || comment.authorEmail === viewer.email)),
+    canEdit: Boolean(canModerate(viewer) || forumItemBelongsToViewer(comment, viewer)),
     canModerate: canModerate(viewer)
   };
 }
@@ -902,7 +954,7 @@ function chronologicalEvents(events = []) {
 
 function assertOwnsOrModerates(item, viewer) {
   if (canModerate(viewer)) return;
-  if (item.authorEmail && item.authorEmail === viewer?.email) return;
+  if (forumItemBelongsToViewer(item, viewer)) return;
   throw userError("You can only edit your own forum content.", 403);
 }
 
@@ -913,6 +965,15 @@ function canModerate(viewer) {
 function categoryBySlug(value) {
   const slug = normalizeCategorySlug(value);
   return FORUM_CATEGORIES.find((category) => category.slug === slug) || null;
+}
+
+function categoryFromState(state, value) {
+  const slug = normalizeCategorySlug(value);
+  return state?.categories?.find((category) => category.slug === slug || category.id === value) || null;
+}
+
+function nextCategorySortOrder(categories = []) {
+  return Math.max(100, ...categories.map((category) => Number(category.sortOrder || 0))) + 10;
 }
 
 function normalizeCategorySlug(value) {
@@ -982,9 +1043,42 @@ function forumVoterKey(viewer) {
 }
 
 function authorDisplayName(viewer) {
+  if (isSparkLabsEmail(viewer?.email)) return "SparkLabs 관리자";
+  const role = String(viewer?.role || "").trim().toLowerCase();
+  if (role === "admin") return "SparkLabs 관리자";
+  if (role === "sparklabs") return "SparkLabs 운영진";
+  const preferred = [viewer?.communityDisplayName, viewer?.organization, viewer?.displayName, viewer?.name]
+    .map((value) => String(value || "").trim())
+    .find(Boolean);
+  if (preferred) return preferred.slice(0, 80);
   const email = String(viewer?.email || "");
   const local = email.split("@")[0] || "member";
   return local.replace(/[._-]+/g, " ").slice(0, 40);
+}
+
+function forumAuthorDisplayName(item, viewer, authorDisplayNames = null) {
+  if (isSparkLabsEmail(item?.authorEmail)) return "SparkLabs 관리자";
+  if (forumItemBelongsToViewer(item, viewer)) return authorDisplayName(viewer);
+  const directoryName = directoryAuthorDisplayName(item?.authorEmail, authorDisplayNames);
+  if (directoryName) return directoryName;
+  return String(item?.authorDisplayName || "Arena member").slice(0, 80);
+}
+
+function isSparkLabsEmail(value) {
+  const email = String(value || "").trim().toLowerCase();
+  return email.endsWith("@sparklabs.co.kr");
+}
+
+function directoryAuthorDisplayName(authorEmail, authorDisplayNames) {
+  const email = String(authorEmail || "").trim().toLowerCase();
+  if (!email || !authorDisplayNames) return "";
+  const domain = email.includes("@") ? email.slice(email.lastIndexOf("@")) : "";
+  const read = (key) => {
+    if (!key) return "";
+    if (typeof authorDisplayNames.get === "function") return authorDisplayNames.get(key) || "";
+    return authorDisplayNames[key] || "";
+  };
+  return String(read(email) || read(domain) || "").trim().slice(0, 80);
 }
 
 function slugify(value) {

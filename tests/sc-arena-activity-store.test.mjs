@@ -4,8 +4,11 @@ import test from "node:test";
 import {
   activityMembershipForViewer,
   activityRecordForSource,
+  isScArenaPlatformActivity,
+  loadScArenaAdminActivity,
   loadScArenaMyLog,
   recordScArenaActivity,
+  recordScArenaClientActivity,
   scArenaActivityConfig
 } from "../netlify/lib/sc-arena-activity.mjs";
 
@@ -76,6 +79,69 @@ test("source records map to allowlisted events and include the content owner as 
   assert.equal(activityRecordForSource("unknown", event, { id: ACTOR_ID, role: "member" }), null);
 });
 
+test("Community edits, bookmarks, and channels map to distinct body-free activity types", () => {
+  const viewer = { id: ACTOR_ID, role: "member", organization: "테스트 팀" };
+  const context = {
+    viewerTeam: { id: "team-1", name: "테스트 팀" },
+    forumSnapshot: {
+      threads: [{ id: "thread-1", title: "업데이트할 글", authorUserId: ACTOR_ID }],
+      comments: [{ id: "comment-1", threadId: "thread-1", authorUserId: ACTOR_ID }]
+    }
+  };
+  const threadEdit = activityRecordForSource("forum", {
+    id: "forum-edit-1",
+    type: "forum_thread_updated",
+    threadId: "thread-1",
+    changes: { bodyMarkdown: "private draft" }
+  }, viewer, context);
+  const commentEdit = activityRecordForSource("forum", {
+    id: "forum-edit-2",
+    type: "forum_comment_updated",
+    commentId: "comment-1",
+    changes: { bodyMarkdown: "private comment" }
+  }, viewer, context);
+  const bookmark = activityRecordForSource("forum", {
+    id: "forum-bookmark-1",
+    type: "forum_thread_bookmarked",
+    threadId: "thread-1"
+  }, viewer, context);
+  const category = activityRecordForSource("forum", {
+    id: "forum-category-1",
+    type: "forum_category_created",
+    category: { id: "category-1", label: "Customer Ops", visibility: "public", description: "private note" }
+  }, viewer, context);
+
+  assert.deepEqual(
+    [threadEdit, commentEdit, bookmark, category].map((record) => record.eventType),
+    ["community.post_updated", "community.comment_updated", "community.thread_bookmarked", "community.category_created"]
+  );
+  assert.equal(JSON.stringify([threadEdit, commentEdit, bookmark, category]).includes("private draft"), false);
+  assert.equal(JSON.stringify([threadEdit, commentEdit, bookmark, category]).includes("private comment"), false);
+  assert.equal(JSON.stringify([threadEdit, commentEdit, bookmark, category]).includes("private note"), false);
+});
+
+test("client activity binds the authenticated viewer and stores no credentials or content", async () => {
+  let body;
+  const result = await recordScArenaClientActivity({
+    action: "page_viewed",
+    page: "community",
+    clientEventId: "page_viewed:11111111-1111-4111-8111-111111111111",
+    viewer: { id: ACTOR_ID, role: "member", email: "private@example.com", organization: "테스트 팀" },
+    context: { viewerTeam: { id: "team-1", name: "테스트 팀" } },
+    env: env(),
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return jsonResponse(88);
+    }
+  });
+  assert.equal(result.stored, true);
+  assert.equal(body.p_actor_user_id, ACTOR_ID);
+  assert.equal(body.p_event_type, "system.page_viewed");
+  assert.deepEqual(body.p_metadata, { page: "community" });
+  assert.equal(JSON.stringify(body).includes("private@example.com"), false);
+  assert.equal(Object.hasOwn(body.p_metadata, "token"), false);
+});
+
 test("writes use opaque secret keys correctly and strip nested metadata", async () => {
   const calls = [];
   const result = await recordScArenaActivity({
@@ -143,6 +209,19 @@ test("My Log syncs membership server-side and reads rows with the caller JWT", a
       calls.push({ url, options });
       if (url.endsWith("sc_arena_sync_membership")) return jsonResponse([{ workspace_id: "workspace-1" }]);
       return jsonResponse([{
+        id: 10,
+        event_uid: "external-event-uid",
+        source_system: "program_hub",
+        source_event_id: "event-registration-1",
+        domain: "events",
+        event_type: "events.registration_created",
+        title: "외부 프로그램 행사 신청",
+        summary: "AI Arena 밖에서 발생한 활동",
+        route_target: "workspace",
+        occurred_at: "2026-08-12T01:01:00.000Z",
+        recorded_at: "2026-08-12T01:01:01.000Z",
+        entities: []
+      }, {
         id: 9,
         event_uid: "event-uid",
         source_system: "forum",
@@ -165,6 +244,7 @@ test("My Log syncs membership server-side and reads rows with the caller JWT", a
 
   assert.equal(result.available, true);
   assert.equal(result.events.length, 1);
+  assert.equal(result.events[0].eventType, "community.post_created");
   assert.deepEqual(result.events[0].metadata, { visible: true, count: 2 });
   assert.equal(calls[0].options.headers.apikey, "sb_secret_server");
   assert.equal(Object.hasOwn(calls[0].options.headers, "Authorization"), false);
@@ -175,6 +255,125 @@ test("My Log syncs membership server-side and reads rows with the caller JWT", a
   assert.equal(body.p_domain, null);
   assert.equal(body.p_before_occurred_at, null);
   assert.equal(body.p_before_id, null);
+});
+
+test("My Log accepts only SparkClaw AI Arena Discover, Community, and Bounty events", () => {
+  assert.equal(isScArenaPlatformActivity({ domain: "discover", event_type: "discover.connection_requested" }), true);
+  assert.equal(isScArenaPlatformActivity({ domain: "community", event_type: "community.comment_created" }), true);
+  assert.equal(isScArenaPlatformActivity({ domain: "bounty", event_type: "bounty.submission_created" }), true);
+  assert.equal(isScArenaPlatformActivity({ domain: "events", event_type: "events.registration_created" }), false);
+  assert.equal(isScArenaPlatformActivity({ domain: "community", event_type: "discover.connection_requested" }), false);
+});
+
+test("admin activity syncs staff membership and reads cross-user rows with the staff JWT", async () => {
+  const calls = [];
+  const req = new Request("https://arena.test/api/arena-activity", {
+    headers: { authorization: "Bearer staff-access-token" }
+  });
+  const result = await loadScArenaAdminActivity({
+    req,
+    viewer: { id: ACTOR_ID, role: "sparklabs", canScore: true, organization: "SparkLabs" },
+    actorUserId: AUTHOR_ID,
+    domain: "community",
+    eventType: "community.comment_created",
+    occurredFrom: "2026-08-01T00:00:00.000Z",
+    occurredTo: "2026-08-18T00:00:00.000Z",
+    limit: 999,
+    env: env(),
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options, body: JSON.parse(options.body) });
+      if (url.endsWith("sc_arena_sync_membership")) return jsonResponse([{ workspace_id: "workspace-1" }]);
+      if (url.endsWith("sc_arena_admin_activity_users")) return jsonResponse([{
+        user_id: AUTHOR_ID,
+        email: "member@example.com",
+        actor_label: "Member Team",
+        role: "claw_member",
+        organization_name: "Member Team",
+        event_count: 5,
+        first_activity_at: "2026-08-12T00:00:00.000Z",
+        last_activity_at: "2026-08-12T01:00:00.000Z"
+      }]);
+      return jsonResponse([{
+        id: 15,
+        event_uid: "33333333-3333-4333-8333-333333333333",
+        actor_user_id: AUTHOR_ID,
+        actor_email: "member@example.com",
+        actor_label: "Member Team",
+        actor_role: "claw_member",
+        organization_name: "Member Team",
+        domain: "community",
+        event_type: "community.comment_created",
+        event_label: "Community 댓글 작성",
+        title: "검증 질문 댓글 작성",
+        summary: "Community 글에 댓글을 남겼습니다.",
+        route_target: "myLogCommunity",
+        source_system: "forum",
+        occurred_at: "2026-08-12T01:00:00.000Z",
+        recorded_at: "2026-08-12T01:00:01.000Z",
+        metadata: { threadId: "thread-1" }
+      }]);
+    }
+  });
+
+  assert.equal(result.available, true);
+  assert.equal(result.users[0].email, "member@example.com");
+  assert.equal(result.events[0].actorUserId, AUTHOR_ID);
+  assert.equal(calls[0].options.headers.apikey, "sb_secret_server");
+  assert.equal(Object.hasOwn(calls[0].options.headers, "Authorization"), false);
+  assert.equal(calls[1].options.headers.Authorization, "Bearer staff-access-token");
+  assert.equal(calls[2].options.headers.Authorization, "Bearer staff-access-token");
+  assert.equal(calls[2].body.p_actor_user_id, AUTHOR_ID);
+  assert.equal(calls[2].body.p_domain, "community");
+  assert.equal(calls[2].body.p_event_type, "community.comment_created");
+  assert.equal(calls[2].body.p_limit, 200);
+});
+
+test("admin activity includes existing Supabase Auth users before they create ledger events", async () => {
+  const req = new Request("https://arena.test/api/arena-activity", {
+    headers: { authorization: "Bearer staff-access-token" }
+  });
+  const accountWithoutActivityId = "44444444-4444-4444-8444-444444444444";
+  const result = await loadScArenaAdminActivity({
+    req,
+    viewer: { id: ACTOR_ID, role: "sparklabs", canScore: true, organization: "SparkLabs" },
+    env: env(),
+    fetchImpl: async (url) => {
+      if (url.endsWith("sc_arena_sync_membership")) return jsonResponse([{ workspace_id: "workspace-1" }]);
+      if (url.endsWith("sc_arena_admin_activity_users")) return jsonResponse([{
+        user_id: AUTHOR_ID,
+        email: "member@example.com",
+        actor_label: "Ledger Team",
+        role: "claw_member",
+        organization_name: "Ledger Team",
+        event_count: 5,
+        first_activity_at: "2026-08-12T00:00:00.000Z",
+        last_activity_at: "2026-08-12T01:00:00.000Z"
+      }]);
+      if (url.includes("/auth/v1/admin/users")) return jsonResponse({ users: [{
+        id: AUTHOR_ID,
+        email: "member@example.com",
+        app_metadata: { arenaRole: "member", provider: "email" },
+        user_metadata: { companyName: "Auth Team", privateNote: "never expose" }
+      }, {
+        id: accountWithoutActivityId,
+        email: "new@example.com",
+        app_metadata: {},
+        user_metadata: { companyName: "New Team" }
+      }] });
+      return jsonResponse([]);
+    }
+  });
+
+  assert.equal(result.available, true);
+  assert.equal(result.users.length, 2);
+  assert.equal(result.users[0].userId, AUTHOR_ID);
+  assert.equal(result.users[0].label, "Ledger Team");
+  assert.equal(result.users[0].eventCount, 5);
+  assert.equal(result.users[1].userId, accountWithoutActivityId);
+  assert.equal(result.users[1].role, "registered");
+  assert.equal(result.users[1].eventCount, 0);
+  assert.equal(JSON.stringify(result.users).includes("privateNote"), false);
+  assert.equal(JSON.stringify(result.users).includes("provider"), false);
 });
 
 test("auxiliary activity requests abort at the configured timeout", async () => {

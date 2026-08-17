@@ -4,7 +4,7 @@ import { loadCompetitionEvents } from "../lib/competition/competition-store.mjs"
 import { buildCompetitionSnapshot } from "../lib/competition/competition-core.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
-export default async function arenaCompetition(req) {
+async function arenaCompetition(req) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (req.method !== "GET") return json({ error: "Method not allowed" }, 405);
 
@@ -27,6 +27,8 @@ export default async function arenaCompetition(req) {
     return json({ error: error.message }, error.status || 400);
   }
 }
+
+export default withScArenaDevelopmentLogging("arena-competition", arenaCompetition);
 
 function competitionAvailableToViewer(viewer) {
   return Boolean(
@@ -53,3 +55,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

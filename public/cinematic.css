@@ -1,0 +1,447 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #020817;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #020817;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: #f5fbff;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+a { font: inherit; }
+
+.cinematic-entry {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 520px;
+  overflow: hidden;
+  background: #020817;
+}
+
+.cinematic-media,
+.cinematic-media::before,
+.cinematic-film,
+.cinematic-grade,
+.cinematic-grain,
+.cinematic-enter {
+  position: absolute;
+  inset: 0;
+}
+
+.cinematic-media {
+  z-index: -3;
+  overflow: hidden;
+  background: #020817 url("/media/sparkclaw-cinematic-poster.jpg") center / cover no-repeat;
+}
+
+.cinematic-media::before {
+  content: "";
+  display: none;
+  background: url("/media/sparkclaw-cinematic-poster.jpg") center / cover no-repeat;
+  filter: blur(28px) brightness(0.48) saturate(1.2);
+  transform: scale(1.12);
+}
+
+.cinematic-film {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  background: transparent;
+  filter: saturate(1.05) contrast(1.035) brightness(0.9);
+  transform: scale(1.018);
+  transition: transform 1100ms cubic-bezier(0.2, 0.75, 0.2, 1), filter 950ms ease, opacity 900ms ease;
+}
+
+.cinematic-grade {
+  z-index: -2;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(1, 7, 21, 0.58) 0%, rgba(1, 7, 21, 0.04) 24%, rgba(1, 7, 21, 0.1) 54%, rgba(1, 7, 21, 0.78) 100%),
+    radial-gradient(circle at 50% 45%, transparent 32%, rgba(0, 4, 15, 0.56) 112%);
+}
+
+.cinematic-grain {
+  z-index: -1;
+  opacity: 0.12;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.38'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+}
+
+.cinematic-brand {
+  position: absolute;
+  z-index: 2;
+  top: max(28px, env(safe-area-inset-top));
+  left: max(32px, env(safe-area-inset-left));
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  opacity: 0;
+  animation: cinematic-copy-in 900ms 360ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  pointer-events: none;
+}
+
+.cinematic-brand-mark {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(161, 227, 255, 0.28);
+  border-radius: 16px;
+  background: rgba(6, 30, 71, 0.46);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 12px 35px rgba(0, 4, 20, 0.24);
+  backdrop-filter: blur(14px);
+}
+
+.cinematic-brand-mark img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+
+.cinematic-brand-copy {
+  display: grid;
+  gap: 2px;
+  text-shadow: 0 3px 18px rgba(0, 5, 20, 0.72);
+}
+
+.cinematic-brand-copy strong {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.cinematic-brand-copy small {
+  color: #73dff5;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.28em;
+}
+
+.cinematic-caption {
+  position: absolute;
+  z-index: 2;
+  left: max(52px, calc((100vw - 1440px) / 2));
+  bottom: max(64px, calc(env(safe-area-inset-bottom) + 42px));
+  width: min(580px, calc(100vw - 104px));
+  pointer-events: none;
+}
+
+.cinematic-caption > span,
+.cinematic-caption h1,
+.cinematic-caption p {
+  opacity: 0;
+  transform: translateY(18px);
+  animation: cinematic-copy-in 900ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.cinematic-caption > span {
+  display: block;
+  color: #65e2dc;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  animation-delay: 760ms;
+}
+
+.cinematic-caption h1 {
+  margin: 12px 0 9px;
+  color: #fff;
+  font-size: clamp(38px, 5.4vw, 78px);
+  font-weight: 780;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+  text-shadow: 0 10px 38px rgba(0, 3, 18, 0.58);
+  animation-delay: 900ms;
+}
+
+.cinematic-caption p {
+  margin: 0;
+  color: rgba(225, 241, 255, 0.78);
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  text-shadow: 0 4px 20px rgba(0, 3, 18, 0.72);
+  animation-delay: 1040ms;
+}
+
+.cinematic-enter {
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  padding: 0 46px max(66px, calc(env(safe-area-inset-bottom) + 44px));
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 10px;
+  border: 0;
+  color: rgba(239, 249, 255, 0.9);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 780;
+  letter-spacing: 0.045em;
+  cursor: pointer;
+}
+
+.cinematic-enter:focus-visible {
+  outline: 2px solid #7beddf;
+  outline-offset: -10px;
+}
+
+.cinematic-enter > span:not(.cinematic-enter-pulse),
+.cinematic-enter > b,
+.cinematic-enter-pulse {
+  opacity: 0;
+  animation: cinematic-copy-in 700ms 1350ms ease forwards;
+  text-shadow: 0 3px 18px rgba(0, 4, 18, 0.75);
+}
+
+.cinematic-enter b {
+  color: #69ebd8;
+  font-size: 18px;
+  transition: transform 180ms ease;
+}
+
+.cinematic-enter:hover b,
+.cinematic-enter:focus-visible b { transform: translateX(5px); }
+
+.cinematic-enter-pulse {
+  width: 9px;
+  height: 9px;
+  border: 2px solid #7bf0df;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(101, 235, 217, 0.5);
+  animation: cinematic-copy-in 700ms 1350ms ease forwards, cinematic-pulse 1.9s 1900ms ease-out infinite;
+}
+
+.cinematic-progress {
+  position: absolute;
+  z-index: 3;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  overflow: hidden;
+  background: rgba(166, 217, 255, 0.12);
+  pointer-events: none;
+}
+
+.cinematic-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #277ef0, #46dbe4 62%, #72eedc);
+  box-shadow: 0 0 14px rgba(89, 228, 226, 0.8);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: cinematic-progress 20.064s linear infinite;
+}
+
+.cinematic-transition {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  color: #fff;
+  background: radial-gradient(circle at 50% 50%, rgba(36, 134, 255, 0.18), transparent 20%), #020817;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(1.08);
+  transition: opacity 680ms ease, transform 950ms cubic-bezier(0.2, 0.8, 0.2, 1), visibility 680ms;
+  pointer-events: none;
+}
+
+.cinematic-transition img {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 25px rgba(54, 198, 255, 0.36));
+}
+
+.cinematic-transition strong {
+  margin-top: 10px;
+  font-size: 16px;
+  letter-spacing: 0.13em;
+}
+
+.cinematic-transition span {
+  margin-top: 3px;
+  color: #67e7df;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.28em;
+}
+
+body.is-entering .cinematic-film {
+  opacity: 0;
+  filter: saturate(0.75) brightness(0.28) blur(8px);
+  transform: scale(1.13);
+}
+
+body.is-entering .cinematic-brand,
+body.is-entering .cinematic-caption,
+body.is-entering .cinematic-enter,
+body.is-entering .cinematic-progress {
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+
+body.is-entering .cinematic-transition {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
+}
+
+.cinematic-skip,
+.cinematic-noscript {
+  position: fixed;
+  z-index: 20;
+  top: 14px;
+  left: 50%;
+  padding: 10px 14px;
+  border: 1px solid rgba(130, 230, 223, 0.5);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(2, 20, 47, 0.94);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  transform: translate(-50%, -160%);
+  transition: transform 180ms ease;
+}
+
+.cinematic-skip:focus { transform: translate(-50%, 0); }
+
+.cinematic-noscript {
+  top: auto;
+  bottom: 24px;
+  transform: translateX(-50%);
+}
+
+@keyframes cinematic-copy-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cinematic-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(101, 235, 217, 0.52); }
+  70%, 100% { box-shadow: 0 0 0 11px rgba(101, 235, 217, 0); }
+}
+
+@keyframes cinematic-progress { to { transform: scaleX(1); } }
+
+@media (orientation: portrait) {
+  .cinematic-media::before { display: block; }
+
+  .cinematic-film {
+    z-index: 1;
+    object-fit: contain;
+    filter: saturate(1.04) contrast(1.03) brightness(0.92);
+  }
+
+  .cinematic-grade {
+    background:
+      linear-gradient(180deg, rgba(1, 7, 21, 0.62) 0%, transparent 22%, transparent 60%, rgba(1, 7, 21, 0.86) 100%),
+      radial-gradient(circle at 50% 45%, transparent 24%, rgba(0, 4, 15, 0.5) 116%);
+  }
+}
+
+@media (max-width: 720px) {
+  .cinematic-entry { min-height: 480px; }
+
+  .cinematic-brand {
+    top: max(18px, env(safe-area-inset-top));
+    left: max(18px, env(safe-area-inset-left));
+    gap: 9px;
+  }
+
+  .cinematic-brand-mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+
+  .cinematic-brand-mark img { width: 39px; height: 39px; }
+  .cinematic-brand-copy strong { font-size: 13px; }
+
+  .cinematic-caption {
+    right: 20px;
+    bottom: max(92px, calc(env(safe-area-inset-bottom) + 72px));
+    left: 20px;
+    width: auto;
+  }
+
+  .cinematic-caption > span { font-size: 10px; letter-spacing: 0.16em; }
+
+  .cinematic-caption h1 {
+    max-width: 320px;
+    margin-top: 9px;
+    font-size: clamp(36px, 12vw, 54px);
+    line-height: 1.02;
+  }
+
+  .cinematic-caption p { font-size: 13px; }
+
+  .cinematic-enter {
+    justify-content: flex-start;
+    padding: 0 20px max(30px, calc(env(safe-area-inset-bottom) + 18px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cinematic-film,
+  .cinematic-brand,
+  .cinematic-caption > span,
+  .cinematic-caption h1,
+  .cinematic-caption p,
+  .cinematic-enter > span,
+  .cinematic-enter > b,
+  .cinematic-enter-pulse,
+  .cinematic-progress span,
+  .cinematic-transition {
+    animation: none !important;
+    transition-duration: 1ms !important;
+  }
+
+  .cinematic-brand,
+  .cinematic-caption > span,
+  .cinematic-caption h1,
+  .cinematic-caption p,
+  .cinematic-enter > span,
+  .cinematic-enter > b,
+  .cinematic-enter-pulse {
+    opacity: 1;
+    transform: none;
+  }
+
+  .cinematic-film { display: none; }
+
+  .cinematic-media::before {
+    display: block;
+    filter: brightness(0.62) saturate(1.05);
+    transform: none;
+  }
+}

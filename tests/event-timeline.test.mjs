@@ -4,10 +4,35 @@ import assert from "node:assert/strict";
 import {
   eventDescriptionPreview,
   formatEventTime,
+  isCommunityEventFromOrientation,
+  isPartnerVisibleProgramEvent,
   koreanWeekday,
+  partnerVisibleProgramEvents,
   shouldCollapseEventDescription,
   sortEventsChronologically
 } from "../public/arena/event-timeline.js";
+
+test("Community Events begin with the 13 August 2026 BootCamp Orientation", () => {
+  assert.equal(isCommunityEventFromOrientation({ date: "2026-08-12" }), false);
+  assert.equal(isCommunityEventFromOrientation({ date: "2026-08-13" }), true);
+  assert.equal(isCommunityEventFromOrientation({ event_date: "2026-08-14" }), true);
+  assert.equal(isCommunityEventFromOrientation({ date: "TBD" }), false);
+});
+
+test("partner calendar keeps the 13 August OT and only public major program events", () => {
+  const events = [
+    { id: "private-team", title: "팀별 비공개 멘토링", date: "2026-08-20", teamId: "team-1" },
+    { id: "minor", title: "운영 체크인", date: "2026-08-21", targetGroup: "운영진" },
+    { id: "public-demo", title: "SparkClaw Demo Day", date: "2026-09-30", targetGroup: "전체 공개" }
+  ];
+  assert.equal(isPartnerVisibleProgramEvent(events[0]), false);
+  assert.equal(isPartnerVisibleProgramEvent(events[1]), false);
+  assert.equal(isPartnerVisibleProgramEvent(events[2]), true);
+  assert.deepEqual(
+    partnerVisibleProgramEvents(events).map((event) => event.id),
+    ["partner-program-orientation-2026-08-13", "public-demo"]
+  );
+});
 
 test("events are ordered by date and then by starting time", () => {
   const events = [

@@ -1,4 +1,4 @@
-import { bearerToken } from "./supabase-auth.mjs";
+import { arenaAuthConfig, bearerToken, viewerFromUser } from "./supabase-auth.mjs";
 
 const WORKSPACE_SLUG = "sparkclaw-ai-arena";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -124,6 +124,77 @@ export function activityRecordForSource(sourceSystem, event, viewer, context = {
 export async function recordScArenaActivity({ sourceSystem, event, viewer, context = {}, env = process.env, fetchImpl = fetch }) {
   const record = activityRecordForSource(sourceSystem, event, viewer, context);
   if (!record) return { stored: false, reason: "not_loggable" };
+  return appendScArenaActivityRecord(record, env, fetchImpl);
+}
+
+export async function recordScArenaClientActivity({
+  action,
+  clientEventId,
+  page = "",
+  viewer,
+  context = {},
+  env = process.env,
+  fetchImpl = fetch
+}) {
+  const membership = activityMembershipForViewer(viewer, context);
+  const eventId = cleanText(clientEventId, 180);
+  const normalizedAction = cleanText(action, 40).toLowerCase();
+  const normalizedPage = cleanText(page, 40).toLowerCase();
+  const pageLabels = {
+    overview: "Discover Home",
+    teams: "Company Directory",
+    discover: "Task-driven Search",
+    passports: "Tech Passports",
+    compare: "Compare",
+    partnerships: "Partnerships",
+    community: "Community",
+    arena: "Bounty",
+    workspace: "My Log",
+    operations: "Operations",
+    database: "Database"
+  };
+  if (!membership || !/^[a-zA-Z0-9:_-]{12,180}$/.test(eventId)) {
+    return { stored: false, reason: "invalid_client_event" };
+  }
+  if (normalizedAction === "page_viewed" && !pageLabels[normalizedPage]) {
+    return { stored: false, reason: "invalid_page" };
+  }
+  if (!new Set(["session_started", "page_viewed"]).has(normalizedAction)) {
+    return { stored: false, reason: "unsupported_client_action" };
+  }
+
+  const actorLabel = cleanText(
+    context.viewerTeam?.name || context.viewerTeamName || viewer.organization || roleLabel(membership.role),
+    160
+  );
+  const isSession = normalizedAction === "session_started";
+  const record = {
+    sourceSystem: "arena_client",
+    sourceEventId: eventId,
+    actorUserId: membership.userId,
+    actorLabel,
+    actorRole: membership.role,
+    actorOrganizationSource: membership.organizationSource,
+    actorOrganizationKey: membership.organizationKey,
+    actorOrganizationName: membership.organizationName,
+    actorOrganizationType: membership.organizationType,
+    eventType: isSession ? "system.session_started" : "system.page_viewed",
+    primaryEntityType: null,
+    primaryEntityKey: null,
+    primaryEntityLabel: null,
+    audienceScope: "actor_only",
+    title: isSession ? "AI Arena 로그인" : `${pageLabels[normalizedPage]} 열람`,
+    summary: isSession ? "SparkClaw AI Arena 세션을 시작했습니다." : `${pageLabels[normalizedPage]} 페이지를 열었습니다.`,
+    routeTarget: isSession ? "workspace" : normalizedPage,
+    metadata: isSession ? { client: "web" } : { page: normalizedPage },
+    relatedEntities: [],
+    viewerUserIds: [],
+    occurredAt: new Date().toISOString()
+  };
+  return appendScArenaActivityRecord(record, env, fetchImpl);
+}
+
+async function appendScArenaActivityRecord(record, env, fetchImpl) {
   const config = scArenaActivityConfig(env);
   if (!config.writeConfigured) return { stored: false, reason: "unconfigured" };
   const response = await activityFetch(fetchImpl, `${config.supabaseUrl}/rest/v1/rpc/sc_arena_append_activity`, {
@@ -213,14 +284,201 @@ export async function loadScArenaMyLog({
     error.status = response.status;
     throw error;
   }
-  const events = Array.isArray(payload) ? payload.map(publicActivityEvent).filter(Boolean) : [];
-  const last = events.length === boundedLimit ? events[events.length - 1] : null;
+  const rows = Array.isArray(payload) ? payload : [];
+  const events = rows.filter(isScArenaPlatformActivity).map(publicActivityEvent).filter(Boolean);
+  const lastRow = rows.length === boundedLimit ? rows[rows.length - 1] : null;
   return {
     available: true,
     events,
-    nextCursor: last ? encodeCursor(last.occurredAt, last.id) : null,
+    nextCursor: lastRow && isValidTimestamp(lastRow.occurred_at) && Number.isSafeInteger(Number(lastRow.id))
+      ? encodeCursor(lastRow.occurred_at, Number(lastRow.id))
+      : null,
     reason: ""
   };
+}
+
+export async function loadScArenaAdminActivity({
+  req,
+  viewer,
+  viewerTeamId = null,
+  viewerTeamName = "",
+  actorUserId = null,
+  domain = null,
+  eventType = null,
+  occurredFrom = null,
+  occurredTo = null,
+  cursor = null,
+  limit = 100,
+  includeUsers = true,
+  env = process.env,
+  fetchImpl = fetch
+}) {
+  const config = scArenaActivityConfig(env);
+  const token = bearerToken(req);
+  const viewerId = cleanText(viewer?.id, 64);
+  if (!config.readConfigured || !token || !UUID_PATTERN.test(viewerId)) {
+    return { available: false, users: [], events: [], nextCursor: null, reason: "unconfigured" };
+  }
+  const membership = activityMembershipForViewer(viewer, {
+    viewerTeamId,
+    viewerTeam: viewerTeamId ? { id: viewerTeamId, name: viewerTeamName } : null
+  });
+  if (!membership || !["staff", "admin"].includes(membership.role)) {
+    const error = new Error("SparkLabs 관리자만 전체 사용자 활동을 열람할 수 있습니다.");
+    error.status = 403;
+    throw error;
+  }
+
+  const membershipResponse = await activityFetch(fetchImpl, `${config.supabaseUrl}/rest/v1/rpc/sc_arena_sync_membership`, {
+    method: "POST",
+    headers: serviceHeaders(config.secretKey),
+    body: JSON.stringify(membershipRpcPayload(membership))
+  }, config.requestTimeoutMs);
+  const membershipPayload = await safeJson(membershipResponse);
+  if (!membershipResponse.ok) {
+    if (missingSchema(membershipResponse, membershipPayload)) {
+      return { available: false, users: [], events: [], nextCursor: null, reason: "schema_missing" };
+    }
+    throw new Error(membershipPayload?.message || "Arena membership could not be synchronized.");
+  }
+
+  const authHeaders = {
+    apikey: config.anonKey,
+    Authorization: `Bearer ${token}`,
+    "content-type": "application/json"
+  };
+  let users = [];
+  if (includeUsers) {
+    const usersResponse = await activityFetch(fetchImpl, `${config.supabaseUrl}/rest/v1/rpc/sc_arena_admin_activity_users`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ p_workspace_slug: WORKSPACE_SLUG, p_search: null, p_limit: 500 })
+    }, config.requestTimeoutMs);
+    const usersPayload = await safeJson(usersResponse);
+    if (!usersResponse.ok) {
+      if (missingSchema(usersResponse, usersPayload)) {
+        return { available: false, users: [], events: [], nextCursor: null, reason: "schema_missing" };
+      }
+      const error = new Error(usersPayload?.message || usersPayload?.error || "Arena users could not be loaded.");
+      error.status = usersResponse.status;
+      throw error;
+    }
+    users = (Array.isArray(usersPayload) ? usersPayload : []).map(publicAdminActivityUser).filter(Boolean);
+  }
+
+  const boundedLimit = Math.min(Math.max(Number(limit) || 100, 1), 200);
+  const cursorValue = parseCursor(cursor);
+  const normalizedActorId = UUID_PATTERN.test(cleanText(actorUserId, 64)) ? cleanText(actorUserId, 64) : null;
+  const normalizedDomain = ["discover", "community", "bounty", "system"].includes(domain) ? domain : null;
+  const normalizedEventType = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/.test(cleanText(eventType, 100))
+    ? cleanText(eventType, 100)
+    : null;
+  const response = await activityFetch(fetchImpl, `${config.supabaseUrl}/rest/v1/rpc/sc_arena_admin_activity`, {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({
+      p_workspace_slug: WORKSPACE_SLUG,
+      p_actor_user_id: normalizedActorId,
+      p_domain: normalizedDomain,
+      p_event_type: normalizedEventType,
+      p_occurred_from: isValidTimestamp(occurredFrom) ? new Date(occurredFrom).toISOString() : null,
+      p_occurred_to: isValidTimestamp(occurredTo) ? new Date(occurredTo).toISOString() : null,
+      p_before_occurred_at: cursorValue?.occurredAt || null,
+      p_before_id: cursorValue?.id || null,
+      p_limit: boundedLimit
+    })
+  }, config.requestTimeoutMs);
+  const payload = await safeJson(response);
+  if (!response.ok) {
+    if (missingSchema(response, payload)) {
+      return { available: false, users, events: [], nextCursor: null, reason: "schema_missing" };
+    }
+    const error = new Error(payload?.message || payload?.error || "Arena activity could not be loaded.");
+    error.status = response.status;
+    throw error;
+  }
+  const rows = Array.isArray(payload) ? payload : [];
+  const events = rows.map(publicAdminActivityEvent).filter(Boolean);
+  const lastRow = rows.length === boundedLimit ? rows[rows.length - 1] : null;
+  if (includeUsers) {
+    const directoryUsers = await loadSupabaseAuthDirectory(config, env, fetchImpl);
+    users = mergeAdminActivityUsers(users, directoryUsers);
+  }
+  return {
+    available: true,
+    users,
+    events,
+    nextCursor: lastRow && isValidTimestamp(lastRow.occurred_at) && Number.isSafeInteger(Number(lastRow.id))
+      ? encodeCursor(lastRow.occurred_at, Number(lastRow.id))
+      : null,
+    reason: ""
+  };
+}
+
+async function loadSupabaseAuthDirectory(config, env, fetchImpl) {
+  try {
+    const response = await activityFetch(fetchImpl, `${config.supabaseUrl}/auth/v1/admin/users?page=1&per_page=1000`, {
+      headers: serviceHeaders(config.secretKey)
+    }, config.requestTimeoutMs);
+    const payload = await safeJson(response);
+    if (!response.ok || !Array.isArray(payload?.users)) return [];
+    const authConfig = arenaAuthConfig(env);
+    return payload.users.map((user) => publicAuthDirectoryUser(user, authConfig)).filter(Boolean);
+  } catch {
+    // The activity ledger remains usable if the Auth Admin directory is
+    // temporarily unavailable. Its users will be merged on the next refresh.
+    return [];
+  }
+}
+
+function publicAuthDirectoryUser(user, authConfig) {
+  const userId = cleanText(user?.id, 64);
+  if (!UUID_PATTERN.test(userId)) return null;
+  const viewer = viewerFromUser(user, authConfig);
+  const role = activityMembershipRole(viewer) || "registered";
+  const email = cleanText(viewer.email, 320);
+  const organizationName = cleanText(viewer.organization, 240);
+  return {
+    userId,
+    email,
+    label: organizationName || email || "Arena account",
+    role,
+    organizationName,
+    eventCount: 0,
+    firstActivityAt: null,
+    lastActivityAt: null
+  };
+}
+
+function mergeAdminActivityUsers(ledgerUsers = [], directoryUsers = []) {
+  const byUserId = new Map();
+  for (const user of directoryUsers) byUserId.set(user.userId, user);
+  for (const ledgerUser of ledgerUsers) {
+    const directoryUser = byUserId.get(ledgerUser.userId);
+    byUserId.set(ledgerUser.userId, {
+      ...directoryUser,
+      ...ledgerUser,
+      email: ledgerUser.email || directoryUser?.email || "",
+      label: ledgerUser.label || directoryUser?.label || "Arena account",
+      role: ledgerUser.role || directoryUser?.role || "registered",
+      organizationName: ledgerUser.organizationName || directoryUser?.organizationName || ""
+    });
+  }
+  return [...byUserId.values()].sort((left, right) => {
+    const leftTime = Date.parse(left.lastActivityAt || "") || 0;
+    const rightTime = Date.parse(right.lastActivityAt || "") || 0;
+    if (leftTime !== rightTime) return rightTime - leftTime;
+    if (left.eventCount !== right.eventCount) return right.eventCount - left.eventCount;
+    return String(left.label || left.email).localeCompare(String(right.label || right.email), "ko");
+  });
+}
+
+export function isScArenaPlatformActivity(row) {
+  const eventType = cleanText(row?.event_type || row?.eventType, 100).toLowerCase();
+  const eventDomain = eventType.split(".")[0];
+  if (!new Set(["discover", "community", "bounty"]).has(eventDomain)) return false;
+  const declaredDomain = cleanText(row?.domain || row?.category, 40).toLowerCase();
+  return !declaredDomain || declaredDomain === eventDomain;
 }
 
 function arenaActivityRecord(event, viewer, context, base) {
@@ -358,6 +616,22 @@ function forumActivityRecord(event, context, base) {
       metadata: { category: event.thread.categorySlug || "general", visibility: event.thread.visibility || "members_only" }
     };
   }
+  if (event.type === "forum_thread_updated" && event.threadId) {
+    const thread = (snapshot.threads || []).find((item) => item.id === event.threadId) || {};
+    const deleted = event.changes?.status === "deleted";
+    return {
+      ...base,
+      eventType: "community.post_updated",
+      primaryEntityType: "forum_thread",
+      primaryEntityKey: event.threadId,
+      audienceScope: "actor_only",
+      primaryEntityLabel: cleanText(thread.title || "Community 글", 240),
+      title: `${cleanText(thread.title || "Community 글", 160)} ${deleted ? "삭제" : "수정"}`,
+      summary: deleted ? "Community 글을 삭제했습니다." : "Community 글을 수정했습니다.",
+      routeTarget: "myLogCommunity",
+      metadata: { change: deleted ? "deleted" : "updated" }
+    };
+  }
   if (event.type === "forum_comment_created" && event.comment) {
     const thread = (snapshot.threads || []).find((item) => item.id === event.comment.threadId) || {};
     return {
@@ -371,6 +645,25 @@ function forumActivityRecord(event, context, base) {
       summary: "Community 글에 댓글을 남겼습니다.",
       routeTarget: "myLogCommunity",
       metadata: { threadId: event.comment.threadId || "" },
+      relatedEntities: thread.id ? [relatedEntity("forum_thread", "forum", thread.id, thread.title, "parent")] : [],
+      viewerUserIds: validUserIds([thread.authorUserId])
+    };
+  }
+  if (event.type === "forum_comment_updated" && event.commentId) {
+    const comment = (snapshot.comments || []).find((item) => item.id === event.commentId) || {};
+    const thread = (snapshot.threads || []).find((item) => item.id === comment.threadId) || {};
+    const deleted = event.changes?.status === "deleted";
+    return {
+      ...base,
+      eventType: "community.comment_updated",
+      primaryEntityType: "forum_comment",
+      primaryEntityKey: event.commentId,
+      audienceScope: "actor_only",
+      primaryEntityLabel: cleanText(thread.title || "Community 글", 240),
+      title: `${cleanText(thread.title || "Community 글", 160)} 댓글 ${deleted ? "삭제" : "수정"}`,
+      summary: deleted ? "Community 댓글을 삭제했습니다." : "Community 댓글을 수정했습니다.",
+      routeTarget: "myLogCommunity",
+      metadata: { threadId: comment.threadId || "", change: deleted ? "deleted" : "updated" },
       relatedEntities: thread.id ? [relatedEntity("forum_thread", "forum", thread.id, thread.title, "parent")] : [],
       viewerUserIds: validUserIds([thread.authorUserId])
     };
@@ -394,6 +687,36 @@ function forumActivityRecord(event, context, base) {
       routeTarget: "myLogCommunity",
       metadata: { targetType: event.targetType || "thread", voteType: event.voteType || "upvote" },
       viewerUserIds: validUserIds([target?.authorUserId])
+    };
+  }
+  if (event.type === "forum_thread_bookmarked" && event.threadId) {
+    const thread = (snapshot.threads || []).find((item) => item.id === event.threadId) || {};
+    return {
+      ...base,
+      eventType: "community.thread_bookmarked",
+      primaryEntityType: "forum_thread",
+      primaryEntityKey: event.threadId,
+      audienceScope: "actor_only",
+      primaryEntityLabel: cleanText(thread.title || "Community 글", 240),
+      title: `${cleanText(thread.title || "Community 글", 160)} 저장`,
+      summary: "Community 글을 저장했습니다.",
+      routeTarget: "myLogCommunity",
+      metadata: {},
+      viewerUserIds: validUserIds([thread.authorUserId])
+    };
+  }
+  if (event.type === "forum_category_created" && event.category) {
+    return {
+      ...base,
+      eventType: "community.category_created",
+      primaryEntityType: "forum_category",
+      primaryEntityKey: event.category.id,
+      audienceScope: "actor_only",
+      primaryEntityLabel: cleanText(event.category.label, 240),
+      title: `${cleanText(event.category.label || "Community", 160)} 채널 생성`,
+      summary: "Community 채널을 만들었습니다.",
+      routeTarget: "community",
+      metadata: { visibility: event.category.visibility || "public" }
     };
   }
   return null;
@@ -540,6 +863,48 @@ function publicActivityEvent(row) {
           relation: cleanText(item?.relation, 20)
         }))
       : []
+  };
+}
+
+function publicAdminActivityUser(row) {
+  const userId = cleanText(row?.user_id, 64);
+  if (!UUID_PATTERN.test(userId)) return null;
+  return {
+    userId,
+    email: cleanText(row.email, 320),
+    label: cleanText(row.actor_label || row.organization_name || row.email, 240),
+    role: cleanText(row.role, 40),
+    organizationName: cleanText(row.organization_name, 240),
+    eventCount: Math.max(Number(row.event_count) || 0, 0),
+    firstActivityAt: isValidTimestamp(row.first_activity_at) ? row.first_activity_at : null,
+    lastActivityAt: isValidTimestamp(row.last_activity_at) ? row.last_activity_at : null
+  };
+}
+
+function publicAdminActivityEvent(row) {
+  const id = Number(row?.id);
+  const actorUserId = cleanText(row?.actor_user_id, 64);
+  if (!Number.isSafeInteger(id) || id < 1 || !UUID_PATTERN.test(actorUserId) || !isValidTimestamp(row?.occurred_at)) {
+    return null;
+  }
+  return {
+    id,
+    eventUid: cleanText(row.event_uid, 64),
+    actorUserId,
+    actorEmail: cleanText(row.actor_email, 320),
+    actorLabel: cleanText(row.actor_label, 160),
+    actorRole: cleanText(row.actor_role, 40),
+    organizationName: cleanText(row.organization_name, 240),
+    category: cleanText(row.domain, 40),
+    eventType: cleanText(row.event_type, 100),
+    eventLabel: cleanText(row.event_label, 120),
+    title: cleanText(row.title, 200),
+    detail: cleanText(row.summary, 1000),
+    target: cleanText(row.route_target || "workspace", 80),
+    sourceSystem: cleanText(row.source_system, 80),
+    occurredAt: row.occurred_at,
+    recordedAt: isValidTimestamp(row.recorded_at) ? row.recorded_at : row.occurred_at,
+    metadata: safeMetadata(row.metadata)
   };
 }
 

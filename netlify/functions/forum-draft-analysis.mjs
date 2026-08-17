@@ -4,7 +4,7 @@ import { resolveProgramParticipantViewer } from "../lib/program-hub.mjs";
 import { consumeRateLimit } from "../lib/rate-limit.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
-export default async function forumDraftAnalysis(req, options = {}) {
+async function forumDraftAnalysis(req, options = {}) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (req.method !== "POST") return json({ error: "지원하지 않는 요청 방식입니다." }, 405);
 
@@ -47,6 +47,8 @@ export default async function forumDraftAnalysis(req, options = {}) {
     return json({ error: message }, status);
   }
 }
+
+export default withScArenaDevelopmentLogging("forum-draft-analysis", forumDraftAnalysis);
 
 async function communityViewer(viewer, resolveViewer, env, fetchImpl) {
   if (viewer?.role !== "public") return viewer;
@@ -92,3 +94,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

@@ -5,7 +5,7 @@ import { consumeRateLimit } from "../lib/rate-limit.mjs";
 import { recordScArenaActivitySafely } from "../lib/sc-arena-activity.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
-export default async function forum(req) {
+async function forum(req) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (!["GET", "POST"].includes(req.method)) return json({ error: "Method not allowed" }, 405);
 
@@ -21,7 +21,11 @@ export default async function forum(req) {
     if (req.method === "GET") {
       const events = await loadForumEvents();
       const url = new URL(req.url);
-      return json(buildForumSnapshot(events, { viewer, demo: isExplicitDemo(url) }));
+      return json(buildForumSnapshot(events, {
+        viewer,
+        demo: isExplicitDemo(url),
+        authorDisplayNames: viewerContext.communityDisplayNames
+      }));
     }
 
     const body = await readJson(req);
@@ -29,7 +33,10 @@ export default async function forum(req) {
     await enforceForumRateLimit(body.action, viewer);
     const event = createForumEvent(body.action, body.payload || {}, viewer, eventsBefore);
     const events = await appendForumEvent(event);
-    const snapshot = buildForumSnapshot(events, { viewer });
+    const snapshot = buildForumSnapshot(events, {
+      viewer,
+      authorDisplayNames: viewerContext.communityDisplayNames
+    });
     await recordScArenaActivitySafely({
       sourceSystem: "forum",
       event,
@@ -37,7 +44,7 @@ export default async function forum(req) {
       context: {
         viewerTeamId: viewerContext.viewerTeamId,
         viewerTeam: viewerContext.viewerTeamId
-          ? { id: viewerContext.viewerTeamId, name: viewer?.organization || "" }
+          ? { id: viewerContext.viewerTeamId, name: viewer?.communityDisplayName || viewer?.organization || "" }
           : null,
         forumSnapshot: forumActivitySnapshot(snapshot, events)
       }
@@ -52,16 +59,19 @@ export default async function forum(req) {
   }
 }
 
+export default withScArenaDevelopmentLogging("forum", forum);
+
 async function communityViewerContext(viewer) {
-  if (viewer?.role !== "public") return { viewer, viewerTeamId: null };
+  if (!viewer) return { viewer, viewerTeamId: null, communityDisplayNames: new Map() };
   try {
     const resolved = await resolveProgramParticipantViewer(viewer);
     return {
       viewer: resolved?.viewer || viewer,
-      viewerTeamId: resolved?.viewerTeamId || null
+      viewerTeamId: resolved?.viewerTeamId || null,
+      communityDisplayNames: resolved?.communityDisplayNames || new Map()
     };
   } catch {
-    return { viewer, viewerTeamId: null };
+    return { viewer, viewerTeamId: null, communityDisplayNames: new Map() };
   }
 }
 
@@ -98,7 +108,7 @@ function forumEnabled(env = process.env) {
 async function enforceForumRateLimit(action, viewer) {
   if (viewer?.canScore) return;
   const rateLimit = await consumeRateLimit(`forum:${action}:${viewer?.id || viewer?.email || "anonymous"}`, {
-    max: action === "createForumComment" ? 40 : 20,
+    max: action === "createForumComment" ? 40 : action === "createForumCategory" ? 8 : 20,
     windowMs: 60 * 60 * 1000
   });
   if (rateLimit.allowed) return;
@@ -141,3 +151,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

@@ -20,6 +20,7 @@ test("login and logout always clear discovery results before another account can
   assert.match(community, /window\.addEventListener\("spark-arena:discovery-reset", resetAgenticDiscovery\)/);
   assert.match(reset, /discoveryRequestId \+= 1/);
   assert.match(reset, /setDiscoveryPending\(false\)/);
+  assert.match(reset, /resetClaweeDiscoveryGuide\(\)/);
   assert.match(reset, /setProcessStatus\(els\.discoveryStatus\)/);
   assert.match(reset, /els\.discoveryResults\.hidden = true/);
   assert.match(reset, /els\.discoveryResults\.replaceChildren\(\)/);
@@ -34,7 +35,7 @@ test("a stale discovery response cannot repopulate results after session reset",
   assert.match(discovery, /finally \{\s*if \(requestId === discoveryRequestId\) setDiscoveryPending\(false\)/);
 });
 
-test("entering Community clears the Spark AI query, progress, and recommendations before returning to Discover", () => {
+test("entering Community clears the Clawee query, progress, and recommendations before returning to Discover", () => {
   const pageListener = functionSlice(community, 'window.addEventListener("spark-arena:page"', 'window.addEventListener("spark-arena:discovery-reset"');
   const reset = functionSlice(community, "function resetAgenticDiscovery", "function renderAgenticResults");
 

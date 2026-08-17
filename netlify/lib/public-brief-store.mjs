@@ -47,6 +47,20 @@ export async function savePublicBrief(input, now = new Date().toISOString(), opt
   throw storageError();
 }
 
+export async function loadPublicBriefMonitor(options = {}) {
+  const allowMemoryFallback = options.allowMemoryFallback ?? !isProductionNetlify();
+  const limit = Math.min(Math.max(Number(options.limit) || 50, 1), 100);
+  let store;
+  try {
+    store = options.store || getStore({ name: STORE_NAME, consistency: "strong" });
+    const current = await loadBriefsWithMetadata(store);
+    return publicBriefMonitor(current.briefs, limit);
+  } catch (error) {
+    if (allowMemoryFallback) return publicBriefMonitor(memoryBriefs, limit);
+    throw monitoringError(error);
+  }
+}
+
 export function normalizePublicBrief(input = {}, now = new Date().toISOString()) {
   assertPlainInput(input);
   assertInputSize(input);
@@ -129,6 +143,45 @@ function memoryReceipt(brief) {
 
 function receipt(brief) {
   return { id: brief.id, status: brief.status, createdAt: brief.createdAt };
+}
+
+function publicBriefMonitor(briefs, limit) {
+  const allItems = (Array.isArray(briefs) ? briefs : [])
+    .filter((brief) => brief?.requestType === "public_discovery_brief" || brief?.source === "public_discovery_brief")
+    .map(publicBriefMonitorItem)
+    .filter(Boolean)
+    .sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0));
+  return {
+    available: true,
+    totalCount: allItems.length,
+    latestAt: allItems[0]?.createdAt || null,
+    items: allItems.slice(0, limit)
+  };
+}
+
+function publicBriefMonitorItem(brief) {
+  const id = storedText(brief?.id, 120);
+  const organization = storedText(brief?.organization, 160);
+  const createdAt = storedTimestamp(brief?.createdAt);
+  if (!id || !organization || !createdAt) return null;
+  return {
+    id,
+    organization,
+    problemSummary: storedText(brief?.problem, 240),
+    status: storedText(brief?.status, 40) || "received",
+    createdAt,
+    updatedAt: storedTimestamp(brief?.updatedAt) || createdAt,
+    deadline: /^\d{4}-\d{2}-\d{2}$/.test(String(brief?.deadline || "")) ? String(brief.deadline) : ""
+  };
+}
+
+function storedText(value, max) {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "";
+}
+
+function storedTimestamp(value) {
+  const parsed = Date.parse(String(value || ""));
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
 }
 
 function assertPlainInput(value) {
@@ -229,6 +282,13 @@ function isProductionNetlify() {
 
 function storageError(cause) {
   const error = new Error("Brief를 안전하게 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  error.status = 503;
+  if (cause) error.cause = cause;
+  return error;
+}
+
+function monitoringError(cause) {
+  const error = new Error("탐색 Brief 모니터링 정보를 불러오지 못했습니다.");
   error.status = 503;
   if (cause) error.cause = cause;
   return error;

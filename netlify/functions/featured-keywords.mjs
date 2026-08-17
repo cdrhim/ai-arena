@@ -5,7 +5,7 @@ import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
 const ALLOWED_ROLES = new Set(["member", "b2b_partner", "human_validator", "sparklabs", "admin"]);
 
-export default async function featuredKeywords(req, options = {}) {
+async function featuredKeywords(req, options = {}) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (req.method !== "POST") return json({ error: "지원하지 않는 요청 방식입니다." }, 405);
 
@@ -43,6 +43,8 @@ export default async function featuredKeywords(req, options = {}) {
   }
 }
 
+export default withScArenaDevelopmentLogging("featured-keywords", featuredKeywords);
+
 async function resolveViewer(viewer, resolver, env, fetchImpl) {
   if (viewer?.role !== "public") return viewer;
   try {
@@ -79,3 +81,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

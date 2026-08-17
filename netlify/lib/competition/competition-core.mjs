@@ -237,13 +237,19 @@ function selectedSubmissionsForRanking(challenge, submissions) {
 
 function sanitizeCompetitionState(state, leaderboards, viewer, now, context = {}) {
   const staff = Boolean(viewer?.canScore);
-  const publicOrJoinedChallenges = state.challenges.filter((challenge) => staff || challenge.visibility === "public" || isTeamMemberForChallenge(state, challenge.id, viewer));
-  const visibleSubmissions = state.submissions
+  const operationalChallenges = state.challenges.filter((challenge) => challenge?.createdBy !== "seed");
+  const operationalChallengeIds = new Set(operationalChallenges.map((challenge) => challenge.id));
+  const operationalTeams = state.teams.filter((team) => operationalChallengeIds.has(team.challengeId));
+  const operationalSubmissions = state.submissions.filter((submission) => operationalChallengeIds.has(submission.challengeId));
+  const operationalSubmissionIds = new Set(operationalSubmissions.map((submission) => submission.id));
+  const publicOrJoinedChallenges = operationalChallenges.filter((challenge) => staff || challenge.visibility === "public" || isTeamMemberForChallenge(state, challenge.id, viewer));
+  const visibleSubmissions = operationalSubmissions
     .filter((submission) => staff || ownsSubmission(state, submission, viewer))
     .map((submission) => sanitizeSubmission(submission, staff, isPrivateRevealed(state, submission.challengeId)));
   const visibleReports = state.validationReports
     .filter((report) => {
-      const submission = state.submissions.find((item) => item.id === report.submissionId);
+      if (!operationalSubmissionIds.has(report.submissionId)) return false;
+      const submission = operationalSubmissions.find((item) => item.id === report.submissionId);
       return staff || ownsSubmission(state, submission, viewer);
     })
     .map((report) => sanitizeReport(report, staff));
@@ -252,7 +258,7 @@ function sanitizeCompetitionState(state, leaderboards, viewer, now, context = {}
     .map((leaderboard) => sanitizeLeaderboard(leaderboard, staff));
   const approvedBriefIds = approvedSponsorBriefIds(context?.bountyRequests);
   const releasableChallengeIds = new Set(
-    state.challenges
+    operationalChallenges
       .filter((challenge) => challengeLinkedToApprovedBrief(challenge, approvedBriefIds))
       .map((challenge) => challenge.id)
   );
@@ -272,18 +278,18 @@ function sanitizeCompetitionState(state, leaderboards, viewer, now, context = {}
       : participantReleased
         ? releasedChallenges.map((challenge) => sanitizeChallenge(challenge, staff))
         : [],
-    teams: staff ? state.teams : participantReleased ? state.teams.filter((team) => ownsTeam(team, viewer)) : [],
+    teams: staff ? operationalTeams : participantReleased ? operationalTeams.filter((team) => ownsTeam(team, viewer)) : [],
     submissions: staff ? visibleSubmissions : participantReleased ? releasedSubmissions : [],
     validationReports: staff ? visibleReports : participantReleased ? releasedReports : [],
     leaderboards: staff ? visibleLeaderboards : participantReleased ? releasedLeaderboards : [],
     validationQueue: staff
-      ? state.submissions
+      ? operationalSubmissions
           .filter((submission) => ["uploaded", "queued", "validating", "schema_failed", "scored", "selected_for_private"].includes(submission.status))
           .map((submission) => sanitizeSubmission(submission, true, true))
       : [],
-    pairwiseVotes: staff ? state.pairwiseVotes.map((vote) => ({ ...vote })) : [],
-    reviews: staff ? state.reviews.map((review) => ({ ...review })) : [],
-    opportunities: staff ? state.opportunities.map((opportunity) => sanitizeOpportunity(opportunity, staff)) : participantReleased ? state.opportunities
+    pairwiseVotes: staff ? state.pairwiseVotes.filter((vote) => operationalChallengeIds.has(vote.challengeId)).map((vote) => ({ ...vote })) : [],
+    reviews: staff ? state.reviews.filter((review) => operationalSubmissionIds.has(review.submissionId)).map((review) => ({ ...review })) : [],
+    opportunities: staff ? state.opportunities.filter((opportunity) => operationalChallengeIds.has(opportunity.challengeId)).map((opportunity) => sanitizeOpportunity(opportunity, staff)) : participantReleased ? state.opportunities
       .filter((opportunity) => releasedChallengeIds.has(opportunity.challengeId))
       .filter((opportunity) => staff || (canUseMemberOwnership(viewer) && (opportunity.requesterUserId === viewer?.id || opportunity.requesterEmail === viewer?.email)))
       .map((opportunity) => sanitizeOpportunity(opportunity, staff)) : [],

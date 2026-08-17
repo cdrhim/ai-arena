@@ -8,7 +8,10 @@ export const FEATURED_COMPANY_CURATION = [
     hook: "AI 체험을 오프라인 매장 경험으로 확장",
     appealKeywords: ["190+ 행사 운영", "42개 AI 콘텐츠", "오프라인 AI 경험"],
     sourceLabel: "회사 공식 성과",
-    sourceUrl: "https://neander.co.kr/",
+    sourceUrl: "https://www.acscent.co.kr/",
+    websiteUrl: "https://www.acscent.co.kr/",
+    spotlightImage: "/arena/assets/featured/acscent-product.png",
+    spotlightImagePosition: "center 54%",
     verifiedAt: "2026-08-11"
   },
   {
@@ -21,6 +24,8 @@ export const FEATURED_COMPANY_CURATION = [
     appealKeywords: ["디지털 헬스", "CareMate 연결", "영양 루틴"],
     sourceLabel: "Apple App Store",
     sourceUrl: "https://apps.apple.com/kr/app/oing/id6756283759",
+    spotlightImage: "/arena/assets/featured/oing-product.png",
+    spotlightImagePosition: "center 42%",
     verifiedAt: "2026-08-11"
   },
   {
@@ -33,6 +38,8 @@ export const FEATURED_COMPANY_CURATION = [
     appealKeywords: ["영상→레시피", "AI 푸드테크", "Google Play 출시"],
     sourceLabel: "Google Play",
     sourceUrl: "https://play.google.com/store/apps/details?id=com.vivivava.hemogry.app",
+    spotlightImage: "/arena/assets/featured/hemogry-product.png",
+    spotlightImagePosition: "center 42%",
     verifiedAt: "2026-08-11"
   },
   {
@@ -45,6 +52,8 @@ export const FEATURED_COMPANY_CURATION = [
     appealKeywords: ["AI 학습 기록", "EdTech", "모바일 서비스"],
     sourceLabel: "Google Play",
     sourceUrl: "https://play.google.com/store/apps/details?id=day.crack.bk",
+    spotlightImage: "/arena/assets/featured/crack-product.png",
+    spotlightImagePosition: "center 46%",
     verifiedAt: "2026-08-11"
   }
 ];

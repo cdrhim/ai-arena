@@ -73,6 +73,7 @@ function approvedChallengeEvent(source = documentChallenge, at = "2026-06-09T00:
     createdAt: at,
     challenge: {
       ...source,
+      createdBy: staff.email,
       status: "open",
       visibility: "public",
       sponsorBriefId: APPROVED_BRIEF_ID,
@@ -269,6 +270,7 @@ test("higher-is-better and lower-is-better rankings work", () => {
     id: "latency-demo",
     slug: "latency-demo",
     title: "Latency Demo",
+    createdBy: staff.email,
     status: "open",
     metricKey: "latency_ms",
     metricDisplayName: "Latency",
@@ -387,12 +389,33 @@ test("only a persisted published Sponsor Brief with explicit challenge approval 
   assert.deepEqual(unapprovedBrief.challenges, []);
 });
 
-test("staff preview retains staged challenge data without reporting participant release", () => {
+test("staff snapshots hide seed Bounties and their fake operational data", () => {
   const snapshot = buildCompetitionSnapshot([], staff, "2026-06-10T00:00:00.000Z");
   assert.equal(snapshot.releaseState, "preparing");
   assert.equal(snapshot.previewMode, true);
-  assert.ok(snapshot.challenges.length >= 1);
-  assert.ok(snapshot.metrics.challenges >= 1);
+  assert.deepEqual(snapshot.challenges, []);
+  assert.deepEqual(snapshot.teams, []);
+  assert.deepEqual(snapshot.submissions, []);
+  assert.deepEqual(snapshot.validationReports, []);
+  assert.deepEqual(snapshot.leaderboards, []);
+  assert.deepEqual(snapshot.validationQueue, []);
+  assert.deepEqual(snapshot.pairwiseVotes, []);
+  assert.equal(snapshot.metrics.challenges, 0);
+});
+
+test("staff snapshots retain Bounties created by real operators", () => {
+  const event = createCompetitionEvent(
+    "saveCompetitionChallenge",
+    { title: "Real sponsor Bounty", status: "draft", visibility: "private" },
+    staff,
+    [],
+    "2026-06-10T00:00:00.000Z"
+  );
+  const snapshot = buildCompetitionSnapshot([event], staff, "2026-06-10T00:01:00.000Z");
+
+  assert.equal(snapshot.challenges.length, 1);
+  assert.equal(snapshot.challenges[0].title, "Real sponsor Bounty");
+  assert.equal(snapshot.metrics.challenges, 1);
 });
 
 test("converted B2B accounts cannot inherit legacy member competition ownership", () => {

@@ -21,6 +21,15 @@ test("B2B company search and comparison use Program DB participants instead of p
           sector: "Manufacturing",
           oneLiner: "Factory inspection",
           serviceSummary: "Detects visual defects",
+          investorProfile: {
+            partneringSummary: "제조 검사 자동화 경험을 보유한 팀입니다. 실행 근거: 현장 PoC 4곳",
+            metrics: ["현장 PoC 4곳"],
+            specialtyTasks: [{
+              label: "Alpha Vision · 미세 표면 결함 판정",
+              description: "생산 라인의 표면 영상을 분석해 미세 결함을 판정하고 검사 결과를 MES에 연결합니다.",
+              evidence: "현장 PoC 4곳"
+            }]
+          },
           matchingKeywords: ["컴퓨터 비전", "품질 검사", "컴퓨터 비전"],
           websiteUrl: "https://alpha.example",
           email: "private@alpha.example",
@@ -41,11 +50,25 @@ test("B2B company search and comparison use Program DB participants instead of p
   assert.deepEqual(result.startups.map((team) => team.name), ["Alpha AI", "Beta AI"]);
   assert.equal(result.startups.some((team) => team.name === "Test"), false);
   assert.deepEqual(result.startups[0].functions, ["컴퓨터 비전", "품질 검사"]);
+  assert.match(result.startups[0].partneringSummary, /현장 PoC 4곳/);
+  assert.equal(result.startups[0].specialtyTasks[0].label, "Alpha Vision · 미세 표면 결함 판정");
+  assert.deepEqual(result.startups[0].investorMetrics, ["현장 PoC 4곳"]);
   assert.equal(result.connectionRequests.length, 1);
   assert.equal(result.bountyRequests.length, 1);
   assert.equal(result.metrics.source, "program_directory");
   assert.equal(JSON.stringify(result).includes("private@alpha.example"), false);
   assert.equal(JSON.stringify(result).includes("Private Founder"), false);
+});
+
+test("Task-driven Search cards surface investor-ready proof and niche operating tasks", () => {
+  assert.match(market, /program-partnering-summary/);
+  assert.match(market, /program-investor-metrics/);
+  assert.match(market, /program-specialty-preview/);
+  assert.match(market, /파트너링·투자 검토 포인트/);
+  assert.match(market, /해결 가능한 Task · 근거 순/);
+  assert.match(market, /해결 가능한 모든 Task/);
+  assert.match(market, /programCapabilityTasks/);
+  assert.match(market, /공개 근거/);
 });
 
 test("Claw members search other participant teams through contact-safe Program DB profiles", () => {
@@ -85,10 +108,14 @@ test("partner prototype snapshot never publishes before Program DB replacement",
   assert.match(arena, /if \(publish\) publishMarketContext\(\)/);
 });
 
-test("comparison state is account-scoped, removes the legacy Test selection, and never auto-selects companies", () => {
+test("comparison state stays current-session only and clears stale selections on reload or account change", () => {
   assert.match(market, /COMPARE_KEY_PREFIX = "sparklabs-ai-arena-compare-v2"/);
-  assert.match(market, /currentViewer\?\.id \|\| currentViewer\?\.subject/);
-  assert.match(market, /localStorage\.removeItem\(LEGACY_COMPARE_KEY\)/);
+  assert.match(market, /clearStoredCompareSelections\(\)/);
+  assert.match(market, /key\.startsWith\(`\$\{COMPARE_KEY_PREFIX\}:`\)/);
+  assert.match(market, /nextIdentity !== compareViewerIdentity[\s\S]*?resetCompareSelection\(\)/);
+  assert.match(market, /function resetCompareSelection\(\)[\s\S]*?selectedTeamIds = \[\]/);
+  assert.doesNotMatch(market, /localStorage\.setItem\([^\n]*compare/iu);
+  assert.doesNotMatch(market, /readCompareSelection/);
   assert.match(market, /selectedTeamIds = reconciled/);
   assert.doesNotMatch(market, /startups\.slice\(0, 2\)\.map/);
   assert.match(market, /임의의 기본 기업은 자동으로 선택하지 않습니다/);

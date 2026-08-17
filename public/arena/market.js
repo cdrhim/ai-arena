@@ -1,7 +1,8 @@
 import { escapeHtml } from "./sanitize.js";
 import { finishProcessStatus, startProcessStatus } from "./progress-status.js";
 import { companyIconMarkup } from "./company-icon.js";
-import { searchableTaskKeywords, taskKeywords, TASK_KEYWORD_PENDING } from "./task-keywords.js";
+import { companyExternalLinkIcon, companyExternalLinks } from "./company-external-links.js";
+import { rankedTaskDetails, searchableTaskKeywords, taskKeywords, TASK_KEYWORD_PENDING } from "./task-keywords.js";
 
 const SESSION_KEY = "sparkclaw-program-hub-session-v1";
 const COMPARE_KEY_PREFIX = "sparklabs-ai-arena-compare-v2";
@@ -30,7 +31,8 @@ const PIPELINE_LABELS = {
 
 let context = window.__sparkArenaContext || {};
 let selectedTeamIds = [];
-let compareStorageKey = "";
+let compareViewerIdentity = "";
+let bountyEditingRequestId = "";
 let filtersPopulated = false;
 let passportFormTouched = false;
 let compareSummaryState = { key: "", status: "idle", summary: null, error: "" };
@@ -42,10 +44,15 @@ let myLogTimelineFilter = "all";
 let myLogTimelineItems = [];
 let myLogCanonicalState = emptyCanonicalMyLogState();
 let myLogCanonicalRequestId = 0;
+let adminActivityState = emptyAdminActivityState();
+let adminActivityRequestId = 0;
+let staffBenefitQueueState = emptyStaffBenefitQueueState();
+let staffBenefitQueueRequestId = 0;
 let curatedCompanyPreviewCandidates = [];
 let curatedCompanyPreviewStack = [];
 let curatedCompanyPreviewTimer = 0;
 let curatedCompanySwapTimer = 0;
+let curatedCompanyCloseTimer = 0;
 let curatedCompanyPreviewActive = false;
 const MARKET_ACTION_PROGRESS_STEPS = [
   "요청 내용과 회원 권한을 확인하고 있습니다.",
@@ -54,8 +61,30 @@ const MARKET_ACTION_PROGRESS_STEPS = [
 ];
 const COMPARE_SUMMARY_PROGRESS_STEPS = [
   "선택한 기업의 공개 프로필을 확인하고 있습니다.",
-  "Spark AI 에이전트가 서비스와 AI 적용 방식의 차이를 비교하고 있습니다.",
+  "클로이가 서비스와 AI 적용 방식의 차이를 비교하고 있습니다.",
   "프로필 근거에 맞게 요약을 정리하고 있습니다."
+];
+const ADMIN_ACTIVITY_ACTIONS = [
+  ["system", "system.session_started", "로그인·세션 시작"],
+  ["system", "system.page_viewed", "페이지 열람"],
+  ["discover", "discover.connection_requested", "기업 연결 요청"],
+  ["discover", "discover.connection_status_changed", "기업 연결 상태 변경"],
+  ["discover", "discover.collaboration_review_requested", "협업 검토 요청"],
+  ["discover", "discover.collaboration_review_responded", "협업 검토 응답"],
+  ["discover", "discover.tech_passport_updated", "Tech Passport 업데이트"],
+  ["community", "community.category_created", "Community 채널 생성"],
+  ["community", "community.post_created", "Community 글 작성"],
+  ["community", "community.post_updated", "Community 글 수정·삭제"],
+  ["community", "community.comment_created", "댓글 작성"],
+  ["community", "community.comment_updated", "댓글 수정·삭제"],
+  ["community", "community.reaction_added", "반응 남김"],
+  ["community", "community.thread_bookmarked", "Community 글 저장"],
+  ["bounty", "bounty.brief_created", "Bounty Brief 등록"],
+  ["bounty", "bounty.brief_status_changed", "Bounty Brief 상태 변경"],
+  ["bounty", "bounty.application_submitted", "Bounty 결과 제출"],
+  ["bounty", "bounty.application_status_changed", "Bounty 제출 상태 변경"],
+  ["bounty", "bounty.opportunity_created", "Bounty 기회 요청·생성"],
+  ["bounty", "bounty.opportunity_status_changed", "Bounty 기회 상태 변경"]
 ];
 
 const els = {
@@ -116,6 +145,11 @@ const els = {
   comparisonResult: document.querySelector("#comparisonResult"),
   bountyBriefPanel: document.querySelector("#bountyBriefPanel"),
   bountyBriefForm: document.querySelector("#bountyBriefForm"),
+  bountyBriefFormTitle: document.querySelector("#bountyBriefFormTitle"),
+  bountyBriefFormDescription: document.querySelector("#bountyBriefFormDescription"),
+  bountyBriefRoleBadge: document.querySelector("#bountyBriefRoleBadge"),
+  bountyBriefSubmit: document.querySelector("#bountyBriefSubmit"),
+  bountyBriefCancelEdit: document.querySelector("#bountyBriefCancelEdit"),
   bountyBriefStatus: document.querySelector("#bountyBriefStatus"),
   connectionPanel: document.querySelector("#connectionPanel"),
   connectionForm: document.querySelector("#connectionForm"),
@@ -134,17 +168,32 @@ const els = {
   myLogTimelineList: document.querySelector("#myLogTimelineList"),
   myLogLoadMoreButton: document.querySelector("#myLogLoadMoreButton"),
   myLogLoadMoreStatus: document.querySelector("#myLogLoadMoreStatus"),
+  myLogBriefs: document.querySelector("#myLogBriefs"),
+  myLogBriefList: document.querySelector("#myLogBriefList"),
   myLogMatchList: document.querySelector("#myLogMatchList"),
   myLogCommunityList: document.querySelector("#myLogCommunityList"),
   myLogBountyList: document.querySelector("#myLogBountyList"),
   staffMarketQueue: document.querySelector("#staffMarketQueue"),
   staffMarketQueueContent: document.querySelector("#staffMarketQueueContent"),
+  adminActivityExplorer: document.querySelector("#adminActivityExplorer"),
+  adminActivityUserFilter: document.querySelector("#adminActivityUserFilter"),
+  adminActivityDomainFilter: document.querySelector("#adminActivityDomainFilter"),
+  adminActivityActionFilter: document.querySelector("#adminActivityActionFilter"),
+  adminActivityFromFilter: document.querySelector("#adminActivityFromFilter"),
+  adminActivityToFilter: document.querySelector("#adminActivityToFilter"),
+  adminActivityResetButton: document.querySelector("#adminActivityResetButton"),
+  adminActivityRefreshButton: document.querySelector("#adminActivityRefreshButton"),
+  adminActivitySummary: document.querySelector("#adminActivitySummary"),
+  adminActivityTableBody: document.querySelector("#adminActivityTableBody"),
+  adminActivityLoadMoreButton: document.querySelector("#adminActivityLoadMoreButton"),
+  adminActivityStatus: document.querySelector("#adminActivityStatus"),
   teamDialog: document.querySelector("#teamDialog"),
   teamDialogContent: document.querySelector("#teamDialogContent"),
   toast: document.querySelector("#toast")
 };
 
 bindEvents();
+clearStoredCompareSelections();
 syncCompareSelectionScope();
 if (context?.market) renderAll();
 
@@ -154,12 +203,16 @@ window.addEventListener("spark-arena:data", (event) => {
   const nextViewerIdentity = viewerIdentity(nextContext?.viewer || nextContext?.market?.viewer);
   const viewerChanged = previousViewerIdentity !== nextViewerIdentity;
   if (viewerChanged) {
+    bountyEditingRequestId = "";
     communityActivity = emptyCommunityActivity();
     myLogTimelineFilter = "all";
     myLogTimelineItems = [];
     resetCanonicalMyLog(nextViewerIdentity);
+    resetAdminActivity(nextViewerIdentity);
+    resetStaffBenefitQueue(nextViewerIdentity);
     similarTeamRequestId += 1;
     similarTeamState = emptySimilarTeamState();
+    resetCompareSelection();
   }
   context = nextContext;
   filtersPopulated = false;
@@ -168,22 +221,27 @@ window.addEventListener("spark-arena:data", (event) => {
   if (isComparePageActive() && isClawMemberViewer()) void loadSimilarTeamRecommendations();
   if (viewerChanged && nextViewerIdentity && document.querySelector('[data-page-panel="workspace"].is-active')) {
     void loadCanonicalMyLog();
+    if (isStaffViewer()) {
+      void loadAdminActivity({ reset: true });
+      void loadStaffBenefitQueue();
+    }
   }
 });
 
 window.addEventListener("spark-arena:page", (event) => {
   const page = event.detail?.page;
   if (page !== "overview") stopCuratedCompanyPreview();
+  renderMarketPage(page);
   if (page === "compare") {
-    renderCompare();
     void loadSimilarTeamRecommendations();
   }
-  if (page === "passports") renderPassports();
-  if (page === "partnerships") renderPartnerships();
   if (page === "workspace") {
-    renderWorkspace();
     window.dispatchEvent(new CustomEvent("spark-arena:load-community-activity"));
     void loadCanonicalMyLog();
+    if (isStaffViewer()) {
+      void loadAdminActivity({ reset: adminActivityState.identity !== viewerIdentity(viewer()) });
+      void loadStaffBenefitQueue();
+    }
   }
 });
 
@@ -202,7 +260,6 @@ window.addEventListener("spark-arena:compare-program-team", (event) => {
       return;
     }
     selectedTeamIds.push(id);
-    writeCompareSelection();
   }
   renderDiscover();
   renderCompare();
@@ -215,8 +272,9 @@ window.addEventListener("spark-arena:restore-team-dialog", (event) => {
 });
 
 function bindEvents() {
+  const renderDiscoverAfterInput = debounceMainThreadRender(renderDiscover);
   [els.search, els.categoryFilter, els.stageFilter, els.stackFilter, els.evidenceFilter].forEach((control) => {
-    control?.addEventListener(control.tagName === "INPUT" ? "input" : "change", renderDiscover);
+    control?.addEventListener(control.tagName === "INPUT" ? "input" : "change", control.tagName === "INPUT" ? renderDiscoverAfterInput : renderDiscover);
   });
   els.teamGrid?.addEventListener("click", handleTeamGridClick);
   els.compareTrayTeams?.addEventListener("click", handleCompareTrayClick);
@@ -238,12 +296,24 @@ function bindEvents() {
     control?.addEventListener("change", () => syncCompareFromSelects(false));
   });
   els.bountyBriefForm?.addEventListener("submit", submitBountyBrief);
+  els.bountyBriefCancelEdit?.addEventListener("click", resetBountyBriefEditor);
   els.connectionForm?.addEventListener("submit", submitConnectionRequest);
   els.partnershipPipeline?.addEventListener("click", handlePipelineAction);
   els.staffMarketQueueContent?.addEventListener("click", handleStaffQueueAction);
   els.myLogTimelineFilters?.addEventListener("click", handleMyLogTimelineFilter);
   els.myLogTimelineList?.addEventListener("click", handleMyLogTimelineOpen);
   els.myLogLoadMoreButton?.addEventListener("click", handleMyLogLoadMore);
+  els.adminActivityUserFilter?.addEventListener("change", handleAdminActivityFilterChange);
+  els.adminActivityDomainFilter?.addEventListener("change", () => {
+    syncAdminActivityActionOptions();
+    handleAdminActivityFilterChange();
+  });
+  els.adminActivityActionFilter?.addEventListener("change", handleAdminActivityFilterChange);
+  els.adminActivityFromFilter?.addEventListener("change", handleAdminActivityFilterChange);
+  els.adminActivityToFilter?.addEventListener("change", handleAdminActivityFilterChange);
+  els.adminActivityRefreshButton?.addEventListener("click", () => loadAdminActivity({ reset: true, force: true }));
+  els.adminActivityResetButton?.addEventListener("click", resetAdminActivityFilters);
+  els.adminActivityLoadMoreButton?.addEventListener("click", () => loadAdminActivity({ append: true }));
   els.curatedCompaniesCard?.addEventListener("pointerenter", startCuratedCompanyPreview);
   els.curatedCompaniesCard?.addEventListener("pointerleave", stopCuratedCompanyPreview);
   els.curatedCompaniesCard?.addEventListener("focus", startCuratedCompanyPreview);
@@ -256,19 +326,51 @@ function bindEvents() {
   });
   document.addEventListener("click", (event) => {
     const pageButton = event.target.closest("[data-market-page]");
-    if (pageButton) goPage(pageButton.dataset.marketPage);
+    if (pageButton) {
+      goPage(pageButton.dataset.marketPage);
+      const targetId = pageButton.dataset.myLogTarget;
+      if (targetId) {
+        window.requestAnimationFrame(() => {
+          const target = document.getElementById(targetId);
+          if (!target || target.hidden) return;
+          target.classList.add("is-targeted");
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+          window.setTimeout(() => target.classList.remove("is-targeted"), 1200);
+        });
+      }
+    }
   });
+}
+
+function debounceMainThreadRender(callback, delay = 120) {
+  let timer = 0;
+  return (...args) => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => callback(...args), delay);
+  };
 }
 
 function renderAll() {
   if (!market()) return;
   curatedCompanyPreviewCandidates = (market().startups || []).filter(isCuratedCompanyPreviewCandidate);
-  populateFilters();
-  renderDiscover();
-  renderPassports();
-  renderCompare();
-  renderPartnerships();
-  renderWorkspace();
+  const activePage = document.querySelector("[data-page-panel].is-active")?.dataset.pagePanel || "overview";
+  renderMarketPage(activePage);
+}
+
+function renderMarketPage(pageName) {
+  if (!market()) return;
+  if (pageName === "discover") {
+    if (!filtersPopulated) populateFilters();
+    renderDiscover();
+  } else if (pageName === "passports") {
+    renderPassports();
+  } else if (pageName === "compare") {
+    renderCompare();
+  } else if (pageName === "partnerships") {
+    renderPartnerships();
+  } else if (pageName === "workspace") {
+    renderWorkspace();
+  }
 }
 
 function renderHome() {
@@ -351,10 +453,13 @@ function isCuratedCompanyPreviewCandidate(startup) {
 
 function startCuratedCompanyPreview() {
   if (!els.curatedCompanyStack || !curatedCompanyPreviewCandidates.length || curatedCompanyPreviewActive) return;
+  window.clearTimeout(curatedCompanyCloseTimer);
+  curatedCompanyCloseTimer = 0;
   curatedCompanyPreviewActive = true;
+  els.curatedCompanyStack.classList.remove("is-leaving");
   showRandomCuratedCompany();
   if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-    curatedCompanyPreviewTimer = window.setInterval(showRandomCuratedCompany, 2100);
+    curatedCompanyPreviewTimer = window.setInterval(showRandomCuratedCompany, 1600);
   }
 }
 
@@ -362,11 +467,18 @@ function stopCuratedCompanyPreview() {
   curatedCompanyPreviewActive = false;
   window.clearInterval(curatedCompanyPreviewTimer);
   window.clearTimeout(curatedCompanySwapTimer);
+  window.clearTimeout(curatedCompanyCloseTimer);
   curatedCompanyPreviewTimer = 0;
   curatedCompanySwapTimer = 0;
-  curatedCompanyPreviewStack = [];
-  els.curatedCompanyStack?.classList.remove("is-visible", "is-revealing");
-  if (els.curatedCompanyStack) els.curatedCompanyStack.innerHTML = "";
+  els.curatedCompanyStack?.classList.remove("is-revealing", "is-settling");
+  els.curatedCompanyStack?.classList.add("is-leaving");
+  curatedCompanyCloseTimer = window.setTimeout(() => {
+    if (curatedCompanyPreviewActive) return;
+    curatedCompanyPreviewStack = [];
+    els.curatedCompanyStack?.classList.remove("is-visible", "is-leaving");
+    if (els.curatedCompanyStack) els.curatedCompanyStack.innerHTML = "";
+    curatedCompanyCloseTimer = 0;
+  }, 240);
 }
 
 function showRandomCuratedCompany() {
@@ -390,7 +502,11 @@ function showRandomCuratedCompany() {
     curatedCompanyPreviewStack = [...remaining, next].filter(Boolean);
     renderCuratedCompanyPreviewStack();
     els.curatedCompanyStack?.classList.remove("is-revealing");
-  }, 420);
+    els.curatedCompanyStack?.classList.add("is-settling");
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      if (curatedCompanyPreviewActive) els.curatedCompanyStack?.classList.remove("is-settling");
+    }));
+  }, 300);
 }
 
 function pickCuratedCompanyPreviewCards(limit) {
@@ -422,7 +538,7 @@ function renderCuratedCompanyPreviewStack() {
 }
 
 function setMetricCardCopy(items) {
-  document.querySelectorAll(".metric-card").forEach((card, index) => {
+  document.querySelectorAll(".metric-card:not(.admin-benefit-request-notice)").forEach((card, index) => {
     const copy = items[index];
     if (!copy) return;
     const label = card.querySelector(":scope > span");
@@ -559,6 +675,8 @@ function marketTeamCardMarkup(startup) {
 
 function programDirectoryTeamCardMarkup(startup) {
   const selected = selectedTeamIds.includes(startup.id);
+  const investorMetrics = Array.isArray(startup.investorMetrics) ? startup.investorMetrics.slice(0, 3) : [];
+  const specialtyTasks = programCapabilityTasks(startup);
   return `<article class="market-team-card program-directory-market-card ${selected ? "is-selected" : ""}">
     <div class="market-team-card-top">
       ${companyIconMarkup(startup)}
@@ -567,12 +685,13 @@ function programDirectoryTeamCardMarkup(startup) {
     <div>
       <span class="market-category">${escapeHtml(startup.category || "AI")}</span>
       <h2>${escapeHtml(startup.name)}</h2>
-      <p>${escapeHtml(startup.tagline || startup.description || "기본 프로필 준비 중")}</p>
+      <p class="program-partnering-summary">${escapeHtml(startup.partneringSummary || startup.tagline || startup.description || "기본 프로필 준비 중")}</p>
     </div>
-    ${taskKeywordMarkup(startup, 4)}
-    <div class="tech-stack-preview program-profile-preview">
-      <div class="tech-stack-preview-head"><strong>Program DB 기본 프로필</strong><span>연락처 비공개</span></div>
-      <p>상세 기술 스택과 도입 근거는 소개 전 SparkLabs가 확인합니다.</p>
+    ${investorMetrics.length ? `<div class="program-investor-metrics" aria-label="공개 정량 근거">${investorMetrics.map((metric) => `<span>${escapeHtml(metric)}</span>`).join("")}</div>` : ""}
+    ${companyOfficialLinksMarkup(startup)}
+    <div class="program-specialty-preview">
+      <strong>해결 가능한 Task · 근거 순</strong>
+      <ol class="program-specialty-ranked-list">${specialtyTasks.map((task, index) => `<li><span class="task-rank-badge">${index + 1}</span><article><b>${escapeHtml(task.label)}</b><p>${escapeHtml(task.description)}</p>${task.evidence ? `<small>공개 근거 · ${escapeHtml(task.evidence)}</small>` : ""}</article></li>`).join("")}</ol>
     </div>
     <div class="evidence-strip program-profile-strip">
       <div><span>산업</span><strong>${escapeHtml(startup.category || "AI")}</strong></div>
@@ -585,6 +704,16 @@ function programDirectoryTeamCardMarkup(startup) {
       <button class="text-link" data-market-team="${escapeHtml(startup.id)}" type="button">기업 상세 →</button>
     </div>
   </article>`;
+}
+
+function companyOfficialLinksMarkup(company, { section = false } = {}) {
+  const links = companyExternalLinks(company);
+  if (!links.length) return "";
+  const linkMarkup = links.map((link) => `<a class="company-official-link is-${escapeHtml(link.kind)}" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(`${link.label} 공식 링크`)}"><span class="company-official-link-icon" aria-hidden="true">${escapeHtml(companyExternalLinkIcon(link.kind))}</span><span>${escapeHtml(link.label)}</span></a>`).join("");
+  if (section) {
+    return `<section class="company-official-links-section"><h2>공식 채널·앱</h2><p class="company-official-links-note">회사 공식 사이트와 앱스토어에서 확인된 링크입니다.</p><div class="company-official-links is-detail">${linkMarkup}</div></section>`;
+  }
+  return `<div class="company-official-links" aria-label="공식 SNS 및 앱스토어 링크">${linkMarkup}</div>`;
 }
 
 function handleTeamGridClick(event) {
@@ -668,6 +797,7 @@ function openMarketTeam(startup, { recordHistory = true } = {}) {
         <strong>Code metrics policy</strong>
         <p>코드 줄 수는 생성 코드, vendor, build 결과를 제외한 Commit 기준 참고 정보로만 표시하며 팀 평가 점수에는 반영하지 않습니다.</p>
       </section>
+      ${companyOfficialLinksMarkup(startup, { section: true })}
       <div class="market-detail-actions">
         ${startup.products?.[0]?.url ? `<a class="secondary-button compact" href="${escapeHtml(startup.products[0].url)}" target="_blank" rel="noopener noreferrer">제품 사이트 ↗</a>` : ""}
         ${companyReviewActionMarkup(startup, "Partner access 요청")}
@@ -688,19 +818,23 @@ function openMarketTeam(startup, { recordHistory = true } = {}) {
 
 function openProgramDirectoryTeam(startup, { recordHistory = true } = {}) {
   const website = startup.products?.[0]?.url || "";
+  const specialtyTasks = programCapabilityTasks(startup);
+  const investorMetrics = Array.isArray(startup.investorMetrics) ? startup.investorMetrics : [];
   els.teamDialogContent.innerHTML = `
     <section class="team-detail-hero market-detail-hero">
       <span class="eyebrow">${escapeHtml(startup.category || "AI")} · ${escapeHtml(startup.programGroup || "SPARKCLAW PARTICIPANT")}</span>
       <h1>${escapeHtml(startup.name)}</h1>
-      <p>${escapeHtml(startup.tagline || "기본 프로필 준비 중")}</p>
+      <p>${escapeHtml(startup.partneringSummary || startup.tagline || "기본 프로필 준비 중")}</p>
       <div class="market-detail-badges"><span>Program DB 참가기업</span><span>연락처 비공개</span><span>상세 검토 전</span></div>
     </section>
     <div class="team-detail-body market-detail-body">
-      <section><h2>서비스와 해결 문제</h2><p>${escapeHtml(startup.serviceSummary || startup.description || "서비스 요약을 확인하고 있습니다.")}</p></section>
+      <section><h2>파트너링·투자 검토 포인트</h2><p>${escapeHtml(startup.partneringSummary || startup.serviceSummary || startup.description || "서비스 요약을 확인하고 있습니다.")}</p></section>
+      ${investorMetrics.length ? `<section><h2>공개 정량 근거</h2><div class="investor-metric-grid">${investorMetrics.map((metric) => `<article><span>PUBLIC EVIDENCE</span><strong>${escapeHtml(metric)}</strong></article>`).join("")}</div></section>` : ""}
       <section><h2>AI 적용 아이디어</h2><p>${escapeHtml(startup.aiIdeaSummary || "공개된 AI 적용 아이디어가 없습니다.")}</p></section>
-      <section><h2>해결하는 Task</h2><div class="task-keywords large">${taskKeywords(startup, 8).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div></section>
+      <section><h2>해결 가능한 모든 Task</h2><p class="evidence-disclosure">Program Supabase의 공개 프로필·지원서·서비스 설명과 키워드를 함께 확인해 근거 강도 순으로 정렬했습니다.</p><div class="task-detail-list is-ranked">${specialtyTasks.map((task, index) => `<article><span class="task-rank-badge">${index + 1}</span><div><strong>${escapeHtml(task.label)}</strong><p>${escapeHtml(task.description)}</p>${task.evidence ? `<small>공개 근거 · ${escapeHtml(task.evidence)}</small>` : ""}</div></article>`).join("")}</div></section>
       <section><h2>기술·도메인 근거 키워드</h2><div class="capability-tags large">${(startup.functions || []).map((item) => `<span>${escapeHtml(item)}</span>`).join("") || "<span>프로필 보완 필요</span>"}</div></section>
       <section class="loc-policy-note"><strong>정보 범위</strong><p>이 화면은 Program DB의 안전한 기본 프로필만 표시합니다. 상세 기술 스택, 고객 근거와 연락처는 대상 스타트업이 요청을 승인한 뒤 SparkLabs 확인을 거쳐 공개됩니다.</p></section>
+      ${companyOfficialLinksMarkup(startup, { section: true })}
       <div class="market-detail-actions">
         ${website ? `<a class="secondary-button compact" href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">회사 사이트 ↗</a>` : ""}
         ${companyReviewActionMarkup(startup, "파트너 연결 검토 요청")}
@@ -719,6 +853,21 @@ function openProgramDirectoryTeam(startup, { recordHistory = true } = {}) {
   }
 }
 
+function programCapabilityTasks(startup = {}) {
+  const derived = rankedTaskDetails({
+    ...startup,
+    investorProfile: startup.investorProfile || {},
+    functions: [...(startup.functions || []), ...(startup.tags || [])]
+  }, 32).filter((task) => task.label !== TASK_KEYWORD_PENDING);
+  const seen = new Set();
+  return [...(startup.specialtyTasks || []), ...derived].filter((task) => {
+    const key = String(task.label || "").toLocaleLowerCase("ko-KR").replace(/[^\p{L}\p{N}]+/gu, "");
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map((task, index) => ({ ...task, rank: index + 1 }));
+}
+
 function toggleCompareTeam(id) {
   if (!id) return;
   if (selectedTeamIds.includes(id)) selectedTeamIds = selectedTeamIds.filter((item) => item !== id);
@@ -727,7 +876,6 @@ function toggleCompareTeam(id) {
     showToast("비교는 최대 3개 팀까지 가능합니다.");
     return;
   }
-  writeCompareSelection();
   renderDiscover();
   renderCompare();
 }
@@ -970,7 +1118,7 @@ function renderSimilarTeamRecommendations() {
   if (!visible) return;
 
   if (els.similarTeamDescription) {
-    els.similarTeamDescription.textContent = `${subjectTeam.name || "내 팀"}의 공개 프로필과 공통 산업·문제·AI 역량이 많은 팀을 계산합니다. 협업 적합도와는 별개의 프로필 유사도입니다.`;
+    els.similarTeamDescription.textContent = `${subjectTeam.name || "내 팀"}의 공개 프로필에서 공통 산업·문제·AI 역량을 찾아 추천 순서와 관점별 근거로 보여드립니다. 협업 적합도와는 별개의 프로필 유사도입니다.`;
   }
   if (els.similarTeamRefreshButton) {
     els.similarTeamRefreshButton.disabled = similarTeamState.status === "loading";
@@ -979,7 +1127,7 @@ function renderSimilarTeamRecommendations() {
 
   if (similarTeamState.status === "loading" || similarTeamState.status === "idle") {
     els.similarTeamList.innerHTML = [0, 1, 2].map(() => `<article class="similar-team-card is-loading" aria-hidden="true"><i></i><span></span><small></small></article>`).join("");
-    setText(els.similarTeamStatus, "Spark AI가 다른 팀의 공개 프로필과 공통 근거를 비교하고 있습니다.");
+    setText(els.similarTeamStatus, "클로이가 다른 팀의 공개 프로필과 공통 근거를 비교하고 있습니다.");
     return;
   }
   if (similarTeamState.status === "error") {
@@ -1005,6 +1153,7 @@ function similarTeamCardMarkup(item) {
   const startup = startupById(item.teamId);
   const selected = selectedTeamIds.includes(String(item.teamId));
   const signals = (item.sharedSignals || []).slice(0, 3);
+  const basisLabel = similarTeamBasisLabel(item);
   return `<article class="similar-team-card">
     <button class="similar-team-card-main" data-similar-team-open="${escapeHtml(item.teamId)}" type="button">
       ${startup ? companyIconMarkup(startup) : `<span class="company-icon company-icon-fallback">AI</span>`}
@@ -1013,13 +1162,32 @@ function similarTeamCardMarkup(item) {
         <strong>${escapeHtml(item.teamName)}</strong>
         <small>${escapeHtml(item.reason)}</small>
       </span>
-      <b>${escapeHtml(item.score)}<small>점</small></b>
+      <span class="similar-team-basis"><small>유사 관점</small><b>${escapeHtml(basisLabel)}</b></span>
     </button>
     <div class="similar-team-card-foot">
       <span>${signals.map((signal) => `<i>${escapeHtml(signal)}</i>`).join("")}</span>
       <button class="secondary-button compact" data-similar-team-compare="${escapeHtml(item.teamId)}" type="button" ${selected ? "disabled" : ""}>${selected ? "비교 선택됨" : "비교에 추가"}</button>
     </div>
   </article>`;
+}
+
+function similarTeamBasisLabel(item) {
+  const evidence = [
+    ...(Array.isArray(item?.sharedSignals) ? item.sharedSignals : []),
+    ...(Array.isArray(item?.evidence) ? item.evidence : []),
+    item?.reason
+  ].join(" ").normalize("NFKC").toLocaleLowerCase("ko-KR");
+  const hasTechnology = /(ai|인공지능|에이전트|llm|생성형|자동화|api|데이터|비전|로보틱|모델|플랫폼|saas)/u.test(evidence);
+  const hasIndustry = /(헬스|의료|제조|패션|광고|교육|금융|커머스|리테일|게임|모빌리티|보안|푸드|adtech|health|medical|manufactur|fashion|education|fintech|commerce|retail|gaming)/u.test(evidence);
+  const hasTask = /(문제|업무|운영|워크플로|고객|마케팅|품질|검사|관리|개선|예측|분석|workflow|operation|quality|customer|task)/u.test(evidence);
+
+  if (hasTechnology && hasTask) return "문제·기술 유사";
+  if (hasIndustry && hasTechnology) return "산업·기술 유사";
+  if (hasIndustry && hasTask) return "시장·문제 유사";
+  if (hasTechnology) return "기술 접근 유사";
+  if (hasIndustry) return "산업 맥락 유사";
+  if (hasTask) return "해결 과제 유사";
+  return "프로필 관점 유사";
 }
 
 async function loadSimilarTeamRecommendations({ refresh = false } = {}) {
@@ -1036,7 +1204,7 @@ async function loadSimilarTeamRecommendations({ refresh = false } = {}) {
   const progressToken = startProcessStatus(els.globalProcessStatus, [
     "내 팀의 공개 프로필 근거를 정리하고 있습니다.",
     "다른 Claw Member 팀과 공통 산업·문제·AI 역량을 비교하고 있습니다.",
-    "유사도와 선정 이유를 저장하고 있습니다."
+    "추천 순서와 공통 근거를 저장하고 있습니다."
   ], { announcement: "나와 비슷한 팀을 계산하고 있습니다." });
   try {
     const response = await fetch("/api/similar-team-recommendations", {
@@ -1074,7 +1242,6 @@ function handleSimilarTeamAction(event) {
       return;
     }
     selectedTeamIds.push(id);
-    writeCompareSelection();
     renderCompare();
     renderCompareTray();
     return;
@@ -1106,7 +1273,6 @@ function renderCompare() {
   const reconciledSelection = selectedTeamIds.filter((id) => validIds.has(String(id))).slice(0, 3);
   if (reconciledSelection.join("|") !== selectedTeamIds.join("|")) {
     selectedTeamIds = reconciledSelection;
-    writeCompareSelection();
   }
   fillCompareSelect(els.compareTeamA, startups, selectedTeamIds[0] || "");
   fillCompareSelect(els.compareTeamB, startups, selectedTeamIds[1] || "");
@@ -1163,7 +1329,6 @@ function syncCompareFromSelects(requestSummary = false) {
   selectedTeamIds = unique([els.compareTeamA?.value, els.compareTeamB?.value, els.compareTeamC?.value].filter(Boolean)).slice(0, 3);
   compareSummaryRequestId += 1;
   compareSummaryState = { key: "", status: "idle", summary: null, error: "" };
-  writeCompareSelection();
   renderCompare();
   renderCompareTray();
   if (requestSummary && selectedTeamIds.length >= 2) requestCompareSummary();
@@ -1230,8 +1395,8 @@ function compareSummaryMarkup(teams, selectionKey) {
   }
   if (current.status !== "ready" || !current.summary) {
     return `<section class="compare-summary-card is-idle">
-      <div class="compare-summary-head"><div><span class="section-kicker">AGENTIC COMPARISON</span><h2>핵심 차이 요약</h2></div><span class="compare-summary-agent">Spark AI 분석 실행 시 생성</span></div>
-      <p class="compare-summary-overview">Spark AI 비교 분석을 실행하면 선택한 ${teams.length}개 기업이 무엇을 해결하고 AI를 어떻게 적용하는지 공개 근거를 바탕으로 정리합니다.</p>
+      <div class="compare-summary-head"><div><span class="section-kicker">AGENTIC COMPARISON</span><h2>핵심 차이 요약</h2></div><span class="compare-summary-agent">클로이 분석 실행 시 생성</span></div>
+      <p class="compare-summary-overview">클로이 비교 분석을 실행하면 선택한 ${teams.length}개 기업이 무엇을 해결하고 AI를 어떻게 적용하는지 공개 근거를 바탕으로 정리합니다.</p>
     </section>`;
   }
   const summary = current.summary;
@@ -1239,7 +1404,7 @@ function compareSummaryMarkup(teams, selectionKey) {
     <article><strong>${escapeHtml(item.teamName || teams.find((team) => String(team.id) === String(item.teamId))?.name || "기업")}</strong><p>${escapeHtml(item.differentiator || "공개 프로필을 확인해 주세요.")}</p></article>`).join("");
   const differences = (summary.keyDifferences || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
   return `<section class="compare-summary-card is-ready" aria-live="polite">
-    <div class="compare-summary-head"><div><span class="section-kicker">AGENTIC COMPARISON</span><h2>핵심 차이 요약</h2></div><span class="compare-summary-agent"><i></i>${summary.source === "spark_ai" ? "Spark AI 분석 완료" : "근거 기반 분석 완료"}</span></div>
+    <div class="compare-summary-head"><div><span class="section-kicker">AGENTIC COMPARISON</span><h2>핵심 차이 요약</h2></div><span class="compare-summary-agent"><i></i>${summary.source === "spark_ai" ? "클로이 분석 완료" : "근거 기반 분석 완료"}</span></div>
     <p class="compare-summary-overview">${escapeHtml(summary.overview || "선택한 기업의 공개 프로필을 비교했습니다.")}</p>
     <div class="compare-summary-teams">${highlights}</div>
     ${differences ? `<ul class="compare-summary-differences">${differences}</ul>` : ""}
@@ -1253,12 +1418,20 @@ function comparisonSelectionKey() {
 
 function renderPartnerships() {
   if (!market()) return;
+  const staff = Boolean(viewer()?.canScore);
   const canRequest = Boolean(viewer()?.canRequestConnections || viewer()?.canScore);
   [els.bountyBriefForm, els.connectionForm].forEach((form) => {
     form?.querySelectorAll("input, textarea, select, button").forEach((control) => {
       control.disabled = !canRequest;
     });
   });
+  els.bountyBriefForm?.querySelectorAll("[data-bounty-staff-only]").forEach((field) => {
+    field.hidden = !staff;
+    field.querySelectorAll("input, textarea, select, button").forEach((control) => {
+      control.disabled = !staff;
+    });
+  });
+  configureBountyBriefEditor({ staff });
   if (!canRequest) {
     setStatus(els.bountyBriefStatus, "기업 문제 등록은 승인된 B2B 파트너 계정에서 사용할 수 있습니다.");
     setStatus(els.connectionStatus, "팀 연결 요청은 승인된 B2B 파트너 계정에서 사용할 수 있습니다.");
@@ -1279,10 +1452,43 @@ function renderPartnerships() {
   ].sort((a, b) => Date.parse(b.updatedAt || b.createdAt || 0) - Date.parse(a.updatedAt || a.createdAt || 0));
   setText(els.pipelineCount, formatNumber(items.length));
   if (els.partnershipPipeline) {
-    els.partnershipPipeline.innerHTML = items.length
-      ? items.map(pipelineCardMarkup).join("")
-      : `<div class="market-empty">아직 진행 중인 요청이 없습니다. Bounty Brief 또는 팀 연결 요청을 시작하세요.</div>`;
+    if (staff) {
+      const bountyItems = items.filter((item) => item.pipelineType === "bounty");
+      const connectionItems = items.filter((item) => item.pipelineType === "connection");
+      els.partnershipPipeline.innerHTML = `
+        <section class="pipeline-group" aria-labelledby="managedBountyBriefsTitle">
+          <div class="pipeline-group-head"><div><span>BOUNTY BRIEF MANAGEMENT</span><h3 id="managedBountyBriefsTitle">설계된 Bounty Brief</h3></div><strong>${formatNumber(bountyItems.length)}</strong></div>
+          <p class="pipeline-group-copy">수정할 Brief를 불러오면 파트너가 등록한 설계와 운영 설정이 편집 화면에 채워집니다.</p>
+          <div class="pipeline-group-list">${bountyItems.length ? bountyItems.map(pipelineCardMarkup).join("") : `<div class="market-empty">아직 관리할 Bounty Brief가 없습니다. 파트너 접수 후 이 목록에서 불러올 수 있습니다.</div>`}</div>
+        </section>
+        <section class="pipeline-group is-secondary" aria-labelledby="managedConnectionsTitle">
+          <div class="pipeline-group-head"><div><span>INTRODUCTION REQUESTS</span><h3 id="managedConnectionsTitle">팀 연결 요청</h3></div><strong>${formatNumber(connectionItems.length)}</strong></div>
+          <div class="pipeline-group-list">${connectionItems.length ? connectionItems.map(pipelineCardMarkup).join("") : `<div class="market-empty">진행 중인 팀 연결 요청이 없습니다.</div>`}</div>
+        </section>`;
+    } else {
+      els.partnershipPipeline.innerHTML = items.length
+        ? items.map(pipelineCardMarkup).join("")
+        : `<div class="market-empty">아직 진행 중인 요청이 없습니다. Bounty Brief 또는 팀 연결 요청을 시작하세요.</div>`;
+    }
   }
+}
+
+function configureBountyBriefEditor({ staff = Boolean(viewer()?.canScore) } = {}) {
+  if (!els.bountyBriefForm) return;
+  const editing = staff && Boolean(bountyEditingRequestId);
+  if (els.bountyBriefFormTitle) {
+    els.bountyBriefFormTitle.textContent = editing ? "Bounty Brief 수정" : staff ? "Bounty Brief Studio" : "기업 Bounty 등록";
+  }
+  if (els.bountyBriefFormDescription) {
+    els.bountyBriefFormDescription.textContent = editing
+      ? "파트너가 제출한 원본과 운영 설정을 검토해 수정합니다. 공개 단계로 저장하면 Bounty Board 과제가 같은 내용으로 동기화됩니다."
+      : staff
+        ? "파트너사를 대신해 Brief를 등록하거나 제출된 Brief를 수정하고 공개 단계까지 한 화면에서 관리합니다."
+        : "문제와 성공 기준뿐 아니라 평가 방식·기준·공개 범위까지 한 번에 설정합니다. 제출 후 SparkLabs가 같은 Brief에서 검토와 공개 전환을 이어갑니다.";
+  }
+  if (els.bountyBriefRoleBadge) els.bountyBriefRoleBadge.textContent = staff ? "SPARKLABS MANAGED" : "PARTNER SUBMISSION";
+  if (els.bountyBriefSubmit) els.bountyBriefSubmit.textContent = editing ? "수정 내용과 운영 설정 저장" : staff ? "파트너 대신 Brief 등록" : "Brief와 운영 설정 제출";
+  if (els.bountyBriefCancelEdit) els.bountyBriefCancelEdit.hidden = !editing;
 }
 
 function pipelineCardMarkup(item) {
@@ -1300,23 +1506,93 @@ function pipelineCardMarkup(item) {
     <div class="pipeline-progress">${stages.map((stage, index) => `<span class="${index <= current ? "is-complete" : ""}" title="${escapeHtml(PIPELINE_LABELS[stage] || stage)}"></span>`).join("")}</div>
     <div class="pipeline-card-footer"><span>다음 단계: ${escapeHtml(item.nextStep || "SparkLabs 확인")}</span><small>${formatDate(item.updatedAt || item.createdAt)}</small></div>
     ${memberCanRespond ? `<div class="pipeline-consent-actions"><p>소개를 요청한 기업의 의사는 접수되었습니다. 대상 스타트업인 우리 팀이 승인한 뒤에만 SparkLabs가 연락처를 연결합니다.</p><button class="primary-button compact" data-connection-response="accepted" data-pipeline-id="${escapeHtml(item.id)}" type="button">소개 동의</button><button class="secondary-button compact" data-connection-response="declined" data-pipeline-id="${escapeHtml(item.id)}" type="button">정중히 거절</button></div>` : ""}
-    ${staff ? `<div class="pipeline-staff-actions">${stages.map((stage) => `<button data-pipeline-type="${item.pipelineType}" data-pipeline-id="${escapeHtml(item.id)}" data-pipeline-status="${stage}" type="button">${escapeHtml(PIPELINE_LABELS[stage] || stage)}</button>`).join("")}</div>` : ""}
+    ${staff ? `<div class="pipeline-staff-actions">${item.pipelineType === "bounty" ? `<button class="is-primary-action" data-bounty-edit="${escapeHtml(item.id)}" data-pipeline-id="${escapeHtml(item.id)}" type="button">Brief 불러와 수정</button>` : ""}${stages.map((stage) => `<button data-pipeline-type="${item.pipelineType}" data-pipeline-id="${escapeHtml(item.id)}" data-pipeline-status="${stage}" type="button">${escapeHtml(PIPELINE_LABELS[stage] || stage)}</button>`).join("")}</div>` : ""}
   </article>`;
 }
 
 async function submitBountyBrief(event) {
   event.preventDefault();
   if (!viewer()?.canRequestConnections && !viewer()?.canScore) return;
-  const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-  payload.organization = viewer()?.organization || "";
-  setStatus(els.bountyBriefStatus, "Bounty Brief를 등록하는 중입니다.");
+  const form = event.currentTarget;
+  const staff = Boolean(viewer()?.canScore);
+  const editing = staff && Boolean(bountyEditingRequestId);
+  const payload = Object.fromEntries(new FormData(form).entries());
+  if (staff) {
+    payload.organization = String(payload.organization || viewer()?.organization || "SparkLabs").trim();
+    payload.requesterEmail = String(payload.requesterEmail || viewer()?.email || "").trim();
+  } else {
+    payload.organization = viewer()?.organization || "";
+    delete payload.requesterEmail;
+    delete payload.status;
+  }
+  const desiredStatus = staff ? String(payload.status || "intake") : "intake";
+  setStatus(els.bountyBriefStatus, editing ? "Bounty Brief와 운영 설정을 수정하고 있습니다." : "Bounty Brief와 운영 설정을 등록하는 중입니다.");
   try {
-    await postMarketAction("requestBounty", payload);
-    event.currentTarget.reset();
-    setStatus(els.bountyBriefStatus, "등록되었습니다. SparkLabs가 Scope Workshop을 준비합니다.", "success");
+    if (editing) {
+      payload.requestId = bountyEditingRequestId;
+      payload.status = desiredStatus;
+      payload.nextStep = nextStepFor(desiredStatus);
+      await postMarketAction("updateBountyRequest", payload);
+      resetBountyBriefEditor({ preserveStatus: true });
+      setStatus(els.bountyBriefStatus, "수정 내용이 저장됐습니다. 공개 단계라면 Bounty Board 과제에도 동기화됐습니다.", "success");
+      showToast("Bounty Brief와 운영 설정을 수정했습니다.");
+      return;
+    }
+
+    delete payload.requestId;
+    delete payload.status;
+    const result = await postMarketAction("requestBounty", payload);
+    const requestId = result?.event?.request?.id;
+    if (staff && requestId && desiredStatus !== "intake") {
+      await postMarketAction("updateBountyRequest", {
+        ...payload,
+        requestId,
+        status: desiredStatus,
+        nextStep: nextStepFor(desiredStatus)
+      });
+    }
+    resetBountyBriefEditor({ preserveStatus: true });
+    setStatus(
+      els.bountyBriefStatus,
+      staff ? "파트너 대리 Brief가 등록되고 운영 설정이 연결됐습니다." : "등록되었습니다. SparkLabs가 같은 Brief에서 검토와 공개 준비를 이어갑니다.",
+      "success"
+    );
   } catch (error) {
     setStatus(els.bountyBriefStatus, error.message || "Bounty Brief를 등록하지 못했습니다.", "error");
   }
+}
+
+function beginBountyBriefEdit(requestId) {
+  if (!viewer()?.canScore || !els.bountyBriefForm) return;
+  const request = (market().bountyRequests || []).find((item) => item.id === requestId);
+  if (!request) {
+    showToast("수정할 Bounty Brief를 찾지 못했습니다.");
+    return;
+  }
+  bountyEditingRequestId = request.id;
+  els.bountyBriefForm.reset();
+  const values = {
+    ...request,
+    requestId: request.id,
+    evaluationCriteria: Array.isArray(request.evaluationCriteria) ? request.evaluationCriteria.join(", ") : request.evaluationCriteria || "",
+    status: request.status || "intake"
+  };
+  for (const [name, value] of Object.entries(values)) {
+    const control = els.bountyBriefForm.elements.namedItem(name);
+    if (!control || value === null || value === undefined) continue;
+    control.value = String(value);
+  }
+  configureBountyBriefEditor({ staff: true });
+  setStatus(els.bountyBriefStatus, "파트너 제출 원본을 불러왔습니다. 수정 후 저장하면 같은 Brief에 반영됩니다.");
+  els.bountyBriefPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  window.setTimeout(() => els.bountyBriefForm?.elements?.problemTitle?.focus(), 280);
+}
+
+function resetBountyBriefEditor({ preserveStatus = false } = {}) {
+  bountyEditingRequestId = "";
+  els.bountyBriefForm?.reset();
+  configureBountyBriefEditor();
+  if (!preserveStatus) setStatus(els.bountyBriefStatus, "");
 }
 
 async function submitConnectionRequest(event) {
@@ -1338,6 +1614,10 @@ async function submitConnectionRequest(event) {
 async function handlePipelineAction(event) {
   const button = event.target.closest("[data-pipeline-id]");
   if (!button) return;
+  if (button.dataset.bountyEdit) {
+    beginBountyBriefEdit(button.dataset.bountyEdit);
+    return;
+  }
   if (button.dataset.connectionResponse) {
     if (viewer()?.role !== "member" && !viewer()?.canScore) return;
     try {
@@ -1367,6 +1647,7 @@ async function handlePipelineAction(event) {
 
 function renderWorkspace() {
   if (!els.workspaceMetrics || !viewer()) return;
+  renderAdminActivityExplorer();
   const role = viewer().role || "member";
   if (["member", "sparklabs", "admin"].includes(role)) {
     renderProgramWorkspace(role);
@@ -1402,7 +1683,7 @@ function renderWorkspace() {
     : role === "sparklabs" || role === "admin"
       ? [["내 Community 기록", `내 글 ${communitySummary.posts}건 · 댓글 ${communitySummary.comments}건`, "community"], ["Tech Passport 검토", `${market().reviewQueue?.length || 0}건이 검토를 기다리고 있습니다.`, "passports"], ["Bounty Intake 정리", `${bountyRequests.length}건의 기업 수요가 있습니다.`, "arena"]]
       : [["Community 활동 이어가기", `내 글 ${communitySummary.posts}건 · 받은 반응 ${communitySummary.commentsReceived + communitySummary.likesReceived}건`, "community"], ["Open Bounty 참가", `${competition().metrics?.openChallenges || 0}개의 Bounty가 열려 있습니다.`, "arena"], ["다른 팀 기술 탐색", "보완 기술과 공동 참여 팀을 찾습니다.", "discover"]];
-  els.workspaceActions.innerHTML = actions.map(([title, copy, page]) => `<button data-market-page="${page}" type="button"><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(copy)}</small></span><i>→</i></button>`).join("");
+  els.workspaceActions.innerHTML = actions.map(workspaceActionMarkup).join("");
 
   const activity = [
     ...bountyRequests.map((item) => ({ source: "BOUNTY", title: item.problemTitle, status: item.status, at: item.updatedAt || item.createdAt })),
@@ -1410,9 +1691,7 @@ function renderWorkspace() {
     ...(passport ? [{ source: "PASSPORT", title: passport.name, status: passport.status, at: passport.updatedAt }] : []),
     ...communityRecentActivity()
   ].sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0)).slice(0, 8);
-  els.workspaceActivity.innerHTML = activity.length
-    ? activity.map(workspaceActivityLogMarkup).join("")
-    : `<div class="market-empty">아직 활동 기록이 없습니다. Discover, Community 또는 Bounty에서 첫 활동을 시작해 보세요.</div>`;
+  renderWorkspaceActivity(activity);
 
   renderMyLogTimeline({ connections, bountyRequests, submissions: myCompetitionSubmissions, opportunities: myCompetitionOpportunities });
   renderMyLogDetails({ role, connections, bountyRequests, submissions: myCompetitionSubmissions, opportunities: myCompetitionOpportunities });
@@ -1421,13 +1700,15 @@ function renderWorkspace() {
 
 function renderProgramWorkspace(role) {
   const staff = role === "sparklabs" || role === "admin";
+  const publicBriefMonitor = staff ? myLogCanonicalState.publicBriefMonitor : emptyPublicBriefMonitor();
+  const publicBriefs = publicBriefMonitor.items || [];
+  const publicBriefCount = Number(publicBriefMonitor.totalCount) || 0;
+  const publicBriefLoading = staff && !publicBriefMonitor.available && ["idle", "loading"].includes(myLogCanonicalState.status);
   const hub = context.hub || {};
   const team = hub.viewerTeam || {};
   const activity = team.activity || {};
-  const applications = hub.benefitApplications || [];
-  const registrations = hub.eventRegistrations || [];
-  const weeklyReports = hub.weeklyReports || [];
   const connections = market()?.connectionRequests || [];
+  const bountyRequests = market()?.bountyRequests || [];
   const collaborationReviews = hub.collaborationReviews || [];
   const collaborationQueue = hub.programQueues?.collaborationReviews || [];
   const collaborationSummary = hub.collaborationReviewSummary || {};
@@ -1439,7 +1720,7 @@ function renderProgramWorkspace(role) {
   setText(
     els.workspaceSubtitle,
     staff
-      ? "내 계정 활동과 함께 팀 간 협업 검토 요청·승인 로그, 프로그램 운영 Queue를 확인합니다."
+      ? "공개 탐색 Brief 접수와 내 계정 활동, 팀 간 협업 검토 요청·승인 로그를 확인합니다."
       : "내가 보낸 매치 요청, Community 글·댓글·받은 반응과 Bounty 진행 상태를 확인합니다."
   );
   const metrics = staff
@@ -1447,7 +1728,8 @@ function renderProgramWorkspace(role) {
         ["My posts", communitySummary.posts, "내 Community 글"],
         ["My comments", communitySummary.comments, "내가 남긴 댓글"],
         ["Reactions", communitySummary.commentsReceived + communitySummary.likesReceived, "내 글에 받은 반응"],
-        ["Ops reviews", collaborationQueue.length, "전체 협업 검토"]
+        ["Ops reviews", collaborationQueue.length, "전체 협업 검토"],
+        ["Discovery briefs", publicBriefLoading ? "…" : publicBriefCount, publicBriefLoading ? "공개 탐색 Brief 확인 중" : "공개 탐색 Brief 누적 접수"]
       ]
     : [
         ["Match requests", collaborationSummary.outgoing || 0, "내가 보낸 협업 검토"],
@@ -1459,10 +1741,12 @@ function renderProgramWorkspace(role) {
   renderWorkspaceMetrics(metrics);
   const actions = staff
     ? [
-        ["협업 검토 감사 로그", `${collaborationQueue.length}건의 요청·승인·거절 이력을 확인합니다.`, "workspace"],
-        ["팀 운영 현황", "팀별 멘토링과 실행 기록을 확인합니다.", "operations"],
-        ["베네핏 Queue", `${hub.programQueues?.benefitApplications?.length || 0}건의 신청 기록을 관리합니다.`, "benefits"],
-        ["일정 RSVP", `${hub.programQueues?.eventRegistrations?.length || 0}건의 신청 기록을 확인합니다.`, "operations"]
+        ["탐색 Brief 접수 확인", publicBriefLoading
+          ? "첫 화면에서 제출된 탐색 Brief를 확인하고 있습니다."
+          : publicBriefCount
+            ? `${publicBriefCount}건이 접수되었습니다. 최근 요청 요약을 확인합니다.`
+            : "아직 접수된 Brief가 없습니다. 새 요청 여부를 확인합니다.", "workspace", "myLogBriefs"],
+        ["협업 검토 감사 로그", `${collaborationQueue.length}건의 요청·승인·거절 이력을 확인합니다.`, "workspace"]
       ]
     : [
         ...(collaborationSummary.incomingPending ? [["받은 매치 요청 답변", `${collaborationSummary.incomingPending}건이 내 답변을 기다리고 있습니다.`, "workspace"]] : []),
@@ -1472,8 +1756,9 @@ function renderProgramWorkspace(role) {
         ["다른 팀 탐색", "다른 Claw Member의 공개 역량을 확인합니다.", "discover"]
       ];
   els.workspaceActions.innerHTML = actions
-    .map(([title, copy, page]) => `<button data-market-page="${page}" type="button"><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(copy)}</small></span><i>→</i></button>`)
+    .map(workspaceActionMarkup)
     .join("");
+  const challengeById = new Map((competition().challenges || []).map((item) => [item.id, item]));
   const recent = [
     ...collaborationReviews.map((item) => ({
       source: "DISCOVER",
@@ -1482,38 +1767,48 @@ function renderProgramWorkspace(role) {
       at: item.updatedAt || item.createdAt
     })),
     ...connections.map((item) => ({ source: "DISCOVER", title: `${item.organization || "기업 파트너"} 소개 요청`, status: item.status, at: item.updatedAt || item.createdAt })),
-    ...weeklyReports.map((item) => ({ source: "REPORT", title: item.weekLabel || "Weekly report", status: item.status, at: item.updatedAt || item.submittedAt })),
-    ...applications.map((item) => ({ source: "PERK", title: item.benefitTitle || "Benefit", status: item.status, at: item.updatedAt || item.appliedAt })),
-    ...registrations.map((item) => ({ source: "EVENT", title: item.eventTitle || "Event", status: item.status, at: item.updatedAt || item.registeredAt })),
+    ...bountyRequests.map((item) => ({ source: "BOUNTY", title: item.problemTitle || "Bounty Brief", status: item.status, at: item.updatedAt || item.createdAt })),
+    ...submissions.map((item) => ({ source: "BOUNTY", title: challengeById.get(item.challengeId)?.title || "Bounty 제출", status: item.status, at: item.scoredAt || item.submittedAt })),
+    ...opportunities.map((item) => ({ source: "BOUNTY", title: challengeById.get(item.challengeId)?.title || "Bounty 기회 연결", status: item.status, at: item.updatedAt || item.requestedAt })),
     ...communityRecentActivity()
   ].sort((left, right) => Date.parse(right.at || 0) - Date.parse(left.at || 0)).slice(0, 8);
-  els.workspaceActivity.innerHTML = recent.length
-    ? recent.map(workspaceActivityLogMarkup).join("")
-    : `<div class="market-empty">아직 활동 기록이 없습니다. Discover, Community 또는 Bounty에서 첫 활동을 시작해 보세요.</div>`;
+  const publicBriefActivity = publicBriefs.map((item) => ({
+    source: "DISCOVER",
+    title: `${item.organization || "외부 기업"} 탐색 Brief 접수`,
+    status: publicBriefStatusLabel(item.status),
+    at: item.updatedAt || item.createdAt
+  }));
+  renderWorkspaceActivity(recent, publicBriefActivity);
   renderMyLogTimeline({
     collaborationReviews: staff ? collaborationQueue : collaborationReviews,
     connections,
-    bountyRequests: market()?.bountyRequests || [],
+    bountyRequests,
     submissions,
-    opportunities
+    opportunities,
+    publicBriefs
   });
   renderMyLogDetails({
     role,
     collaborationReviews: staff ? collaborationQueue : collaborationReviews,
     connections,
-    bountyRequests: market()?.bountyRequests || [],
+    bountyRequests,
     submissions,
-    opportunities
+    opportunities,
+    publicBriefMonitor
   });
   if (staff) renderStaffQueue();
   else if (els.staffMarketQueue) els.staffMarketQueue.hidden = true;
+}
+
+function workspaceActionMarkup([title, copy, page, target = ""]) {
+  return `<button data-market-page="${escapeHtml(page)}"${target ? ` data-my-log-target="${escapeHtml(target)}"` : ""} type="button"><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(copy)}</small></span><i>→</i></button>`;
 }
 
 function renderWorkspaceMetrics(metrics) {
   if (!els.workspaceMetrics) return;
   els.workspaceMetrics.style.setProperty("--workspace-metric-count", String(Math.max(1, metrics.length)));
   els.workspaceMetrics.innerHTML = metrics
-    .map(([label, value, copy]) => `<article><span>${escapeHtml(label)}</span><strong>${formatNumber(value)}</strong><small>${escapeHtml(copy)}</small></article>`)
+    .map(([label, value, copy]) => `<article><span>${escapeHtml(label)}</span><strong>${typeof value === "number" ? formatNumber(value) : escapeHtml(value)}</strong><small>${escapeHtml(copy)}</small></article>`)
     .join("");
 }
 
@@ -1536,6 +1831,35 @@ function workspaceActivityLogMarkup(item, index) {
   </article>`;
 }
 
+function renderWorkspaceActivity(fallbackItems = [], supplementalItems = []) {
+  if (!els.workspaceActivity) return;
+  if (myLogCanonicalState.status === "loading" && !myLogCanonicalState.available) {
+    els.workspaceActivity.innerHTML = `<div class="market-empty">SparkClaw AI Arena 전용 활동 원장을 불러오고 있습니다.</div>`;
+    return;
+  }
+  const canonicalItems = myLogCanonicalState.available
+    ? myLogCanonicalState.events.map(canonicalMyLogRawActivity).filter(Boolean)
+    : [];
+  const activity = [...(myLogCanonicalState.available ? canonicalItems : fallbackItems), ...supplementalItems]
+    .filter((item) => item?.title)
+    .sort((left, right) => Date.parse(right.at || 0) - Date.parse(left.at || 0))
+    .slice(0, 8);
+  els.workspaceActivity.innerHTML = activity.length
+    ? activity.map(workspaceActivityLogMarkup).join("")
+    : `<div class="market-empty">아직 AI Arena 활동 기록이 없습니다. Discover, Community 또는 Bounty에서 첫 활동을 시작해 보세요.</div>`;
+}
+
+function canonicalMyLogRawActivity(event) {
+  const category = canonicalMyLogCategory(event?.category, event?.eventType);
+  if (!category) return null;
+  return {
+    source: category.toUpperCase(),
+    title: String(event?.title || "AI Arena 활동").trim(),
+    status: String(event?.metadata?.status || event?.detail || event?.eventType || "기록됨").trim(),
+    at: event?.occurredAt || event?.recordedAt
+  };
+}
+
 function rawLogTimestamp(value) {
   const parsed = Date.parse(value || "");
   if (!Number.isFinite(parsed)) return "time_unknown";
@@ -1551,10 +1875,19 @@ function rawLogTimestamp(value) {
   }).format(new Date(parsed)).replace(" ", "T")}+09:00`;
 }
 
-function renderMyLogTimeline({ collaborationReviews = [], connections = [], bountyRequests = [], submissions = [], opportunities = [] }) {
+function renderMyLogTimeline({ collaborationReviews = [], connections = [], bountyRequests = [], submissions = [], opportunities = [], publicBriefs = [] }) {
   if (!els.myLogTimelineList || !els.myLogTimelineFilters) return;
   const challengeById = new Map((competition().challenges || []).map((item) => [item.id, item]));
   const discoverItems = [
+    ...publicBriefs.map((item) => ({
+      sourceSystem: "public_brief",
+      sourceEventId: item.id,
+      category: "discover",
+      title: `${item.organization || "외부 기업"} 탐색 Brief 접수`,
+      detail: `${publicBriefStatusLabel(item.status)}${item.problemSummary ? ` · ${item.problemSummary}` : ""}`,
+      at: item.updatedAt || item.createdAt,
+      target: "myLogBriefs"
+    })),
     ...collaborationReviews.map((item) => ({
       sourceSystem: "program_actions",
       sourceEventId: item.id,
@@ -1678,6 +2011,9 @@ async function loadCanonicalMyLog({ append = false } = {}) {
       return;
     }
     const incomingEvents = available && Array.isArray(result.events) ? result.events : [];
+    const publicBriefMonitor = append
+      ? existingState.publicBriefMonitor
+      : normalizePublicBriefMonitor(result?.publicBriefMonitor);
     myLogCanonicalState = {
       identity,
       status: "ready",
@@ -1686,6 +2022,7 @@ async function loadCanonicalMyLog({ append = false } = {}) {
         ? mergeCanonicalMyLogEvents(existingState.events, incomingEvents)
         : mergeCanonicalMyLogEvents([], incomingEvents),
       nextCursor: available ? result?.nextCursor || null : null,
+      publicBriefMonitor,
       loadingMore: false,
       error: ""
     };
@@ -1711,6 +2048,7 @@ async function loadCanonicalMyLog({ append = false } = {}) {
 function canonicalMyLogTimelineItem(event) {
   if (!event || typeof event !== "object") return null;
   const category = canonicalMyLogCategory(event.category, event.eventType);
+  if (!category) return null;
   const targetByCategory = {
     discover: "myLogMatches",
     community: "myLogCommunity",
@@ -1733,9 +2071,10 @@ function canonicalMyLogTimelineItem(event) {
 
 function canonicalMyLogCategory(category, eventType) {
   const declared = String(category || "").trim().toLowerCase();
-  if (["discover", "community", "bounty"].includes(declared)) return declared;
   const prefix = String(eventType || "").split(".")[0].trim().toLowerCase();
-  return ["discover", "community", "bounty"].includes(prefix) ? prefix : "discover";
+  const allowed = ["discover", "community", "bounty"];
+  if (!allowed.includes(prefix)) return "";
+  return !declared || declared === prefix ? prefix : "";
 }
 
 function mergeMyLogTimelineItems(canonicalItems, legacyItems) {
@@ -1773,14 +2112,265 @@ function emptyCanonicalMyLogState(identity = "") {
     available: false,
     events: [],
     nextCursor: null,
+    publicBriefMonitor: emptyPublicBriefMonitor(),
     loadingMore: false,
     error: ""
+  };
+}
+
+function emptyPublicBriefMonitor() {
+  return { available: false, totalCount: 0, latestAt: null, items: [] };
+}
+
+function normalizePublicBriefMonitor(value) {
+  const items = (Array.isArray(value?.items) ? value.items : [])
+    .map((item) => ({
+      id: String(item?.id || "").trim(),
+      organization: String(item?.organization || "").trim(),
+      problemSummary: String(item?.problemSummary || "").trim(),
+      status: String(item?.status || "received").trim(),
+      createdAt: item?.createdAt || "",
+      updatedAt: item?.updatedAt || item?.createdAt || "",
+      deadline: String(item?.deadline || "").trim()
+    }))
+    .filter((item) => item.id && item.organization)
+    .slice(0, 100);
+  return {
+    available: value?.available === true,
+    totalCount: Number.isFinite(Number(value?.totalCount)) && Number(value.totalCount) >= 0
+      ? Math.min(Math.floor(Number(value.totalCount)), 500)
+      : items.length,
+    latestAt: items[0]?.createdAt || null,
+    items
   };
 }
 
 function resetCanonicalMyLog(identity = "") {
   myLogCanonicalRequestId += 1;
   myLogCanonicalState = emptyCanonicalMyLogState(identity);
+}
+
+function emptyAdminActivityState(identity = "") {
+  return {
+    identity,
+    status: "idle",
+    available: false,
+    loading: false,
+    loadingMore: false,
+    users: [],
+    events: [],
+    nextCursor: null,
+    error: "",
+    loadedFilterKey: ""
+  };
+}
+
+function resetAdminActivity(identity = "") {
+  adminActivityRequestId += 1;
+  adminActivityState = emptyAdminActivityState(identity);
+  renderAdminActivityExplorer();
+}
+
+function isStaffViewer() {
+  const role = String(viewer()?.role || "").toLowerCase();
+  return Boolean(viewer()?.canScore || role === "sparklabs" || role === "admin");
+}
+
+function adminActivityFilters() {
+  return {
+    user: String(els.adminActivityUserFilter?.value || "").trim(),
+    domain: String(els.adminActivityDomainFilter?.value || "").trim(),
+    action: String(els.adminActivityActionFilter?.value || "").trim(),
+    from: localDateBoundary(els.adminActivityFromFilter?.value, false),
+    to: localDateBoundary(els.adminActivityToFilter?.value, true)
+  };
+}
+
+function adminActivityFilterKey(filters = adminActivityFilters()) {
+  return JSON.stringify(filters);
+}
+
+function localDateBoundary(value, endOfRange) {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  if (endOfRange) date.setDate(date.getDate() + 1);
+  return date.toISOString();
+}
+
+function syncAdminActivityActionOptions() {
+  if (!els.adminActivityActionFilter) return;
+  const current = els.adminActivityActionFilter.value;
+  const domain = String(els.adminActivityDomainFilter?.value || "");
+  const options = ADMIN_ACTIVITY_ACTIONS.filter(([actionDomain]) => !domain || actionDomain === domain);
+  els.adminActivityActionFilter.innerHTML = `<option value="">전체 행위</option>${options
+    .map(([, value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)
+    .join("")}`;
+  if (options.some(([, value]) => value === current)) els.adminActivityActionFilter.value = current;
+}
+
+function syncAdminActivityUserOptions() {
+  if (!els.adminActivityUserFilter) return;
+  const current = els.adminActivityUserFilter.value;
+  const options = adminActivityState.users.map((user) => {
+    const primary = user.email || user.label || "Arena 사용자";
+    const organization = user.organizationName && user.organizationName !== primary ? ` · ${user.organizationName}` : "";
+    return `<option value="${escapeHtml(user.userId)}">${escapeHtml(`${primary}${organization}`)}</option>`;
+  });
+  els.adminActivityUserFilter.innerHTML = `<option value="">전체 사용자</option>${options.join("")}`;
+  if (adminActivityState.users.some((user) => user.userId === current)) els.adminActivityUserFilter.value = current;
+}
+
+function handleAdminActivityFilterChange() {
+  if (!isStaffViewer()) return;
+  void loadAdminActivity({ reset: true });
+}
+
+function resetAdminActivityFilters() {
+  [els.adminActivityUserFilter, els.adminActivityDomainFilter, els.adminActivityActionFilter, els.adminActivityFromFilter, els.adminActivityToFilter]
+    .forEach((control) => {
+      if (control) control.value = "";
+    });
+  syncAdminActivityActionOptions();
+  void loadAdminActivity({ reset: true, force: true });
+}
+
+async function loadAdminActivity({ reset = false, append = false, force = false } = {}) {
+  const identity = viewerIdentity(viewer());
+  const session = readSession();
+  if (!isStaffViewer() || !identity || !session?.access_token) {
+    resetAdminActivity(identity);
+    return;
+  }
+  const filters = adminActivityFilters();
+  const filterKey = adminActivityFilterKey(filters);
+  if (append && (!adminActivityState.nextCursor || adminActivityState.loadingMore)) return;
+  if (!append && !force && adminActivityState.identity === identity && adminActivityState.loadedFilterKey === filterKey && adminActivityState.status === "ready") {
+    renderAdminActivityExplorer();
+    return;
+  }
+  if (append && adminActivityState.loadingMore) return;
+  if (!append && adminActivityState.loading && adminActivityState.loadedFilterKey === filterKey) return;
+
+  const requestId = ++adminActivityRequestId;
+  const existing = adminActivityState;
+  const params = new URLSearchParams({ limit: "100", includeUsers: append ? "0" : "1" });
+  if (filters.user) params.set("user", filters.user);
+  if (filters.domain) params.set("domain", filters.domain);
+  if (filters.action) params.set("action", filters.action);
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
+  if (append && existing.nextCursor) params.set("cursor", existing.nextCursor);
+  adminActivityState = append
+    ? { ...existing, loadingMore: true, error: "" }
+    : {
+        ...emptyAdminActivityState(identity),
+        status: "loading",
+        loading: true,
+        users: reset ? existing.users : [],
+        loadedFilterKey: filterKey
+      };
+  renderAdminActivityExplorer();
+  try {
+    const response = await fetch(`/api/arena-activity?${params.toString()}`, {
+      method: "GET",
+      headers: { Accept: "application/json", Authorization: `Bearer ${session.access_token}` }
+    });
+    const result = await safeJson(response);
+    if (!response.ok) throw new Error(result?.error || "전체 사용자 활동을 불러오지 못했습니다.");
+    if (requestId !== adminActivityRequestId || identity !== viewerIdentity(viewer())) return;
+    const available = result?.available === true;
+    const incomingEvents = available && Array.isArray(result.events) ? result.events : [];
+    const incomingUsers = available && Array.isArray(result.users) ? result.users : [];
+    adminActivityState = {
+      identity,
+      status: "ready",
+      available,
+      loading: false,
+      loadingMore: false,
+      users: append ? existing.users : incomingUsers,
+      events: append ? mergeAdminActivityEvents(existing.events, incomingEvents) : mergeAdminActivityEvents([], incomingEvents),
+      nextCursor: available ? result.nextCursor || null : null,
+      error: available ? "" : "활동 데이터베이스 연결을 확인해 주세요.",
+      loadedFilterKey: filterKey
+    };
+  } catch (error) {
+    if (requestId !== adminActivityRequestId || identity !== viewerIdentity(viewer())) return;
+    adminActivityState = {
+      ...(append ? existing : emptyAdminActivityState(identity)),
+      identity,
+      status: "error",
+      loading: false,
+      loadingMore: false,
+      error: error?.message || "전체 사용자 활동을 불러오지 못했습니다.",
+      loadedFilterKey: filterKey
+    };
+  }
+  renderAdminActivityExplorer();
+}
+
+function mergeAdminActivityEvents(current, incoming) {
+  const seen = new Set();
+  return [...(current || []), ...(incoming || [])].filter((event) => {
+    const key = String(event?.id || event?.eventUid || "");
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function renderAdminActivityExplorer() {
+  if (!els.adminActivityExplorer) return;
+  const staff = isStaffViewer();
+  els.adminActivityExplorer.hidden = !staff;
+  if (!staff) return;
+  syncAdminActivityUserOptions();
+  if ((els.adminActivityActionFilter?.options.length || 0) <= 1) syncAdminActivityActionOptions();
+  const state = adminActivityState;
+  const latest = state.events[0]?.occurredAt || state.users[0]?.lastActivityAt;
+  if (els.adminActivitySummary) {
+    els.adminActivitySummary.innerHTML = [
+      ["조회된 활동", `${formatNumber(state.events.length)}건`, "현재 필터에서 불러온 Arena 활동"],
+      ["등록 계정", `${formatNumber(state.users.length)}명`, "Supabase에 등록된 Arena 사용자"],
+      ["최근 기록", latest ? formatDateTime(latest) : "—", "페이지 열람과 주요 실행 기록"]
+    ].map(([label, value, copy]) => `<article><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(copy)}</small></article>`).join("");
+  }
+  if (els.adminActivityTableBody) {
+    els.adminActivityTableBody.innerHTML = state.events.length
+      ? state.events.map(adminActivityRowMarkup).join("")
+      : `<tr><td class="admin-activity-empty" colspan="5">${state.status === "loading" ? "전체 사용자 활동을 불러오는 중입니다…" : "선택한 조건에 해당하는 AI Arena 활동이 없습니다."}</td></tr>`;
+  }
+  if (els.adminActivityLoadMoreButton) {
+    els.adminActivityLoadMoreButton.hidden = !state.nextCursor;
+    els.adminActivityLoadMoreButton.disabled = state.loadingMore;
+    els.adminActivityLoadMoreButton.textContent = state.loadingMore ? "불러오는 중…" : "이전 활동 더 보기";
+  }
+  setText(
+    els.adminActivityStatus,
+    state.error || (state.status === "loading" ? "Arena 전용 활동 원장을 조회하고 있습니다." : state.events.length ? `${formatNumber(state.events.length)}건 표시 중` : "")
+  );
+}
+
+function adminActivityRowMarkup(event) {
+  const actor = event.actorEmail || event.actorLabel || "Arena 사용자";
+  const organization = event.organizationName && event.organizationName !== actor ? event.organizationName : "";
+  const category = String(event.category || "system").toLowerCase();
+  const label = event.eventLabel || adminActivityActionLabel(event.eventType);
+  return `<tr>
+    <td><time datetime="${escapeHtml(event.occurredAt || "")}">${escapeHtml(formatDateTime(event.occurredAt))}</time></td>
+    <td><strong>${escapeHtml(actor)}</strong>${organization ? `<small>${escapeHtml(organization)}</small>` : ""}</td>
+    <td><span class="admin-activity-domain is-${escapeHtml(category)}">${escapeHtml(adminActivityDomainLabel(category))}</span></td>
+    <td><strong>${escapeHtml(label)}</strong><small>${escapeHtml(event.eventType || "")}</small></td>
+    <td><strong>${escapeHtml(event.title || "활동 기록")}</strong><small>${escapeHtml(event.detail || "AI Arena 활동")}</small></td>
+  </tr>`;
+}
+
+function adminActivityActionLabel(eventType) {
+  return ADMIN_ACTIVITY_ACTIONS.find(([, value]) => value === eventType)?.[2] || eventType || "활동";
+}
+
+function adminActivityDomainLabel(domain) {
+  return ({ system: "로그인·페이지", discover: "Discover", community: "Community", bounty: "Bounty" })[domain] || "System";
 }
 
 function renderMyLogTimelineItems() {
@@ -1853,10 +2443,41 @@ function handleMyLogLoadMore() {
   void loadCanonicalMyLog({ append: true });
 }
 
-function renderMyLogDetails({ role, collaborationReviews = [], connections = [], bountyRequests = [], submissions = [], opportunities = [] }) {
+function renderMyLogDetails({ role, collaborationReviews = [], connections = [], bountyRequests = [], submissions = [], opportunities = [], publicBriefMonitor = emptyPublicBriefMonitor() }) {
+  renderMyLogPublicBriefs(role, publicBriefMonitor);
   renderMyLogMatches(role, collaborationReviews, connections);
   renderMyLogCommunity();
   renderMyLogBounties(bountyRequests, submissions, opportunities);
+}
+
+function renderMyLogPublicBriefs(role, monitor) {
+  if (!els.myLogBriefs || !els.myLogBriefList) return;
+  const staff = ["sparklabs", "admin"].includes(role);
+  els.myLogBriefs.hidden = !staff;
+  if (!staff) {
+    els.myLogBriefList.innerHTML = "";
+    return;
+  }
+  if (["idle", "loading"].includes(myLogCanonicalState.status) && !monitor?.available) {
+    els.myLogBriefList.innerHTML = `<div class="my-log-loading"><span class="activity-dot" aria-hidden="true"></span><div><strong>공개 탐색 Brief를 불러오는 중입니다.</strong><span>운영자 전용 접수 기록을 안전하게 확인하고 있습니다.</span></div></div>`;
+    return;
+  }
+  if (!monitor?.available) {
+    els.myLogBriefList.innerHTML = `<div class="my-log-empty"><strong>탐색 Brief 모니터를 불러오지 못했습니다.</strong><span>잠시 후 My Log를 다시 열어 확인해 주세요.</span></div>`;
+    return;
+  }
+  const items = monitor.items || [];
+  els.myLogBriefList.innerHTML = items.length
+    ? items.map((item) => myLogItemMarkup(
+        `${item.organization} 탐색 Brief`,
+        `${item.problemSummary || "문제 요약 확인 필요"} · ${formatDate(item.createdAt)}`,
+        publicBriefStatusLabel(item.status)
+      )).join("")
+    : `<div class="my-log-empty"><strong>아직 공개 탐색 Brief 접수가 없습니다.</strong><span>첫 화면에서 새 Brief가 제출되면 누적 접수 건수와 접수 시간이 여기에 표시됩니다.</span></div>`;
+}
+
+function publicBriefStatusLabel(status) {
+  return status === "received" ? "접수됨" : "상태 확인";
 }
 
 function renderMyLogMatches(role, collaborationReviews, connections) {
@@ -2003,15 +2624,12 @@ function renderStaffQueue() {
   if (!els.staffMarketQueue || !els.staffMarketQueueContent) return;
   els.staffMarketQueue.hidden = !staff;
   if (!staff) return;
-  const reviews = market().reviewQueue || [];
-  const bounties = market().bountyRequests || [];
   const connections = market().connectionRequests || [];
   const collaborationReviews = context.hub?.programQueues?.collaborationReviews || [];
   const collaborationAuditLogs = context.hub?.programAuditLogs || [];
   els.staffMarketQueueContent.innerHTML = `
     <div class="staff-queue-columns">
-      <section><h3>Tech Passport review</h3>${reviews.length ? reviews.map((item) => `<article class="staff-queue-item"><div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(passportStatus(item.status))} · ${item.readiness?.score || 0}% ready</span></div><div><button data-submission-action="approveSubmission" data-submission-id="${escapeHtml(item.id)}" type="button">Approve</button><button data-submission-action="publishSubmission" data-submission-id="${escapeHtml(item.id)}" type="button">Publish</button><button data-submission-action="requestSubmissionChanges" data-submission-id="${escapeHtml(item.id)}" type="button">Changes</button></div></article>`).join("") : `<div class="market-empty">검토 대기 없음</div>`}</section>
-      <section><h3>Bounty intake</h3>${bounties.length ? bounties.slice(0, 8).map((item) => `<article class="staff-queue-item"><div><strong>${escapeHtml(item.problemTitle)}</strong><span>${escapeHtml(item.organization)} · ${escapeHtml(PIPELINE_LABELS[item.status] || item.status)}</span></div><button data-market-page="partnerships" type="button">Pipeline →</button></article>`).join("") : `<div class="market-empty">신규 Brief 없음</div>`}</section>
+      <section><div class="staff-queue-section-head"><h3>혜택 신청</h3>${staffBenefitQueueBadge()}</div>${staffBenefitQueueMarkup()}</section>
       <section><h3>Partnerships</h3>${connections.length ? connections.slice(0, 8).map((item) => `<article class="staff-queue-item"><div><strong>${escapeHtml(startupById(item.startupId)?.name || "Team")}</strong><span>${escapeHtml(item.organization || "")} · ${escapeHtml(PIPELINE_LABELS[item.status] || item.status)}</span></div><button data-market-page="partnerships" type="button">Pipeline →</button></article>`).join("") : `<div class="market-empty">연결 요청 없음</div>`}</section>
     </div>
     <div class="staff-collaboration-grid">
@@ -2028,6 +2646,74 @@ function renderStaffQueue() {
           : `<div class="market-empty">아직 협업 검토 활동 로그가 없습니다.</div>`}</div>
       </section>
     </div>`;
+}
+
+function emptyStaffBenefitQueueState(identity = "") {
+  return { identity, status: "idle", summary: null, requests: [], error: "" };
+}
+
+function resetStaffBenefitQueue(identity = "") {
+  staffBenefitQueueRequestId += 1;
+  staffBenefitQueueState = emptyStaffBenefitQueueState(identity);
+}
+
+async function loadStaffBenefitQueue({ force = false } = {}) {
+  if (!isStaffViewer()) return;
+  const identity = viewerIdentity(viewer());
+  if (!identity) return;
+  if (!force && staffBenefitQueueState.identity === identity && ["loading", "loaded"].includes(staffBenefitQueueState.status)) return;
+  const requestId = ++staffBenefitQueueRequestId;
+  staffBenefitQueueState = { ...emptyStaffBenefitQueueState(identity), status: "loading" };
+  renderStaffQueue();
+  try {
+    const session = readSession();
+    const response = await fetch("/api/benefit-needs-survey", {
+      headers: { ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}), Accept: "application/json" },
+      cache: "no-store"
+    });
+    const payload = await safeJson(response);
+    if (requestId !== staffBenefitQueueRequestId) return;
+    if (!response.ok || payload?.available === false || !payload?.staffSummary) {
+      throw new Error(payload?.error || "혜택 신청을 불러오지 못했습니다.");
+    }
+    staffBenefitQueueState = {
+      identity,
+      status: "loaded",
+      summary: payload.staffSummary,
+      requests: Array.isArray(payload.staffSummary.requests) ? payload.staffSummary.requests.slice(0, 12) : [],
+      error: ""
+    };
+  } catch (error) {
+    if (requestId !== staffBenefitQueueRequestId) return;
+    staffBenefitQueueState = { ...emptyStaffBenefitQueueState(identity), status: "error", error: error.message || "혜택 신청을 불러오지 못했습니다." };
+  }
+  renderStaffQueue();
+}
+
+function staffBenefitQueueBadge() {
+  if (["idle", "loading"].includes(staffBenefitQueueState.status)) return `<span class="trust-badge small">확인 중</span>`;
+  const count = Math.max(0, Number(staffBenefitQueueState.summary?.newRequestCount) || 0);
+  return `<span class="trust-badge small${count ? " is-alert" : ""}">${formatNumber(count)}건</span>`;
+}
+
+function staffBenefitQueueMarkup() {
+  if (["idle", "loading"].includes(staffBenefitQueueState.status)) {
+    return `<div class="market-empty">Claw Member 혜택 신청을 확인하고 있습니다.</div>`;
+  }
+  if (staffBenefitQueueState.status === "error") {
+    return `<div class="market-empty">${escapeHtml(staffBenefitQueueState.error)}</div>`;
+  }
+  if (staffBenefitQueueState.requests.length) {
+    return staffBenefitQueueState.requests.map((item) => `<article class="staff-queue-item staff-benefit-request">
+      <div class="staff-benefit-request-head"><div><strong>${escapeHtml(item.solutionName || "혜택 요청")}</strong><span>${escapeHtml(item.organizationName || "Claw Member 팀")} · ${escapeHtml(formatDate(item.submittedAt))}</span></div><em>${escapeHtml(programActivityStatus(item.status))}</em></div>
+      ${item.solutionDetails ? `<p>${escapeHtml(item.solutionDetails)}</p>` : ""}
+      ${item.solutionReason ? `<small><b>필요한 이유</b> ${escapeHtml(item.solutionReason)}</small>` : ""}
+    </article>`).join("");
+  }
+  const count = Math.max(0, Number(staffBenefitQueueState.summary?.newRequestCount) || 0);
+  return count
+    ? `<div class="market-empty"><strong>${formatNumber(count)}건의 신규 신청이 있습니다.</strong><span>최근 신청 상세를 준비하고 있습니다.</span></div>`
+    : `<div class="market-empty">새로운 혜택 신청이 없습니다.</div>`;
 }
 
 function collaborationAuditActionLabel(action) {
@@ -2408,44 +3094,36 @@ function readSession() {
   }
 }
 
-function readCompareSelection() {
-  if (!compareStorageKey) return [];
-  try {
-    const values = JSON.parse(localStorage.getItem(compareStorageKey) || "[]");
-    return Array.isArray(values) ? values.slice(0, 3) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeCompareSelection() {
-  if (!compareStorageKey) return;
-  try {
-    localStorage.setItem(compareStorageKey, JSON.stringify(selectedTeamIds));
-  } catch {
-    // Comparison selection is a device-local preference only.
-  }
-}
-
 function syncCompareSelectionScope() {
   const currentViewer = viewer();
-  const rawScope = String(currentViewer?.id || currentViewer?.subject || "").trim();
-  const safeScope = rawScope.replace(/[^a-z0-9_-]/gi, "-").slice(0, 96);
-  const nextKey = safeScope ? `${COMPARE_KEY_PREFIX}:${safeScope}` : "";
-  try {
-    localStorage.removeItem(LEGACY_COMPARE_KEY);
-  } catch {
-    // Legacy comparison state is optional device-local data.
-  }
-  if (nextKey !== compareStorageKey) {
-    compareStorageKey = nextKey;
-    selectedTeamIds = readCompareSelection();
+  const nextIdentity = viewerIdentity(currentViewer);
+  if (nextIdentity !== compareViewerIdentity) {
+    compareViewerIdentity = nextIdentity;
+    resetCompareSelection();
   }
   const validIds = new Set((market()?.startups || []).map((item) => String(item.id)));
   const reconciled = selectedTeamIds.filter((id) => validIds.has(String(id))).slice(0, 3);
   if (reconciled.join("|") !== selectedTeamIds.join("|")) {
     selectedTeamIds = reconciled;
-    writeCompareSelection();
+  }
+}
+
+function resetCompareSelection() {
+  selectedTeamIds = [];
+  compareSummaryRequestId += 1;
+  compareSummaryState = { key: "", status: "idle", summary: null, error: "" };
+}
+
+function clearStoredCompareSelections() {
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const key = localStorage.key(index) || "";
+      if (key === LEGACY_COMPARE_KEY || key === COMPARE_KEY_PREFIX || key.startsWith(`${COMPARE_KEY_PREFIX}:`)) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Old device-local comparison selections are optional cleanup data.
   }
 }
 

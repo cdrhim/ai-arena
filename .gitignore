@@ -9,5 +9,6 @@ __pycache__/
 private/
 output/
 outputs/
+deliverables/
 netlify/data/sparkclaw-applicants/*.csv
 netlify/data/sparkclaw-applicants/*.xlsx

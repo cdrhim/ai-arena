@@ -89,6 +89,18 @@ test("Community composer and Arena updates share the same official announcement 
   assert.match(client, /categorySlug === "announcements"/);
   assert.match(client, /payload\.official = true/);
   assert.match(client, /fetch\("\/api\/arena-announcements"/);
+  assert.match(client, /cache:\s*"no-store"/);
+  assert.match(client, /spark-arena:announcements-updated/);
+  assert.match(client, /syncAnnouncementsFromForum\(\);\s*renderThreadDialog\(\);/);
   assert.match(client, /Community 상단과 Discover의 Arena 소식/);
   assert.match(config, /from = "\/api\/arena-announcements"/);
+});
+
+test("Community announcement board uses a compact horizontal layout with a readable mobile fallback", async () => {
+  const css = await readFile("public/arena/arena.css", "utf8");
+
+  assert.match(css, /\.community-announcement-board\s*\{[\s\S]*?grid-template-columns:\s*minmax\(165px, 210px\) minmax\(0, 1fr\);[\s\S]*?padding:\s*17px 20px;/);
+  assert.match(css, /\.community-announcement-list button\s*\{[\s\S]*?grid-template-areas:[\s\S]*?"label body date"[\s\S]*?"title body date"/);
+  assert.match(css, /\.community-announcement-list p\s*\{[\s\S]*?-webkit-line-clamp:\s*2;/);
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*?\.community-announcement-board\s*\{[\s\S]*?grid-template-columns:\s*1fr;/);
 });

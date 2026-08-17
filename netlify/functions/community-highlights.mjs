@@ -3,7 +3,7 @@ import { consumeRateLimit } from "../lib/rate-limit.mjs";
 import { resolveProgramParticipantViewer } from "../lib/program-hub.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
-export default async function communityHighlights(req, options = {}) {
+async function communityHighlights(req, options = {}) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (req.method !== "POST") return json({ error: "지원하지 않는 요청 방식입니다." }, 405);
 
@@ -35,6 +35,8 @@ export default async function communityHighlights(req, options = {}) {
     return json({ error: status < 500 ? error.message : "현재 Arena 소식을 정리하지 못했습니다." }, status);
   }
 }
+
+export default withScArenaDevelopmentLogging("community-highlights", communityHighlights);
 
 async function communityViewer(viewer, resolveViewer, env, fetchImpl) {
   if (viewer?.role !== "public") return viewer;
@@ -72,3 +74,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

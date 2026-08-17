@@ -2,12 +2,72 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="0; url=/arena/">
-  <meta name="description" content="SparkLabs AI Arena — Where AI companies meet.">
-  <title>SparkLabs AI Arena</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#020817">
+  <meta name="description" content="SparkClaw AI Arena — Where AI companies meet.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="SparkClaw AI Arena">
+  <meta property="og:description" content="Where AI companies meet.">
+  <meta property="og:url" content="https://sparkclaw-arena.netlify.app/">
+  <meta property="og:image" content="https://sparkclaw-arena.netlify.app/og-ai-arena-v3.png">
+  <link rel="canonical" href="https://sparkclaw-arena.netlify.app/">
+  <link rel="shortcut icon" href="/favicon.ico?v=ai-arena-20260811">
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png?v=ai-arena-20260811">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=ai-arena-20260811">
+  <link rel="preload" href="/media/sparkclaw-cinematic-intro.mp4" as="video" type="video/mp4">
+  <link rel="stylesheet" href="/cinematic.css?v=sparkclaw-cinematic-v1">
+  <title>SparkClaw AI Arena</title>
 </head>
 <body>
-  <p><a href="/arena/">SparkLabs AI Arena 열기</a></p>
+  <a class="cinematic-skip" href="/arena/">영상 건너뛰고 AI Arena 열기</a>
+
+  <main id="cinematicEntry" class="cinematic-entry" aria-labelledby="cinematicTitle">
+    <div class="cinematic-media" aria-hidden="true">
+      <video
+        id="cinematicFilm"
+        class="cinematic-film"
+        autoplay
+        muted
+        loop
+        playsinline
+        preload="auto"
+        poster="/media/sparkclaw-cinematic-poster.jpg"
+        tabindex="-1"
+      >
+        <source src="/media/sparkclaw-cinematic-intro.mp4" type="video/mp4">
+      </video>
+    </div>
+
+    <div class="cinematic-grade" aria-hidden="true"></div>
+    <div class="cinematic-grain" aria-hidden="true"></div>
+
+    <header class="cinematic-brand" aria-label="SparkClaw AI Arena">
+      <span class="cinematic-brand-mark"><img src="/arena/assets/sparkclaw-logo-blue.png" alt="" width="48" height="48"></span>
+      <span class="cinematic-brand-copy"><strong>SPARKCLAW</strong><small>AI ARENA</small></span>
+    </header>
+
+    <section class="cinematic-caption">
+      <span>SPARKLABS NETWORK · AI DISCOVERY</span>
+      <h1 id="cinematicTitle">Where AI companies meet.</h1>
+      <p>Clawee가 다음 연결을 탐색하고 있습니다.</p>
+    </section>
+
+    <button id="cinematicEnter" class="cinematic-enter" type="button" aria-label="AI Arena 랜딩 페이지로 입장">
+      <span class="cinematic-enter-pulse" aria-hidden="true"></span>
+      <span>화면을 눌러 입장</span>
+      <b aria-hidden="true">→</b>
+    </button>
+
+    <div class="cinematic-progress" aria-hidden="true"><span></span></div>
+
+    <div class="cinematic-transition" aria-hidden="true">
+      <img src="/arena/assets/sparkclaw-logo-blue.png" alt="" width="88" height="88">
+      <strong>SPARKCLAW</strong>
+      <span>AI ARENA</span>
+    </div>
+  </main>
+
+  <noscript><a class="cinematic-noscript" href="/arena/">AI Arena 열기 →</a></noscript>
+  <script src="/cinematic.js?v=sparkclaw-cinematic-v1" defer></script>
 </body>
 </html>

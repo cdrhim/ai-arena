@@ -268,8 +268,14 @@ export function validateBountyRequest(payload, now = new Date().toISOString(), v
     ? String(payload.visibility)
     : "invite_only";
   const contactName = requiredString(payload, "contactName", 120);
-  const requesterEmail = viewer?.email || requiredString(payload, "requesterEmail", 160);
+  const staffSubmittingForPartner = Boolean(viewer?.canScore);
+  const requesterEmail = staffSubmittingForPartner
+    ? optionalString(payload, "requesterEmail", 160) || viewer?.email || ""
+    : viewer?.email || requiredString(payload, "requesterEmail", 160);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requesterEmail)) throw new Error("A valid requester email is required.");
+  const organization = staffSubmittingForPartner
+    ? optionalString(payload, "organization", 160) || optionalString(viewer || {}, "organization", 160) || "B2B partner"
+    : optionalString(viewer || {}, "organization", 160) || optionalString(payload, "organization", 160) || "B2B partner";
   return {
     id: eventId("bounty_req", `${requesterEmail}:${problemTitle}`, now),
     problemTitle,
@@ -282,10 +288,19 @@ export function validateBountyRequest(payload, now = new Date().toISOString(), v
     pilotBudget,
     deadline,
     visibility,
+    opportunity: optionalString(payload, "opportunity", 1000),
+    evaluationMode: enumString(payload.evaluationMode, ["automatic", "staff_recorded", "hybrid"], "hybrid"),
+    evaluationCriteria: optionalStringList(payload, "evaluationCriteria", 12, 160),
+    challengeType: enumString(payload.challengeType, ["product_benchmark", "endpoint_eval", "pairwise_validation", "composite"], "product_benchmark"),
+    dataPolicy: optionalString(payload, "dataPolicy", 1600),
+    rules: optionalString(payload, "rules", 4000),
     contactName,
     requesterEmail,
-    requesterUserId: viewer?.id || null,
-    organization: optionalString(payload, "organization", 160) || optionalString(viewer || {}, "organization", 160) || "B2B partner",
+    requesterUserId: requesterEmail === viewer?.email ? viewer?.id || null : null,
+    organization,
+    submittedByEmail: viewer?.email || requesterEmail,
+    submittedByUserId: viewer?.id || null,
+    submittedByRole: viewer?.role || "b2b_partner",
     status: "intake",
     nextStep: "Scope workshop",
     createdAt: now,
@@ -301,7 +316,7 @@ function validatePipelineUpdate(payload, now, viewer, kind) {
     : ["interest", "qualified", "founder_review", "mutually_accepted", "intro_scheduled", "discovery", "pilot", "production", "expansion", "declined", "closed", "matched", "nda", "proposal"];
   const status = requiredString(payload, "status", 40);
   if (!allowed.includes(status)) throw new Error(`Invalid ${kind} pipeline status.`);
-  return {
+  const update = {
     requestId,
     status,
     nextStep: optionalString(payload, "nextStep", 300),
@@ -309,6 +324,48 @@ function validatePipelineUpdate(payload, now, viewer, kind) {
     updatedBy: viewer?.email || "",
     updatedAt: now
   };
+  if (kind !== "bounty") return update;
+
+  const stringFields = [
+    ["problemTitle", 160, true],
+    ["problem", 1600, true],
+    ["currentWorkflow", 1200, false],
+    ["targetKpi", 500, true],
+    ["dataAvailability", 800, false],
+    ["constraints", 1000, false],
+    ["budget", 200, false],
+    ["pilotBudget", 200, false],
+    ["deadline", 40, false],
+    ["opportunity", 1000, false],
+    ["dataPolicy", 1600, false],
+    ["rules", 4000, false],
+    ["contactName", 120, true],
+    ["organization", 160, true],
+    ["requesterEmail", 160, true]
+  ];
+  for (const [key, maxLength, required] of stringFields) {
+    if (!Object.hasOwn(payload, key)) continue;
+    update[key] = required ? requiredString(payload, key, maxLength) : optionalString(payload, key, maxLength);
+  }
+  if (Object.hasOwn(payload, "requesterEmail") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(update.requesterEmail)) {
+    throw new Error("A valid requester email is required.");
+  }
+  if (Object.hasOwn(payload, "requesterEmail")) {
+    update.requesterUserId = update.requesterEmail === viewer?.email ? viewer?.id || null : null;
+  }
+  if (Object.hasOwn(payload, "visibility")) {
+    update.visibility = enumString(payload.visibility, ["invite_only", "arena_members", "public"], "invite_only");
+  }
+  if (Object.hasOwn(payload, "evaluationMode")) {
+    update.evaluationMode = enumString(payload.evaluationMode, ["automatic", "staff_recorded", "hybrid"], "hybrid");
+  }
+  if (Object.hasOwn(payload, "challengeType")) {
+    update.challengeType = enumString(payload.challengeType, ["product_benchmark", "endpoint_eval", "pairwise_validation", "composite"], "product_benchmark");
+  }
+  if (Object.hasOwn(payload, "evaluationCriteria")) {
+    update.evaluationCriteria = optionalStringList(payload, "evaluationCriteria", 12, 160);
+  }
+  return update;
 }
 
 export function validatePairwiseVote(payload, now = new Date().toISOString()) {
@@ -712,6 +769,21 @@ function optionalString(payload, key, maxLength) {
   const value = String(payload[key]).trim();
   if (value.length > maxLength) throw new Error(`${key} must be ${maxLength} characters or fewer.`);
   return value;
+}
+
+function optionalStringList(payload, key, maxItems, maxLength) {
+  const source = Array.isArray(payload[key]) ? payload[key] : String(payload[key] || "").split(/[\n,]+/);
+  const values = [...new Set(source.map((item) => String(item || "").trim()).filter(Boolean))];
+  if (values.length > maxItems) throw new Error(`${key} must contain ${maxItems} items or fewer.`);
+  for (const value of values) {
+    if (value.length > maxLength) throw new Error(`${key} items must be ${maxLength} characters or fewer.`);
+  }
+  return values;
+}
+
+function enumString(value, allowed, fallback) {
+  const normalized = String(value || "").trim();
+  return allowed.includes(normalized) ? normalized : fallback;
 }
 
 function boundedNumber(payload, key, min, max) {

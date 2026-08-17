@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const html = readFileSync("public/arena/index.html", "utf8");
+const arena = readFileSync("public/arena/arena.js", "utf8");
 const market = readFileSync("public/arena/market.js", "utf8");
 const community = readFileSync("public/arena/community.js", "utf8");
 const css = readFileSync("public/arena/market.css", "utf8");
@@ -14,6 +15,7 @@ test("Workspace navigation is replaced by a personal My Log hub", () => {
   assert.match(html, /data-nav-target="myLogCommunity"/);
   assert.match(html, /data-nav-target="myLogBounties"/);
   assert.match(html, /data-nav-target="myLogTimeline"/);
+  assert.match(html, /data-nav-target="myLogBriefs"[^>]*data-permission="canViewOperations"/);
   assert.match(html, /id="myLogTimelineList"/);
   assert.match(html, /id="myLogLoadMoreButton"[^>]*>이전 기록 더 불러오기<\/button>/);
   assert.match(html, /id="myLogMatchList"/);
@@ -21,7 +23,7 @@ test("Workspace navigation is replaced by a personal My Log hub", () => {
   assert.match(html, /id="myLogBountyList"/);
 });
 
-test("My Log combines match, Community, and Bounty activity without removing staff tools", () => {
+test("My Log combines match, Community, and Bounty activity while keeping only the raw staff utility", () => {
   assert.match(market, /function renderMyLogMatches/);
   assert.match(market, /function renderMyLogCommunity/);
   assert.match(market, /function renderMyLogBounties/);
@@ -30,8 +32,11 @@ test("My Log combines match, Community, and Bounty activity without removing sta
   assert.match(market, /function renderWorkspaceMetrics\(metrics\)/);
   assert.match(market, /competition\(\)\.opportunities/);
   assert.match(html, /id="staffUtilityNav"/);
-  assert.match(html, /data-permission="canViewOperations"/);
+  assert.doesNotMatch(html, /<strong>Program Operations<\/strong>/);
+  assert.doesNotMatch(html, /data-nav-page="operations"/);
+  assert.doesNotMatch(html, /data-go-page="operations"|>운영 현황<\/button>/);
   assert.match(html, /data-permission="canViewRawDatabase"/);
+  assert.match(arena, /if \(pageName === "operations"\) \{[\s\S]*?pageName = "workspace"/);
 });
 
 test("Claw Members and partners see authored comments as a distinct My Log metric", () => {
@@ -47,6 +52,27 @@ test("My Log removes the legacy weekly report, mentoring, and duplicate review w
   assert.doesNotMatch(myLogPage, /programWorkspaceDetails|주간 실행 리포트|내 팀 멘토링|collaborationReviewWorkspace/);
   assert.match(myLogPage, /id="myLogMatches"/);
   assert.match(market, /function myLogMatchItemMarkup/);
+});
+
+test("SparkLabs Next Actions monitors public discovery Briefs alongside the collaboration audit log", () => {
+  const programWorkspace = market.slice(market.indexOf("function renderProgramWorkspace"), market.indexOf("function renderWorkspaceMetrics"));
+  assert.match(programWorkspace, /탐색 Brief 접수 확인/);
+  assert.match(programWorkspace, /publicBriefCount/);
+  assert.match(programWorkspace, /publicBriefLoading/);
+  assert.match(programWorkspace, /data-my-log-target/);
+  assert.match(programWorkspace, /협업 검토 감사 로그/);
+  assert.doesNotMatch(programWorkspace, /팀 운영 현황|베네핏 Queue|일정 RSVP/);
+  assert.doesNotMatch(programWorkspace, /프로그램 운영 Queue/);
+});
+
+test("public discovery Brief monitoring is rendered only in the SparkLabs My Log", () => {
+  assert.match(html, /id="myLogBriefs"[^>]*hidden/);
+  assert.match(html, /id="myLogBriefList"/);
+  assert.match(market, /function renderMyLogPublicBriefs/);
+  assert.match(market, /\["sparklabs", "admin"\]\.includes\(role\)/);
+  assert.match(market, /sourceSystem: "public_brief"/);
+  assert.match(market, /target: "myLogBriefs"/);
+  assert.match(css, /\.my-log-public-brief-panel\s*\{[\s\S]*?grid-column:\s*1 \/ -1/);
 });
 
 test("Community publishes a viewer-scoped activity projection to My Log", () => {
@@ -71,6 +97,14 @@ test("Recent activity is presented as a readable raw log stream", () => {
   assert.match(market, /function rawLogTimestamp/);
   assert.match(market, /timeZone: "Asia\/Seoul"/);
   assert.match(market, /source: "COMMUNITY"/);
+  assert.match(market, /function renderWorkspaceActivity/);
+  assert.match(market, /myLogCanonicalState\.events\.map\(canonicalMyLogRawActivity\)/);
+  assert.doesNotMatch(market, /source: "REPORT"/);
+  assert.doesNotMatch(market, /source: "PERK"/);
+  assert.doesNotMatch(market, /source: "EVENT"/);
+  assert.doesNotMatch(market, /hub\.eventRegistrations/);
+  assert.doesNotMatch(market, /hub\.benefitApplications/);
+  assert.doesNotMatch(market, /hub\.weeklyReports/);
   assert.match(css, /\.workspace-activity\s*\{[\s\S]*?font-family:[^;]*monospace/);
   assert.match(css, /content: "stdout \/ activity\.stream \/ newest_first"/);
   assert.match(css, /\.workspace-activity article\s*\{[\s\S]*?grid-template-columns: 3ch 19ch 12ch minmax\(0, 1fr\) auto/);

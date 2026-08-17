@@ -33,14 +33,19 @@ test("operator and partner accounts without a linked team do not fail qualificat
   assert.equal(viewerBenefitQualification(""), "");
 });
 
-test("benefit page exposes a personalized summary and an operator qualification filter", () => {
+test("benefit page separates the partner catalog from member applications and operator filters", () => {
   const html = readFileSync("public/arena/index.html", "utf8");
   const js = readFileSync("public/arena/arena.js", "utf8");
   const css = readFileSync("public/arena/arena.css", "utf8");
   assert.match(html, /id="benefitQualificationFilterLabel" hidden/);
   assert.match(html, /id="benefitEligibilitySummary"/);
-  assert.match(js, /hub\?\.viewer\?\.role === "b2b_partner"/);
+  assert.match(js, /function isPartnerBenefitCatalogViewer\(\)[\s\S]*?=== "b2b_partner"/);
+  assert.match(js, /function isBenefitQualificationOperator\(\)[\s\S]*?canManageProgramActions/);
+  assert.match(js, /파트너 신청 화면이 아닙니다/);
+  assert.match(js, /partnerBenefitCatalogMarkup/);
+  assert.match(js, /프로그램 제공 사례 · 신청은 Claw Member 대상/);
   assert.match(js, /memberBenefitGroupsMarkup/);
   assert.match(js, /operatorBenefitGroupsMarkup/);
   assert.match(css, /\.benefit-qualification-group/);
+  assert.match(css, /\.benefit-catalog-context/);
 });

@@ -46,6 +46,7 @@ export function arenaAuthConfig(env = process.env) {
     b2bPartnerEmails,
     humanValidatorDomains,
     humanValidatorEmails,
+    googleAdminLoginEnabled: envFlag(env.SPARKLABS_ARENA_GOOGLE_ADMIN_LOGIN_ENABLED),
     features: {
       arena: envFlag(env.SPARKCLAW_ENABLE_ARENA),
       forum: envFlag(env.SPARKCLAW_ENABLE_FORUM, true),
@@ -63,6 +64,7 @@ export function publicArenaAuthConfig(env = process.env) {
     supabaseUrl: config.supabaseUrl,
     supabaseAnonKey: config.anonKey,
     adminDomains: config.adminDomains,
+    googleAdminLoginEnabled: config.googleAdminLoginEnabled,
     features: config.features
   };
 }

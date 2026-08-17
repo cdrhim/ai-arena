@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import programHub from "../netlify/functions/program-hub.mjs";
-import { loadPartnerDirectory, loadProgramHub } from "../netlify/lib/program-hub.mjs";
+import { loadPartnerDirectory, loadProgramHub, loadProgramHubBootstrap } from "../netlify/lib/program-hub.mjs";
 
 const PROGRAM_ENV = {
   SPARKCLAW_PROGRAM_SUPABASE_URL: "https://program.supabase.co",
@@ -27,6 +27,10 @@ test("program hub projects team data and aggregates activity without writes", as
   assert.equal(snapshot.metrics.customerInterviews, 1);
   assert.equal(snapshot.teams[0].activity.mentoringSessions, 1);
   assert.equal(snapshot.teams[0].activity.interviews, 1);
+  assert.equal(snapshot.teams[0].publicSignals.teamSize, 2);
+  assert.equal(snapshot.teams[0].publicSignals.customerInterviews, 5);
+  assert.equal(snapshot.teams[0].publicSignals.weeklyReports, 1);
+  assert.equal(snapshot.teams[0].programStage, "discoverer");
   assert.equal(snapshot.teams[0].founder, "Founder One");
   assert.equal(snapshot.permissions.canViewRawDatabase, true);
   assert.equal(snapshot.metrics.collaborationFitStatus, "not_applicable");
@@ -43,6 +47,29 @@ test("program hub projects team data and aggregates activity without writes", as
   assert.ok(requests.every((request) => request.options.method === undefined));
   assert.ok(requests.every((request) => request.options.headers.apikey === "server-secret"));
   assert.ok(requests.every((request) => request.options.headers["user-agent"].includes("program-hub-reader")));
+});
+
+test("login bootstrap reads only the team directory before background hydration", async () => {
+  const requestedTables = [];
+  const snapshot = await loadProgramHubBootstrap(
+    { email: "member@example.com", role: "member", canScore: false },
+    PROGRAM_ENV,
+    async (url) => {
+      const table = new URL(url).pathname.split("/").pop();
+      requestedTables.push(table);
+      return Response.json(fixtures()[table] || []);
+    }
+  );
+
+  assert.deepEqual(requestedTables, ["teams"]);
+  assert.equal(snapshot.bootstrap, true);
+  assert.equal(snapshot.viewerTeam.id, "1");
+  assert.equal(snapshot.viewer.role, "member");
+  assert.deepEqual(snapshot.memberDirectory.map((team) => team.name), ["Beta"]);
+  assert.deepEqual(snapshot.events, []);
+  assert.deepEqual(snapshot.benefits, []);
+  assert.equal(snapshot.metrics.teams, 2);
+  assert.equal(snapshot.metrics.collaborationFitStatus, "ready");
 });
 
 test("member hub exposes its own private workspace and hides other teams' private data", async () => {
@@ -71,10 +98,21 @@ test("member hub exposes its own private workspace and hides other teams' privat
 
   assert.equal(otherTeam.founder, "");
   assert.equal(otherTeam.item, "");
-  assert.equal(otherTeam.serviceSummary, "");
-  assert.equal(otherTeam.aiIdeaSummary, "");
+  assert.equal(otherTeam.serviceSummary, "Private clinical workflow details");
+  assert.equal(otherTeam.aiIdeaSummary, "Private model strategy");
   assert.equal(otherTeam.expertise, "");
   assert.equal(otherTeam.activity, null);
+  assert.deepEqual(otherTeam.publicSignals, {
+    teamSize: 0,
+    teamRoles: [],
+    customerInterviews: 0,
+    hypotheses: 0,
+    mentoringSessions: 0,
+    pmfResponses: 0,
+    payingCustomers: 0,
+    weeklyReports: 0,
+    pmfPhase: ""
+  });
   assert.equal(otherTeam.isViewerTeam, false);
   assert.deepEqual(snapshot.benefitApplications.map((item) => item.teamId), [1]);
   assert.deepEqual(snapshot.eventRegistrations.map((item) => item.teamId), [1]);
@@ -88,6 +126,9 @@ test("member hub exposes its own private workspace and hides other teams' privat
   assert.equal(snapshot.memberDirectory[0].serviceSummary, "Private clinical workflow details");
   assert.equal(snapshot.memberDirectory[0].aiIdeaSummary, "Private model strategy");
   assert.equal(snapshot.memberDirectory[0].privateDetailsVisible, false);
+  assert.equal(snapshot.memberDirectory[0].programStage, "discoverer");
+  assert.equal(Object.hasOwn(snapshot.memberDirectory[0], "publicSignals"), true);
+  assert.equal(typeof snapshot.memberDirectory[0].investorProfile.teamSummary, "string");
   assert.equal(Object.hasOwn(snapshot.memberDirectory[0], "email"), false);
   assert.equal(Object.hasOwn(snapshot.memberDirectory[0], "founder"), false);
   assert.equal(Object.hasOwn(snapshot.memberDirectory[0], "status"), false);
@@ -111,6 +152,48 @@ test("program events are returned in date and start-time order", async () => {
   );
 
   assert.deepEqual(snapshot.events.map((event) => event.id), [61, 62, 63]);
+});
+
+test("Community Events exclude schedules before BootCamp Orientation on 13 August 2026", async () => {
+  const data = fixtures();
+  data.events = [
+    { id: 60, title: "Earlier event", event_date: "2026-08-12", event_time: "15:00:00", kind: "행사" },
+    { id: 61, title: "BootCamp Orientation", event_date: "2026-08-13", event_time: "10:00:00", kind: "행사" },
+    { id: 62, title: "Follow-up session", event_date: "2026-08-14", event_time: "14:00:00", kind: "행사" },
+    { id: 63, title: "Undated event", event_date: "", event_time: "", kind: "행사" }
+  ];
+  const snapshot = await loadProgramHub(
+    { email: "staff@sparklabs.co.kr", role: "sparklabs", canScore: true },
+    PROGRAM_ENV,
+    async (url) => {
+      const table = new URL(url).pathname.split("/").pop();
+      return Response.json(data[table] || []);
+    }
+  );
+
+  assert.deepEqual(snapshot.events.map((event) => event.id), [61, 62]);
+  assert.equal(snapshot.metrics.events, 2);
+});
+
+test("B2B partners receive the OT anchor and later public major events only", async () => {
+  const data = fixtures();
+  data.events = [
+    { id: 60, title: "Earlier event", event_date: "2026-08-12", event_time: "15:00:00", kind: "행사" },
+    { id: 61, title: "Internal team check-in", event_date: "2026-08-20", event_time: "10:00:00", kind: "미팅", team_id: 1 },
+    { id: 62, title: "SparkClaw Demo Day", event_date: "2026-09-30", event_time: "14:00:00", kind: "데모데이", target_group: "전체 공개" }
+  ];
+  const snapshot = await loadProgramHub(
+    { id: "partner-1", email: "partner@example.com", role: "b2b_partner", canScore: false },
+    PROGRAM_ENV,
+    async (url) => {
+      const table = new URL(url).pathname.split("/").pop();
+      return Response.json(data[table] || []);
+    }
+  );
+
+  assert.deepEqual(snapshot.events.map((event) => event.id), ["partner-program-orientation-2026-08-13", 62]);
+  assert.equal(snapshot.events[0].date, "2026-08-13");
+  assert.equal(snapshot.events[1].title, "SparkClaw Demo Day");
 });
 
 test("program hub API requires a valid Arena login", async () => {
@@ -186,6 +269,7 @@ test("Youngone B2B login receives every eligible participant as a contact-safe b
     assert.ok(payload.teams.every((team) => team.privateDetailsVisible === false));
     assert.ok(payload.teams.every((team) => !Object.hasOwn(team, "email") && !Object.hasOwn(team, "founder") && !Object.hasOwn(team, "status")));
     assert.ok(payload.teams.every((team) => !Object.hasOwn(team, "item") && !Object.hasOwn(team, "expertise") && !Object.hasOwn(team, "activity")));
+    assert.ok(payload.teams.every((team) => team.programStage === "discoverer" && Object.hasOwn(team, "publicSignals")));
     assert.ok(payload.teams.every((team) => !Object.hasOwn(team, "isBuilder") && !Object.hasOwn(team, "isSoloFounder")));
     assert.equal(payload.permissions.canViewRawDatabase, false);
   } finally {
@@ -239,6 +323,21 @@ test("partner directory returns every eligible participant without an arbitrary 
   assert.equal(teams.at(-1).name, "Participant 125");
 });
 
+test("partner directory repairs the legacy AC'SCENT URL that concatenated a second website", async () => {
+  const teams = await loadPartnerDirectory(PROGRAM_ENV, async () => Response.json([
+    {
+      id: 53,
+      name: "네안데르 / AC'SCENT",
+      status: "최종 선발",
+      sector: "Fashion",
+      one_liner: "AI fragrance experience",
+      website_url: "https://www.acscent.co.kr/en/https:/www.smoat.co.kr"
+    }
+  ]));
+
+  assert.equal(teams[0].websiteUrl, "https://www.acscent.co.kr/");
+});
+
 function fixtures() {
   return {
     teams: [
@@ -277,6 +376,10 @@ function fixtures() {
       }
     ],
     mentors: [{ id: 8, name: "Mentor", affiliation: "SparkLabs", booking_url: "https://example.com/book" }],
+    team_members: [
+      { id: 11, team_id: 1, is_founder: true },
+      { id: 12, team_id: 1, is_founder: false }
+    ],
     hypotheses: [{ id: 20, team_id: 1, week_number: 1 }],
     customer_interviews: [{ id: 30, team_id: 1, hypothesis_id: 20, pain_level: 4 }],
     mentoring_sessions: [
@@ -303,6 +406,7 @@ function fixtures() {
       { id: 91, benefit_id: 80, team_id: 2, status: "submitted" }
     ],
     report_reminders: [{ id: 100, team_id: 1, week_number: 1 }],
+    weekly_reports: [{ id: 105, team_id: 1, week_number: 2, interview_count: 5, status: "submitted" }],
     weekly_report_notice: [{ id: 110, title: "Weekly", body: "Submit report", updated_at: "2026-07-20T00:00:00Z" }]
   };
 }

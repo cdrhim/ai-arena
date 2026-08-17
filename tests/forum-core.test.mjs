@@ -13,6 +13,7 @@ import {
 const member = { id: "member_1", email: "member@example.com", role: "member", roleLabel: "Approved member" };
 const partner = { id: "partner_1", email: "partner@example.com", role: "b2b_partner", roleLabel: "B2B partner" };
 const staff = { id: "staff_1", email: "staff@sparklabs.co.kr", role: "sparklabs", roleLabel: "SparkLabs staff", canScore: true };
+const admin = { id: "admin_1", email: "a.rhim@sparklabs.co.kr", role: "admin", roleLabel: "SparkLabs admin", canScore: true };
 const unapproved = { id: "public_1", email: "public@example.com", role: "public", roleLabel: "Public" };
 
 test("forum hot score rewards votes and recency with pinned/staff boosts", () => {
@@ -44,6 +45,171 @@ test("forum thread validation and public snapshot avoid private author fields", 
   assert.equal(snapshot.threads[0].title, "What eval stack are Korean AI teams using?");
   assert.equal(Object.hasOwn(snapshot.threads[0], "authorEmail"), false);
   assert.equal(Object.hasOwn(snapshot.threads[0], "staffNotes"), false);
+});
+
+test("Community shows the current member's service name on new and existing posts and comments", () => {
+  const serviceViewer = { ...member, communityDisplayName: "Oing" };
+  const legacyThread = createForumEvent(
+    "createForumThread",
+    { title: "Legacy founder update", categorySlug: "general", bodyMarkdown: "Written before the service profile was linked." },
+    member,
+    [],
+    "2026-06-30T00:00:00.000Z"
+  );
+  const legacyComment = createForumEvent(
+    "createForumComment",
+    { threadId: legacyThread.thread.id, bodyMarkdown: "A legacy comment from the same member." },
+    member,
+    [legacyThread],
+    "2026-06-30T00:01:00.000Z"
+  );
+  const otherThread = createForumEvent(
+    "createForumThread",
+    { title: "Partner update", categorySlug: "general", bodyMarkdown: "This author's name must remain unchanged." },
+    partner,
+    [legacyThread, legacyComment],
+    "2026-06-30T00:02:00.000Z"
+  );
+  const newThread = createForumEvent(
+    "createForumThread",
+    { title: "Service-named update", categorySlug: "general", bodyMarkdown: "Written after the service profile was linked." },
+    serviceViewer,
+    [legacyThread, legacyComment, otherThread],
+    "2026-06-30T00:03:00.000Z"
+  );
+  const snapshot = buildForumSnapshot([legacyThread, legacyComment, otherThread, newThread], {
+    viewer: serviceViewer,
+    now: "2026-06-30T00:04:00.000Z"
+  });
+
+  assert.equal(newThread.thread.authorDisplayName, "Oing");
+  assert.equal(snapshot.viewer.displayName, "Oing");
+  assert.equal(snapshot.threads.find((thread) => thread.id === legacyThread.thread.id).authorDisplayName, "Oing");
+  assert.equal(snapshot.threads.find((thread) => thread.id === newThread.thread.id).authorDisplayName, "Oing");
+  assert.equal(snapshot.comments.find((comment) => comment.id === legacyComment.comment.id).authorDisplayName, "Oing");
+  assert.equal(snapshot.threads.find((thread) => thread.id === otherThread.thread.id).authorDisplayName, "partner");
+});
+
+test("SparkLabs administrators publish posts and comments under the administrator label", () => {
+  const legacyAdmin = { ...admin, communityDisplayName: "a rhim", displayName: "A Rhim" };
+  const legacyThread = createForumEvent(
+    "createForumThread",
+    { title: "Administrator update", categorySlug: "general", bodyMarkdown: "An administrator-authored Community update." },
+    legacyAdmin,
+    [],
+    "2026-08-17T00:00:00.000Z"
+  );
+  const comment = createForumEvent(
+    "createForumComment",
+    { threadId: legacyThread.thread.id, bodyMarkdown: "An administrator-authored comment." },
+    legacyAdmin,
+    [legacyThread],
+    "2026-08-17T00:01:00.000Z"
+  );
+  const snapshot = buildForumSnapshot([legacyThread, comment], {
+    viewer: legacyAdmin,
+    now: "2026-08-17T00:02:00.000Z"
+  });
+
+  assert.equal(legacyThread.thread.authorDisplayName, "SparkLabs 관리자");
+  assert.equal(comment.comment.authorDisplayName, "SparkLabs 관리자");
+  assert.equal(snapshot.viewer.displayName, "SparkLabs 관리자");
+  assert.equal(snapshot.threads[0].authorDisplayName, "SparkLabs 관리자");
+  assert.equal(snapshot.comments[0].authorDisplayName, "SparkLabs 관리자");
+});
+
+test("every sparklabs.co.kr author uses the administrator label", () => {
+  const event = createForumEvent(
+    "createForumThread",
+    { title: "Operator update", categorySlug: "general", bodyMarkdown: "An operator-authored Community update." },
+    { ...staff, communityDisplayName: "staff" },
+    [],
+    "2026-08-17T00:00:00.000Z"
+  );
+  const readerSnapshot = buildForumSnapshot([event], {
+    viewer: member,
+    now: "2026-08-17T00:01:00.000Z"
+  });
+
+  assert.equal(event.thread.authorDisplayName, "SparkLabs 관리자");
+  assert.equal(readerSnapshot.threads[0].authorDisplayName, "SparkLabs 관리자");
+});
+
+test("Community resolves legacy authors to a company or service name without exposing email", () => {
+  const legacyAuthor = { id: "legacy-oing-user", email: "founder@gorocket.me", role: "member" };
+  const reader = { id: "other-reader", email: "reader@example.com", role: "member" };
+  const thread = createForumEvent(
+    "createForumThread",
+    { title: "Legacy service update", categorySlug: "general", bodyMarkdown: "Stored before the Program team was linked." },
+    legacyAuthor,
+    [],
+    "2026-06-30T00:00:00.000Z"
+  );
+  const comment = createForumEvent(
+    "createForumComment",
+    { threadId: thread.thread.id, bodyMarkdown: "Legacy service comment." },
+    legacyAuthor,
+    [thread],
+    "2026-06-30T00:01:00.000Z"
+  );
+  const snapshot = buildForumSnapshot([thread, comment], {
+    viewer: reader,
+    authorDisplayNames: new Map([["@gorocket.me", "고로켓컴퍼니 / Oing"]]),
+    now: "2026-06-30T00:02:00.000Z"
+  });
+
+  assert.equal(snapshot.threads[0].authorDisplayName, "고로켓컴퍼니 / Oing");
+  assert.equal(snapshot.comments[0].authorDisplayName, "고로켓컴퍼니 / Oing");
+  assert.equal(Object.hasOwn(snapshot.threads[0], "authorEmail"), false);
+  assert.equal(Object.hasOwn(snapshot.comments[0], "authorEmail"), false);
+});
+
+test("authors can edit their own posts and comments later while other members cannot", () => {
+  const thread = createForumEvent(
+    "createForumThread",
+    { title: "Original post", categorySlug: "general", bodyMarkdown: "Original body" },
+    member,
+    [],
+    "2026-06-30T00:00:00.000Z"
+  );
+  const comment = createForumEvent(
+    "createForumComment",
+    { threadId: thread.thread.id, bodyMarkdown: "Original comment" },
+    member,
+    [thread],
+    "2026-06-30T00:01:00.000Z"
+  );
+  const threadUpdate = createForumEvent(
+    "updateOwnForumThread",
+    { threadId: thread.thread.id, title: "Updated post", bodyMarkdown: "Updated body" },
+    member,
+    [thread, comment],
+    "2026-08-12T00:00:00.000Z"
+  );
+  const commentUpdate = createForumEvent(
+    "updateOwnForumComment",
+    { commentId: comment.comment.id, bodyMarkdown: "Updated comment" },
+    member,
+    [thread, comment, threadUpdate],
+    "2026-08-12T00:01:00.000Z"
+  );
+  const snapshot = buildForumSnapshot([thread, comment, threadUpdate, commentUpdate], {
+    viewer: member,
+    now: "2026-08-12T00:02:00.000Z"
+  });
+  assert.equal(snapshot.threads[0].title, "Updated post");
+  assert.equal(snapshot.threads[0].bodyMarkdown, "Updated body");
+  assert.equal(snapshot.threads[0].canEdit, true);
+  assert.equal(snapshot.comments[0].bodyMarkdown, "Updated comment");
+  assert.equal(snapshot.comments[0].canEdit, true);
+  assert.throws(
+    () => createForumEvent("updateOwnForumThread", { threadId: thread.thread.id, title: "Stolen", bodyMarkdown: "No" }, partner, [thread], "2026-08-12T00:03:00.000Z"),
+    (error) => error.status === 403 && /only edit your own/i.test(error.message)
+  );
+  assert.throws(
+    () => createForumEvent("updateOwnForumComment", { commentId: comment.comment.id, bodyMarkdown: "Stolen" }, partner, [thread, comment], "2026-08-12T00:04:00.000Z"),
+    (error) => error.status === 403 && /only edit your own/i.test(error.message)
+  );
 });
 
 test("forum votes dedupe server-side", () => {

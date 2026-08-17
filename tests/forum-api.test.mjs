@@ -52,7 +52,7 @@ test("Program DB participant logins receive Claw Member Community access", async
   global.fetch = async (url) => {
     const value = String(url);
     if (value.startsWith("https://arena.example") && value.includes("/auth/v1/user")) {
-      return Response.json({ id: "program-community-member", email: participantEmail, app_metadata: {}, user_metadata: {} });
+      return Response.json({ id: "program-community-member", email: participantEmail, app_metadata: { role: "member" }, user_metadata: {} });
     }
     if (value.startsWith("https://program.example") && value.includes("/rest/v1/teams")) {
       return Response.json([{ id: 11, name: "Program Member", email: participantEmail, status: "active" }]);
@@ -84,8 +84,53 @@ test("Program DB participant logins receive Claw Member Community access", async
     const created = await createResponse.json();
     assert.equal(createResponse.status, 200, JSON.stringify(created));
     assert.equal(created.event.thread.authorEmail, participantEmail);
+    assert.equal(created.event.thread.authorDisplayName, "Program Member");
     assert.equal(created.event.thread.visibility, "members_only");
     assert.equal(created.snapshot.viewer.role, "member");
+    assert.equal(created.snapshot.viewer.displayName, "Program Member");
+    assert.equal(
+      created.snapshot.threads.find((thread) => thread.id === created.event.thread.id)?.authorDisplayName,
+      "Program Member"
+    );
+  } finally {
+    global.fetch = originalFetch;
+    restoreEnv(previous);
+  }
+});
+
+test("Community links a unique company email domain to its company and service name", async () => {
+  const previous = captureEnv([
+    "SPARKCLAW_ENABLE_FORUM",
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SPARKCLAW_PROGRAM_SUPABASE_URL",
+    "SPARKCLAW_PROGRAM_SUPABASE_SECRET_KEY"
+  ]);
+  const originalFetch = global.fetch;
+  process.env.SPARKCLAW_ENABLE_FORUM = "true";
+  process.env.SUPABASE_URL = "https://arena-domain.example";
+  process.env.SUPABASE_ANON_KEY = "anon";
+  process.env.SPARKCLAW_PROGRAM_SUPABASE_URL = "https://program-domain.example";
+  process.env.SPARKCLAW_PROGRAM_SUPABASE_SECRET_KEY = "program-secret";
+
+  global.fetch = async (url) => {
+    const value = String(url);
+    if (value.startsWith("https://arena-domain.example") && value.includes("/auth/v1/user")) {
+      return Response.json({ id: "oing-community-member", email: "bw.you@gorocket.me", app_metadata: { role: "member" }, user_metadata: {} });
+    }
+    if (value.startsWith("https://program-domain.example") && value.includes("/rest/v1/teams")) {
+      return Response.json([{ id: 12, name: "고로켓컴퍼니 / Oing", email: "founder@gorocket.me", status: "active" }]);
+    }
+    return originalFetch(url);
+  };
+
+  try {
+    const response = await forum(new Request("https://example.test/api/forum", {
+      headers: { Authorization: "Bearer oing-session" }
+    }));
+    const payload = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(payload));
+    assert.equal(payload.viewer.displayName, "고로켓컴퍼니 / Oing");
   } finally {
     global.fetch = originalFetch;
     restoreEnv(previous);

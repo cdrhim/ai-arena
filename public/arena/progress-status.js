@@ -20,7 +20,9 @@ function resetProcessElement(element) {
 function renderProcessStep(state, nextIndex) {
   state.index = Math.max(0, Math.min(nextIndex, state.steps.length - 1));
   state.copy.textContent = state.steps[state.index];
-  state.step.textContent = `${state.index + 1}/${state.steps.length}`;
+  state.step.textContent = state.showElapsed
+    ? `${state.index + 1}/${state.steps.length} · ${state.elapsedSeconds}초`
+    : `${state.index + 1}/${state.steps.length}`;
   state.element.dataset.processStep = String(state.index + 1);
   state.element.style.setProperty("--process-progress", `${((state.index + 1) / state.steps.length) * 100}%`);
 }
@@ -59,7 +61,21 @@ export function startProcessStatus(element, steps, options = {}) {
   element.setAttribute("aria-atomic", "true");
   element.setAttribute("aria-busy", "true");
 
-  const state = { token, element, steps: messages, spinner, copy, step, index: 0, timer: null, clock };
+  const interval = Math.max(900, Number(options.interval) || 1800);
+  const state = {
+    token,
+    element,
+    steps: messages,
+    spinner,
+    copy,
+    step,
+    index: 0,
+    timer: null,
+    clock,
+    interval,
+    showElapsed: Boolean(options.showElapsed),
+    elapsedSeconds: 0
+  };
   activeProcesses.set(element, state);
   renderProcessStep(state, 0);
 
@@ -68,12 +84,23 @@ export function startProcessStatus(element, steps, options = {}) {
     state.timer = clock.setInterval(() => {
       const current = activeProcesses.get(element);
       if (current?.token !== token) return;
+      if (current.showElapsed) current.elapsedSeconds += 1;
+      const shouldAdvance = current.index < current.steps.length - 1
+        && (!current.showElapsed || current.elapsedSeconds * 1000 >= (current.index + 1) * current.interval);
+      if (shouldAdvance) {
+        renderProcessStep(current, current.index + 1);
+        return;
+      }
+      if (current.showElapsed) {
+        renderProcessStep(current, current.index);
+        return;
+      }
       if (current.index >= current.steps.length - 1) {
         clearProcessTimer(current);
         return;
       }
       renderProcessStep(current, current.index + 1);
-    }, Math.max(900, Number(options.interval) || 1800));
+    }, state.showElapsed ? 1000 : interval);
   }
 
   return token;

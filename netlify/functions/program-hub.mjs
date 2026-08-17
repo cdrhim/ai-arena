@@ -1,4 +1,4 @@
-import { loadProgramHub, sectorSummary } from "../lib/program-hub.mjs";
+import { loadProgramHub, loadProgramHubBootstrap, sectorSummary } from "../lib/program-hub.mjs";
 import { buildProgramActionSnapshot, createProgramActionEvent } from "../lib/program-actions.mjs";
 import { appendProgramActionEvent, loadProgramActionEvents } from "../lib/program-actions-store.mjs";
 import { collaborationFitMetrics, collaborationFitNotApplicable } from "../lib/collaboration-fit.mjs";
@@ -11,16 +11,18 @@ import { recordScArenaActivitySafely } from "../lib/sc-arena-activity.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 import { loadWeeklyFeaturedSnapshotSafely } from "../lib/weekly-featured-store.mjs";
 
-export default async function programHub(req) {
+async function programHub(req) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (!["GET", "POST"].includes(req.method)) return json({ error: "Method not allowed" }, 405);
 
   try {
     const auth = await verifyArenaRequest(req);
     if (!auth.ok) return json({ error: auth.error }, auth.status);
-    const [programHub, weeklyFeatured] = await Promise.all([
-      loadProgramHub(auth.viewer),
-      loadWeeklyFeaturedSnapshotSafely()
+    const bootstrap = req.method === "GET" && new URL(req.url).searchParams.get("bootstrap") === "1";
+    const [programHub, weeklyFeatured, eventsBefore] = await Promise.all([
+      bootstrap ? loadProgramHubBootstrap(auth.viewer) : loadProgramHub(auth.viewer),
+      bootstrap ? Promise.resolve({ available: false }) : loadWeeklyFeaturedSnapshotSafely(),
+      loadProgramActionEvents()
     ]);
     const loadedHub = {
       ...programHub,
@@ -50,8 +52,8 @@ export default async function programHub(req) {
     const baseHub = ["b2b_partner", "human_validator"].includes(role)
       ? externalViewerShell(loadedHub, partnerProfile)
       : loadedHub;
-    const eventsBefore = await loadProgramActionEvents();
     const current = buildProgramActionSnapshot(baseHub, eventsBefore, baseHub.viewer);
+    if (bootstrap) return json({ ...current, bootstrap: true });
     if (req.method === "GET") return json(current);
 
     const body = await readJson(req);
@@ -73,6 +75,8 @@ export default async function programHub(req) {
     return json({ error: error.message }, error.status || 400);
   }
 }
+
+export default withScArenaDevelopmentLogging("program-hub", programHub);
 
 function externalViewerShell(hub, partnerProfile = null) {
   const teams = Array.isArray(hub.partnerDirectory) ? hub.partnerDirectory : [];
@@ -149,3 +153,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

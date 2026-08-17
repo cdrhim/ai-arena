@@ -53,6 +53,18 @@ test("Community thread cards open details and comments can target a thread or pa
   assert.match(js, /comment\.parentCommentId/);
 });
 
+test("Community owners can edit their own posts and comments inline", () => {
+  assert.match(js, /data-community-edit-thread/);
+  assert.match(js, /data-community-edit-comment/);
+  assert.match(js, /action:\s*["']updateOwnForumThread["']/);
+  assert.match(js, /action:\s*["']updateOwnForumComment["']/);
+  assert.match(js, /thread\.canEdit/);
+  assert.match(js, /comment\.canEdit/);
+  assert.match(js, /수정됨/);
+  assert.match(css, /\.community-inline-edit\b/);
+  assert.match(css, /\.community-content-edit\b/);
+});
+
 test("Comment submission uses the shared progress treatment and keeps busy state accessible", () => {
   assert.match(js, /startProcessStatus\(\s*els\.(?:commentStatus|communityCommentStatus)/s);
   assert.match(js, /finishProcessStatus\(\s*els\.(?:commentStatus|communityCommentStatus)/s);

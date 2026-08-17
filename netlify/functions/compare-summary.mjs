@@ -8,7 +8,7 @@ import { loadArenaSubmissions } from "../lib/supabase-submissions-store.mjs";
 
 const COMPARISON_ROLES = new Set(["member", "b2b_partner", "human_validator", "sparklabs", "admin"]);
 
-export default async function compareSummary(req, options = {}) {
+async function compareSummary(req, options = {}) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (req.method !== "POST") return json({ error: "지원하지 않는 요청 방식입니다." }, 405);
 
@@ -51,6 +51,8 @@ export default async function compareSummary(req, options = {}) {
     return json({ error: status === 400 ? "비교할 기업을 두 곳 이상 선택해 주세요." : "기업 비교 요약을 생성하지 못했습니다." }, status);
   }
 }
+
+export default withScArenaDevelopmentLogging("compare-summary", compareSummary);
 
 async function comparisonViewer(viewer, resolveViewer, env, fetchImpl) {
   if (viewer?.role !== "public") return viewer;
@@ -131,3 +133,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

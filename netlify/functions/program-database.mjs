@@ -1,7 +1,7 @@
 import { loadProgramDatabaseSchema, readProgramDatabaseTable, assertProgramDatabaseAccess } from "../lib/program-database.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
-export default async function programDatabase(req) {
+async function programDatabase(req) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (req.method !== "GET") return json({ error: "Method not allowed" }, 405);
 
@@ -38,6 +38,8 @@ export default async function programDatabase(req) {
   }
 }
 
+export default withScArenaDevelopmentLogging("program-database", programDatabase);
+
 function json(payload, status = 200) {
   return corsResponse(JSON.stringify(payload), status, {
     "content-type": "application/json; charset=utf-8",
@@ -56,3 +58,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

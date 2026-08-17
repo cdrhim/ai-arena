@@ -27,7 +27,7 @@ export async function polishFeaturedKeywords(input = {}, options = {}) {
     });
     return { items: validateGeneratedItems(generated?.items, fallback), source: "spark_ai", model: null };
   } catch (error) {
-    console.warn("[featured-keywords] Spark AI provider request failed", {
+    console.warn("[featured-keywords] Clawee provider request failed", {
       model,
       message: bounded(error?.message || "Unknown AI provider error", 220)
     });
@@ -124,7 +124,7 @@ function validateGeneratedItems(items, fallbackItems) {
 
 function safeDisplayText(value) {
   const providerName = ["g", "e", "m", "i", "n", "i"].join("");
-  return String(value || "").replace(new RegExp(providerName, "giu"), "Spark AI");
+  return String(value || "").replace(new RegExp(providerName, "giu"), "Clawee 클로이");
 }
 
 function plain(value, maxLength) {

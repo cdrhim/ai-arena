@@ -1,4 +1,9 @@
 import { createHash } from "node:crypto";
+import {
+  latestTeamCardVisibilityByTeam,
+  normalizeTeamCardVisibility,
+  projectTeamCardVisibility
+} from "./team-card-visibility.mjs";
 
 const BENEFIT_APPLICATION_STATUSES = new Set([
   "interest",
@@ -28,6 +33,7 @@ export function buildProgramActionSnapshot(hub, events = [], viewer = hub?.viewe
   for (const event of [...events].sort(sortOldestEvent)) {
     applyProgramActionEvent({ applications, registrations, reports, collaborationReviews, collaborationAuditLogs, configs }, event);
   }
+  const projectedHub = projectTeamCardVisibility(hub, latestTeamCardVisibilityByTeam(events), viewer);
 
   const visibleApplications = staff
     ? applications
@@ -100,13 +106,14 @@ export function buildProgramActionSnapshot(hub, events = [], viewer = hub?.viewe
     }));
 
   return {
-    ...hub,
+    ...projectedHub,
     permissions: {
       ...(hub?.permissions || {}),
       canApplyBenefits: Boolean(hub?.viewerTeam && viewer?.role === "member"),
       canRegisterEvents: Boolean(hub?.viewerTeam && viewer?.role === "member"),
       canSubmitWeeklyReport: Boolean(hub?.viewerTeam && viewer?.role === "member"),
       canRequestCollaborationReview: Boolean(hub?.viewerTeam && viewer?.role === "member"),
+      canEditTeamCardVisibility: Boolean(projectedHub?.permissions?.canEditTeamCardVisibility),
       canManageProgramActions: staff
     },
     benefits,
@@ -132,6 +139,22 @@ export function createProgramActionEvent(action, payload, hub, viewer, now = new
   assertPlainObject(payload, "payload");
   const staff = Boolean(viewer?.canScore);
   const team = hub?.viewerTeam;
+
+  if (action === "updateTeamCardVisibility") {
+    requireMemberTeam(viewer, team);
+    const fields = normalizeTeamCardVisibility(payload.fields);
+    return {
+      id: eventId("team_card_visibility", `${team.id}:${viewer.id || viewer.email}`, now),
+      type: "team_card_visibility_updated",
+      visibility: {
+        teamId: String(team.id),
+        fields,
+        updatedByUserId: viewer.id || null,
+        updatedAt: now
+      },
+      createdAt: now
+    };
+  }
 
   if (action === "createCollaborationReview") {
     requireMemberTeam(viewer, team);

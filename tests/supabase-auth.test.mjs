@@ -20,6 +20,7 @@ test("arena auth config reads Supabase and SparkLabs role settings", () => {
   assert.equal(config.supabaseUrl, "https://example.supabase.co");
   assert.deepEqual(config.adminDomains, ["sparklabs.co.kr", "example.com"]);
   assert.deepEqual(config.adminEmails, ["admin@sparklabs.co.kr"]);
+  assert.equal(config.googleAdminLoginEnabled, false);
   assert.equal(config.features.bounties, false);
 });
 
@@ -32,7 +33,18 @@ test("public arena auth config exposes only client-safe settings", () => {
 
   assert.equal(config.authConfigured, true);
   assert.equal(config.supabaseAnonKey, "anon");
+  assert.equal(config.googleAdminLoginEnabled, false);
   assert.equal(Object.hasOwn(config, "adminEmails"), false);
+});
+
+test("Google admin login is exposed only through its explicit public feature flag", () => {
+  const config = publicArenaAuthConfig({
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_ANON_KEY: "anon",
+    SPARKLABS_ARENA_GOOGLE_ADMIN_LOGIN_ENABLED: "true"
+  });
+
+  assert.equal(config.googleAdminLoginEnabled, true);
 });
 
 test("SparkLabs users can score and partner users cannot", () => {

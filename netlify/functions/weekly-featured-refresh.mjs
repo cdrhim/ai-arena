@@ -1,5 +1,6 @@
 import { buildWeeklyFeaturedSnapshot, loadWeeklyFeaturedSource } from "../lib/weekly-featured-companies.mjs";
 import { publishWeeklyFeaturedSnapshot } from "../lib/weekly-featured-store.mjs";
+import { recordScArenaDevelopmentLogSafely } from "../lib/sc-arena-operational-logs.mjs";
 
 export default async function weeklyFeaturedRefresh(_req, _context, options = {}) {
   const env = options.env || process.env;
@@ -21,6 +22,12 @@ export default async function weeklyFeaturedRefresh(_req, _context, options = {}
     return Response.json({ ok: true, cycleKey: snapshot.cycleKey, itemCount: snapshot.items.length });
   } catch (error) {
     console.error("[weekly-featured] refresh failed", { message: error?.message || "unknown" });
+    await recordScArenaDevelopmentLogSafely({
+      source: "weekly-featured-refresh",
+      error,
+      req: _req,
+      responseStatus: Number(error?.status) || 500
+    }, env, fetchImpl);
     return Response.json({ error: "Weekly spotlight refresh failed." }, { status: error?.status || 500 });
   }
 }

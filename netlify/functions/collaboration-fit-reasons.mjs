@@ -11,7 +11,7 @@ import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
 const SUPPORTED_ROLES = new Set(["member", "b2b_partner"]);
 
-export default async function collaborationFitReasons(req, options = {}) {
+async function collaborationFitReasons(req, options = {}) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (req.method !== "POST") return json({ error: "지원하지 않는 요청 방식입니다." }, 405);
 
@@ -49,6 +49,8 @@ export default async function collaborationFitReasons(req, options = {}) {
     }, status);
   }
 }
+
+export default withScArenaDevelopmentLogging("collaboration-fit-reasons", collaborationFitReasons);
 
 export async function trustedFitContext(viewer = {}, requestedIds = [], options = {}) {
   const env = options.env || process.env;
@@ -114,3 +116,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

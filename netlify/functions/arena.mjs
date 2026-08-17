@@ -7,7 +7,7 @@ import { buildCompetitionSnapshot, createCompetitionEvent, isCompetitionAction }
 import { recordScArenaActivitySafely } from "../lib/sc-arena-activity.mjs";
 import { authorizeArenaAction, verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
-export default async function arena(req) {
+async function arena(req) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (!["GET", "POST"].includes(req.method)) return json({ error: "Method not allowed" }, 405);
 
@@ -86,7 +86,38 @@ export default async function arena(req) {
       context: { snapshot: currentSnapshot }
     });
     const submissions = await loadArenaSubmissions();
-    const competitionEvents = await loadCompetitionEvents();
+    let competitionEvents = await loadCompetitionEvents();
+    if (body.action === "updateBountyRequest" && auth.viewer?.canScore) {
+      const arenaSnapshot = buildArenaSnapshot(events, new Date().toISOString(), submissions);
+      const brief = (arenaSnapshot.bountyRequests || []).find((item) => item.id === event.update?.requestId);
+      if (brief) {
+        const competitionSnapshot = buildCompetitionSnapshot(competitionEvents, auth.viewer, new Date().toISOString(), {
+          bountyRequests: arenaSnapshot.bountyRequests || []
+        });
+        const existingChallenge = (competitionSnapshot.challenges || []).find(
+          (challenge) => challenge.sponsorBriefId === brief.id
+        );
+        const competitionEvent = createCompetitionEvent(
+          "saveCompetitionChallenge",
+          competitionChallengeFromBrief(brief, existingChallenge, event.createdAt),
+          auth.viewer,
+          competitionEvents,
+          event.createdAt,
+          { bountyRequests: arenaSnapshot.bountyRequests || [] }
+        );
+        competitionEvents = await appendCompetitionEvent(competitionEvent);
+        await recordScArenaActivitySafely({
+          sourceSystem: "competition",
+          event: competitionEvent,
+          viewer: auth.viewer,
+          context: {
+            competitionSnapshot: buildCompetitionSnapshot(competitionEvents, auth.viewer, new Date().toISOString(), {
+              bountyRequests: arenaSnapshot.bountyRequests || []
+            })
+          }
+        });
+      }
+    }
     const snapshot = snapshotForViewer(events, auth.viewer, submissions, competitionEvents);
     return json({
       ok: true,
@@ -97,6 +128,45 @@ export default async function arena(req) {
     return json({ error: error.message }, error.status || 400);
   }
 }
+
+export function competitionChallengeFromBrief(brief, existingChallenge, approvedAt) {
+  const approved = ["published", "evaluating", "pilot", "production"].includes(String(brief.status || ""));
+  const challengeStatus = ({
+    published: "open",
+    evaluating: "locked",
+    pilot: "ended",
+    production: "ended",
+    closed: "archived"
+  })[brief.status] || "draft";
+  const dataPolicy = [brief.dataPolicy, brief.dataAvailability, brief.constraints].filter(Boolean).join("\n\n");
+  const opportunity = brief.opportunity || [brief.pilotBudget, brief.budget].filter(Boolean).join(" · ");
+  return {
+    id: existingChallenge?.id,
+    title: brief.problemTitle,
+    sponsor: brief.organization,
+    shortDescription: brief.problem,
+    longDescription: [brief.problem, brief.currentWorkflow].filter(Boolean).join("\n\n"),
+    opportunity,
+    sponsorBriefId: brief.id,
+    releaseApprovedAt: approved ? existingChallenge?.releaseApprovedAt || approvedAt : existingChallenge?.releaseApprovedAt,
+    evaluationCriteria: brief.evaluationCriteria || [],
+    dataPolicy,
+    status: challengeStatus,
+    visibility: brief.visibility === "public" ? "public" : brief.visibility === "invite_only" ? "invite_only" : "private",
+    challengeType: brief.challengeType || "product_benchmark",
+    evaluationMode: brief.evaluationMode || "hybrid",
+    metricKey: existingChallenge?.metricKey || "pass_rate",
+    metricDisplayName: existingChallenge?.metricDisplayName || "Task Pass Rate",
+    higherIsBetter: existingChallenge?.higherIsBetter !== false,
+    submissionLimitPerDay: existingChallenge?.submissionLimitPerDay || 3,
+    maxSelectedSubmissions: existingChallenge?.maxSelectedSubmissions || 1,
+    publicSplitPercentage: existingChallenge?.publicSplitPercentage || 40,
+    endsAt: brief.deadline || existingChallenge?.endsAt || null,
+    rules: brief.rules || brief.constraints || "재현 가능한 데모 또는 제품 URL과 검증 방법을 제출해야 합니다."
+  };
+}
+
+export default withScArenaDevelopmentLogging("arena", arena);
 
 function arenaAvailableToViewer(viewer, env = process.env) {
   if (viewer?.canScore) return true;
@@ -276,3 +346,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";

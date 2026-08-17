@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { personalizedCommunityPrompts } from "../public/arena/community-prompts.js";
 
-test("창업팀 프로필로 프리 OT의 회계·마케팅·비개발 위탁 질문을 만든다", () => {
+test("창업팀 프로필로 회계·마케팅·비개발 위탁 작성 질문을 만든다", () => {
   const prompts = personalizedCommunityPrompts({
     hub: {
       viewer: { role: "member" },
@@ -23,7 +23,8 @@ test("창업팀 프로필로 프리 OT의 회계·마케팅·비개발 위탁 �
   assert.match(prompts[1].template, /SaaS 고객/);
   assert.match(prompts[2].label, /비개발 업무/);
   assert.match(prompts[2].template, /콘텐츠·B2B 세일즈 운영·고객지원·채용/);
-  assert.ok(prompts.every((item) => item.origin === "PRE-OT 공통 수요 · 운영진 질문"));
+  assert.ok(prompts.every((item) => item.origin === "작성 힌트 · 왼쪽 초안에 적용"));
+  assert.ok(prompts.every((item) => !/PRE-OT|프리 OT/.test(`${item.origin} ${item.guide}`)));
   assert.ok(prompts.every((item) => item.template.split("\n").length >= 7));
 });
 
@@ -66,19 +67,29 @@ test("운영진에는 기업 비공개 정보를 요구하지 않는 운영 가�
 test("Community UI는 맞춤 가이드 영역과 동적 프롬프트 목록을 연결한다", () => {
   const html = fs.readFileSync(new URL("../public/arena/index.html", import.meta.url), "utf8");
   const js = fs.readFileSync(new URL("../public/arena/community.js", import.meta.url), "utf8");
+  const promptSource = fs.readFileSync(new URL("../public/arena/community-prompts.js", import.meta.url), "utf8");
+  const tutorial = fs.readFileSync(new URL("../public/arena/arena-guide-tutorial.js", import.meta.url), "utf8");
+  const css = fs.readFileSync(new URL("../public/arena/arena.css", import.meta.url), "utf8");
   assert.match(html, /id="communityPromptList"/);
   assert.match(html, /id="communityPromptGuide"/);
-  assert.match(html, /id="communityPromptKicker"[^>]*>COMMUNITY STARTERS/);
-  assert.match(html, /id="communityPromptTitle"[^>]*>대화를 시작할 질문/);
-  assert.match(html, /로그인한 프로필을 확인해 맞춤 작성 가이드를 준비합니다\. 실제 게시물이 아닙니다/);
-  assert.match(html, /PRE-OT 공통 수요 · 운영진 질문/);
+  assert.match(html, /id="communityPromptKicker"[^>]*>DRAFT STARTERS/);
+  assert.match(html, /id="communityPromptTitle"[^>]*>막힐 때 꺼내 쓰는 질문/);
+  assert.match(html, /질문을 누르면 왼쪽 내용 칸에 맞춤 초안이 들어갑니다/);
+  assert.match(html, /작성 힌트 · 왼쪽 초안에 적용[\s\S]*?<i aria-hidden="true">←<\/i>/);
   assert.match(js, /communityPromptProfile\(context\)/);
   assert.match(js, /personalizedCommunityPrompts\(context\)/);
   assert.match(js, /PARTNER CONVERSATION STARTERS/);
   assert.match(js, /협업 수요를 구체화할 질문/);
   assert.match(js, /COMMUNITY OPERATIONS/);
   assert.match(js, /운영진이 대화를 여는 질문/);
-  assert.match(js, /PRE-OT NETWORKING NEEDS/);
-  assert.match(js, /아직 게시된 글이 아닙니다/);
+  assert.match(js, /DRAFT STARTERS/);
+  assert.match(js, /질문을 왼쪽 내용 칸에 적용/);
+  assert.match(js, /classList\.add\("is-transferring"\)/);
   assert.match(js, /scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/);
+  assert.doesNotMatch(`${html}\n${js}\n${promptSource}\n${tutorial}`, /PRE-OT|프리 OT/);
+  assert.match(tutorial, /질문 옆의 왼쪽 화살표를 누르면 현재 팀에 맞춘 작성 틀이 본문에 들어갑니다/);
+  assert.match(css, /\.conversation-prompts button::before[\s\S]*?right: 100%;[\s\S]*?width: 40px/);
+  assert.match(css, /\.conversation-prompts button i\s*\{[\s\S]*?left: -64px;[\s\S]*?border-radius: 50%/);
+  assert.match(css, /@media \(max-width: 1180px\)[\s\S]*?\.conversation-prompts button::before[\s\S]*?display: none/);
+  assert.match(css, /@media \(max-width: 1180px\)[\s\S]*?\.conversation-prompts button\.is-transferring i[\s\S]*?animation: none/);
 });

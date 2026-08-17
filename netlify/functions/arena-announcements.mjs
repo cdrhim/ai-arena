@@ -3,7 +3,7 @@ import { buildForumSnapshot } from "../lib/forum-core.mjs";
 import { resolveProgramParticipantViewer } from "../lib/program-hub.mjs";
 import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
-export default async function arenaAnnouncements(req, options = {}) {
+async function arenaAnnouncements(req, options = {}) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
   if (req.method !== "GET") return json({ error: "지원하지 않는 요청 방식입니다." }, 405);
 
@@ -29,6 +29,8 @@ export default async function arenaAnnouncements(req, options = {}) {
     return json({ error: error?.message || "AI Arena 공지를 불러오지 못했습니다." }, Number(error?.status) || 500);
   }
 }
+
+export default withScArenaDevelopmentLogging("arena-announcements", arenaAnnouncements);
 
 export function publicAnnouncements(threads = [], limit = 5) {
   const boundedLimit = Math.max(1, Math.min(10, Number(limit || 5)));
@@ -77,3 +79,4 @@ function corsResponse(body, status, headers = {}) {
     }
   });
 }
+import { withScArenaDevelopmentLogging } from "../lib/sc-arena-operational-logs.mjs";
