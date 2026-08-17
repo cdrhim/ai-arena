@@ -12,3 +12,7 @@ outputs/
 deliverables/
 netlify/data/sparkclaw-applicants/*.csv
 netlify/data/sparkclaw-applicants/*.xlsx
+
+.vercel/
+.env.local
+.env.*.local
