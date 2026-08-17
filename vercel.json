@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm test",
+  "buildCommand": "node --test tests/vercel-deployment.test.mjs",
   "outputDirectory": "public",
   "rewrites": [
     {

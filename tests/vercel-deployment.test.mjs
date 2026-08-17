@@ -5,7 +5,7 @@ import test from "node:test";
 const config = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8"));
 
 test("Vercel publishes the tested static site and preserves the Arena SPA routes", () => {
-  assert.equal(config.buildCommand, "pnpm test");
+  assert.equal(config.buildCommand, "node --test tests/vercel-deployment.test.mjs");
   assert.equal(config.outputDirectory, "public");
   assert.deepEqual(
     config.rewrites.filter((rule) => rule.source.startsWith("/arena")),
