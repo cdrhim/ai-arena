@@ -1,4 +1,4 @@
-const TABLE_NAME = "arena_submissions";
+export const SUPABASE_SUBMISSIONS_TABLE = "sc_arena_submissions";
 
 export function supabaseSubmissionConfig(env = process.env) {
   const supabaseUrl = String(env.SUPABASE_URL || env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
@@ -6,10 +6,8 @@ export function supabaseSubmissionConfig(env = process.env) {
     env.SUPABASE_SECRET_KEY ||
       env.SUPABASE_SERVICE_ROLE_KEY ||
       env.SUPABASE_SERVICE_KEY ||
-      env.SUPABASE_ANON_KEY ||
-      env.VITE_SUPABASE_ANON_KEY ||
       ""
-  );
+  ).trim();
   return {
     supabaseUrl,
     secretKey,
@@ -17,11 +15,11 @@ export function supabaseSubmissionConfig(env = process.env) {
   };
 }
 
-export async function loadArenaSubmissions(env = process.env) {
+export async function loadArenaSubmissions(env = process.env, fetchImpl = fetch) {
   const config = supabaseSubmissionConfig(env);
   if (!config.configured) return [];
 
-  const response = await fetch(`${config.supabaseUrl}/rest/v1/${TABLE_NAME}?select=id,payload,updated_at&order=updated_at.desc`, {
+  const response = await fetchImpl(`${config.supabaseUrl}/rest/v1/${SUPABASE_SUBMISSIONS_TABLE}?select=id,payload,updated_at&order=updated_at.desc`, {
     headers: restHeaders(config)
   });
 
@@ -33,14 +31,14 @@ export async function loadArenaSubmissions(env = process.env) {
   return Array.isArray(payload) ? payload.map((row) => row.payload).filter(Boolean) : [];
 }
 
-export async function saveArenaSubmission(submission, env = process.env) {
+export async function saveArenaSubmission(submission, env = process.env, fetchImpl = fetch) {
   const config = supabaseSubmissionConfig(env);
   if (!config.configured) {
     throw new Error("Supabase submission storage is not configured. Set SUPABASE_URL and SUPABASE_SECRET_KEY.");
   }
 
   const row = submissionRow(submission);
-  const response = await fetch(`${config.supabaseUrl}/rest/v1/${TABLE_NAME}?on_conflict=id`, {
+  const response = await fetchImpl(`${config.supabaseUrl}/rest/v1/${SUPABASE_SUBMISSIONS_TABLE}?on_conflict=id`, {
     method: "POST",
     headers: {
       ...restHeaders(config),
@@ -76,10 +74,11 @@ export function submissionRow(submission) {
 }
 
 function restHeaders(config) {
-  return {
-    apikey: config.secretKey,
-    Authorization: `Bearer ${config.secretKey}`
-  };
+  const headers = { apikey: config.secretKey };
+  if (!config.secretKey.startsWith("sb_secret_")) {
+    headers.Authorization = `Bearer ${config.secretKey}`;
+  }
+  return headers;
 }
 
 async function safeJson(response) {

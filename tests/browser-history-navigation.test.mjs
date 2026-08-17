@@ -45,6 +45,6 @@ test("community threads and collaboration reviews also return through browser hi
 });
 
 test("deployed browser assets keep the shared current cache version", () => {
-  const assetReferences = htmlSource.match(/\/arena\/(?:arena-activity-client|arena|market|community)\.js\?v=ai-arena-20260817-partner-events-perks-v112/g) || [];
+  const assetReferences = htmlSource.match(/\/arena\/(?:arena-activity-client|arena|market|community)\.js\?v=ai-arena-20260817-mobile-brand-v114/g) || [];
   assert.equal(assetReferences.length, 4);
 });

@@ -16,7 +16,7 @@ test("ordinary members cannot call privileged Arena API actions directly", async
     if (String(url).includes("/auth/v1/user")) {
       return Response.json({ id: "ordinary_member", email: "ordinary.member@example.com", app_metadata: { role: "member" } });
     }
-    if (String(url).includes("/rest/v1/arena_submissions")) {
+    if (String(url).includes("/rest/v1/sc_arena_submissions")) {
       return Response.json([]);
     }
     return originalFetch(url);
@@ -165,7 +165,7 @@ test("direct Arena API cannot bypass the staged Claw Member Bounty release gate"
     if (String(url).includes("/auth/v1/user")) {
       return Response.json({ id: "staged_member", email: "member@example.com", app_metadata: { role: "member" } });
     }
-    if (String(url).includes("/rest/v1/arena_submissions")) return Response.json([]);
+    if (String(url).includes("/rest/v1/sc_arena_submissions")) return Response.json([]);
     return originalFetch(url);
   };
 

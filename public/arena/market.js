@@ -4,7 +4,7 @@ import { companyIconMarkup } from "./company-icon.js";
 import { companyExternalLinkIcon, companyExternalLinks } from "./company-external-links.js";
 import { rankedTaskDetails, searchableTaskKeywords, taskKeywords, TASK_KEYWORD_PENDING } from "./task-keywords.js";
 
-const SESSION_KEY = "sparkclaw-program-hub-session-v1";
+const SESSION_KEY = "sparkclaw-program-hub-session-gfmummaahlrnmrgnirxu-v1";
 const COMPARE_KEY_PREFIX = "sparklabs-ai-arena-compare-v2";
 const LEGACY_COMPARE_KEY = "sparklabs-ai-arena-compare-v1";
 const PIPELINE_LABELS = {

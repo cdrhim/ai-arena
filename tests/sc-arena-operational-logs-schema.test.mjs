@@ -9,8 +9,8 @@ test("admin audits and development diagnostics use separate protected tables", a
   assert.match(sql, /create table if not exists public\.sc_arena_admin_audit_logs/);
   assert.match(sql, /create table if not exists public\.sc_arena_development_logs/);
   assert.equal((sql.match(/force row level security/g) || []).length, 2);
-  assert.match(sql, /revoke all on public\.sc_arena_admin_audit_logs from public, anon, authenticated/);
-  assert.match(sql, /revoke all on public\.sc_arena_development_logs from public, anon, authenticated/);
+  assert.match(sql, /revoke all on public\.sc_arena_admin_audit_logs from public, anon, authenticated, service_role/);
+  assert.match(sql, /revoke all on public\.sc_arena_development_logs from public, anon, authenticated, service_role/);
 });
 
 test("every staff activity is copied transactionally and existing history is backfilled", async () => {

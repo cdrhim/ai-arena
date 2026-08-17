@@ -1,22 +1,24 @@
 import { normalizeStoredKeywords } from "./team-keywords.mjs";
 
-const TABLE = "arena_team_keywords";
+export const TEAM_KEYWORDS_TABLE = "sc_arena_team_keywords";
 
 export function teamKeywordStoreConfig(env = process.env) {
   const supabaseUrl = String(env.SUPABASE_URL || env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
-  const key = String(env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || "").trim();
-  return { supabaseUrl, key, configured: Boolean(supabaseUrl && key) };
+  const secretKey = String(
+    env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY || ""
+  ).trim();
+  return { supabaseUrl, secretKey, configured: Boolean(supabaseUrl && secretKey) };
 }
 
 export async function loadTeamKeywordRows(env = process.env, fetchImpl = fetch) {
   const config = teamKeywordStoreConfig(env);
   if (!config.configured) return [];
-  const url = new URL(`${config.supabaseUrl}/rest/v1/${TABLE}`);
+  const url = new URL(`${config.supabaseUrl}/rest/v1/${TEAM_KEYWORDS_TABLE}`);
   url.searchParams.set("select", "team_id,company_name,service_name,keywords,keyword_version,updated_at");
   url.searchParams.set("limit", "1000");
   const response = await fetchImpl(url, {
     headers: {
-      apikey: config.key,
+      ...serviceHeaders(config.secretKey),
       Accept: "application/json",
       "user-agent": "sparkclaw-team-keyword-reader"
     }
@@ -47,4 +49,12 @@ async function safeJson(response) {
 
 function text(value, maxLength) {
   return String(value ?? "").trim().slice(0, maxLength);
+}
+
+function serviceHeaders(secretKey) {
+  const headers = { apikey: secretKey };
+  if (!secretKey.startsWith("sb_secret_")) {
+    headers.Authorization = `Bearer ${secretKey}`;
+  }
+  return headers;
 }

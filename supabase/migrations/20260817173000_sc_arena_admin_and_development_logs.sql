@@ -73,8 +73,8 @@ alter table public.sc_arena_development_logs enable row level security;
 alter table public.sc_arena_admin_audit_logs force row level security;
 alter table public.sc_arena_development_logs force row level security;
 
-revoke all on public.sc_arena_admin_audit_logs from public, anon, authenticated;
-revoke all on public.sc_arena_development_logs from public, anon, authenticated;
+revoke all on public.sc_arena_admin_audit_logs from public, anon, authenticated, service_role;
+revoke all on public.sc_arena_development_logs from public, anon, authenticated, service_role;
 
 create or replace function sc_arena_private.capture_staff_activity_audit()
 returns trigger

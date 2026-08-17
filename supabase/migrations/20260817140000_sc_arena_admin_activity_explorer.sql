@@ -13,7 +13,7 @@ set domain = excluded.domain,
     label = excluded.label,
     default_retention_days = excluded.default_retention_days;
 
-create index if not exists sc_arena_activity_actor_time_idx
+create index if not exists sc_arena_activity_workspace_actor_time_idx
   on public.sc_arena_activity_events (workspace_id, actor_user_id, occurred_at desc, id desc);
 
 create index if not exists sc_arena_activity_type_time_idx

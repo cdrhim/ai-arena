@@ -232,7 +232,7 @@ test("Youngone B2B login receives every eligible participant as a contact-safe b
         user_metadata: { role: "member", organization: "Spoofed" }
       });
     }
-    if (value.startsWith("https://auth.supabase.co") && value.includes("/rest/v1/arena_team_keywords")) {
+    if (value.startsWith("https://auth.supabase.co") && value.includes("/rest/v1/sc_arena_team_keywords")) {
       return Response.json([]);
     }
     if (value.startsWith(PROGRAM_ENV.SPARKCLAW_PROGRAM_SUPABASE_URL)) {

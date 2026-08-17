@@ -1,4 +1,4 @@
-const expectedArenaRef = "ilsoatwwizyahhlzapie";
+const expectedArenaRef = "gfmummaahlrnmrgnirxu";
 
 const arenaUrl = requiredUrl("ARENA_SUPABASE_URL");
 const arenaSecret = required("ARENA_SUPABASE_SECRET");

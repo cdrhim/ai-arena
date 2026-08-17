@@ -8,7 +8,11 @@ test("admin activity migration adds login and page events with lookup indexes", 
   const sql = await readFile(migrationUrl, "utf8");
   assert.match(sql, /'system\.session_started'/);
   assert.match(sql, /'system\.page_viewed'/);
-  assert.match(sql, /sc_arena_activity_actor_time_idx/);
+  assert.match(
+    sql,
+    /create index if not exists sc_arena_activity_workspace_actor_time_idx\s+on public\.sc_arena_activity_events \(workspace_id, actor_user_id, occurred_at desc, id desc\)/
+  );
+  assert.doesNotMatch(sql, /create index if not exists sc_arena_activity_actor_time_idx/);
   assert.match(sql, /sc_arena_activity_type_time_idx/);
 });
 test("cross-user activity RPCs are fail-closed to authenticated workspace staff", async () => {

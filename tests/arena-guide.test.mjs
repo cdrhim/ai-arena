@@ -99,7 +99,8 @@ test("클로이 UI는 첨부 캐릭터, 친절한 문구, 접근 가능한 대�
   assert.match(css, /\.arena-guide-launcher:hover \.arena-guide-avatar > img/);
   assert.match(css, /body \.arena-guide\s*\{[\s\S]*?top:\s*7px;[\s\S]*?left:\s*max\(190px/);
   assert.match(css, /body \.arena-guide-panel\s*\{[\s\S]*?transform-origin:\s*top left;[\s\S]*?arena-guide-drop/);
-  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.app-header \.brand-copy[\s\S]*?display:\s*none[\s\S]*?body \.arena-guide[\s\S]*?left:\s*61px/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.app-header \.brand-copy[\s\S]*?display:\s*block[\s\S]*?body \.arena-guide[\s\S]*?left:\s*clamp\(158px, 44vw, 178px\)/);
+  assert.match(css, /body \.arena-guide-launcher > span:not\(\.arena-guide-avatar\)[\s\S]*?display:\s*none/);
   assert.match(css, /@media \(max-width: 760px\)[\s\S]*?\.arena-guide-panel/);
   assert.match(config, /from = "\/api\/arena-guide"/);
   assert.doesNotMatch(`${html}\n${client}`, /GEMINI_API_KEY|GOOGLE_API_KEY|x-goog-api-key|Gemini/);

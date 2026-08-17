@@ -19,8 +19,8 @@
   <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png?v=ai-arena-20260811">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=ai-arena-20260811">
   <title>SparkLabs AI Arena</title>
-  <link rel="stylesheet" href="/arena/arena.css?v=ai-arena-20260817-partner-events-perks-v112">
-  <link rel="stylesheet" href="/arena/market.css?v=ai-arena-20260817-partner-events-perks-v112">
+  <link rel="stylesheet" href="/arena/arena.css?v=ai-arena-20260817-mobile-brand-v114">
+  <link rel="stylesheet" href="/arena/market.css?v=ai-arena-20260817-mobile-brand-v114">
 </head>
 <body class="is-booting">
   <div id="bootScreen" class="boot-screen" aria-live="polite">
@@ -85,7 +85,7 @@
           <button class="nav-dropdown-link" data-nav-page="arena" data-nav-target="arenaStaffPanel" data-permission="canViewOperations" role="menuitem" type="button"><strong>Operations</strong><small>설계·평가·기회 전환 관리</small></button>
         </div>
       </div>
-      <div class="nav-menu" data-nav-menu>
+      <div class="nav-menu" data-nav-menu data-guide-chapter="events-perks">
         <button class="nav-link" data-page="calendar" data-nav-roles="b2b_partner,human_validator" type="button" aria-haspopup="true" aria-expanded="false">Events &amp; Perks</button>
         <div class="nav-dropdown" role="menu" aria-label="Events and Perks 하위 메뉴">
           <button class="nav-dropdown-link" data-nav-page="calendar" role="menuitem" type="button"><strong>Events</strong><small>8월 13일 OT 이후 공개 일정</small></button>
@@ -1602,7 +1602,7 @@
       </div>
       <button class="arena-guide-tutorial-start" data-guide-tutorial-start type="button">
         <span aria-hidden="true">◎</span>
-        <span><strong>AI Arena 처음이신가요?</strong><small>각 메뉴의 전체 화면부터 세부 기능까지 21단계로 둘러보세요.</small></span>
+        <span><strong>AI Arena 처음이신가요?</strong><small data-guide-tutorial-summary>내 역할에 필요한 핵심 기능을 9단계 이내로 안내합니다.</small></span>
         <b aria-hidden="true">→</b>
       </button>
       <div id="arenaGuideMessages" class="arena-guide-messages" role="log" aria-live="polite" aria-relevant="additions"></div>
@@ -1615,11 +1615,11 @@
       <p id="arenaGuideStatus" class="arena-guide-status" role="status" aria-live="polite" hidden></p>
       <section id="arenaGuideTutorial" class="arena-guide-tutorial" aria-labelledby="arenaGuideTutorialTitle" hidden>
         <header>
-          <div><span>QUICK START</span><h3 id="arenaGuideTutorialTitle">AI Arena 둘러보기</h3></div>
-          <strong data-guide-tutorial-progress>1 / 21</strong>
+          <div><span>QUICK START</span><h3 id="arenaGuideTutorialTitle" data-guide-tutorial-role-title>SparkClaw 멤버 빠른 시작</h3></div>
+          <strong data-guide-tutorial-progress>1 / 9</strong>
           <button type="button" data-guide-tutorial-close aria-label="튜토리얼 닫기">×</button>
         </header>
-        <nav data-guide-tutorial-nav aria-label="튜토리얼 21단계"></nav>
+        <nav data-guide-tutorial-nav aria-label="역할별 튜토리얼"></nav>
         <article>
           <div class="arena-guide-tutorial-index">
             <span data-guide-tutorial-number>01</span>
@@ -1637,9 +1637,9 @@
     </section>
   </aside>
 
-  <script type="module" src="/arena/arena-activity-client.js?v=ai-arena-20260817-partner-events-perks-v112"></script>
-  <script type="module" src="/arena/arena.js?v=ai-arena-20260817-partner-events-perks-v112"></script>
-  <script type="module" src="/arena/market.js?v=ai-arena-20260817-partner-events-perks-v112"></script>
-  <script type="module" src="/arena/community.js?v=ai-arena-20260817-partner-events-perks-v112"></script>
+  <script type="module" src="/arena/arena-activity-client.js?v=ai-arena-20260817-mobile-brand-v114"></script>
+  <script type="module" src="/arena/arena.js?v=ai-arena-20260817-mobile-brand-v114"></script>
+  <script type="module" src="/arena/market.js?v=ai-arena-20260817-mobile-brand-v114"></script>
+  <script type="module" src="/arena/community.js?v=ai-arena-20260817-mobile-brand-v114"></script>
 </body>
 </html>

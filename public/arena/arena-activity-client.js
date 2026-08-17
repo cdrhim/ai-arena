@@ -1,4 +1,4 @@
-const SESSION_KEY = "sparkclaw-program-hub-session-v1";
+const SESSION_KEY = "sparkclaw-program-hub-session-gfmummaahlrnmrgnirxu-v1";
 const AUTHENTICATED_ROLES = new Set(["admin", "sparklabs", "member", "b2b_partner", "human_validator"]);
 const TRACKABLE_PAGES = new Set([
   "overview",

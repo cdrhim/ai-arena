@@ -1,10 +1,10 @@
-export const ARENA_GUIDE_TUTORIAL_STEPS = Object.freeze([
+const ARENA_GUIDE_TUTORIAL_CATALOG = Object.freeze([
   Object.freeze({
     key: "discover-overview",
     number: "01",
     label: "DISCOVER",
     title: "먼저 Discover 전체 화면을 둘러보세요",
-    description: "최신 성과, 클로이 기업 탐색, 전체 참가기업, 협업 추천, Task Map과 혜택 제안이 한 화면에서 어떻게 이어지는지 먼저 보여드립니다. 다음 단계부터 각 기능을 하나씩 살펴봅니다.",
+    description: "최신 성과, 기업 탐색, 협업 추천과 다음 행동이 Discover에서 어떻게 이어지는지 확인합니다.",
     page: "overview",
     target: "#overviewPage",
     pageOverview: true,
@@ -27,7 +27,7 @@ export const ARENA_GUIDE_TUTORIAL_STEPS = Object.freeze([
     number: "03",
     label: "DISCOVER",
     title: "Clawee 클로이에게 필요한 기업을 자연어로 물어보세요",
-    description: "예: ‘제조 현장 비전 검사 PoC 경험이 있는 팀을 찾아줘’처럼 해결할 문제, 필요한 역량과 성공 기준을 구체적으로 입력하면 공개 프로필 근거로 후보를 정리합니다.",
+    description: "해결할 문제와 필요한 역량을 적으면 클로이가 공개 프로필 근거로 후보를 정리합니다.",
     page: "overview",
     target: "#agenticDiscoverySection",
     targetLabel: "여기에 해결할 문제와 필요한 역량을 입력하세요",
@@ -74,7 +74,7 @@ export const ARENA_GUIDE_TUTORIAL_STEPS = Object.freeze([
     number: "07",
     label: "DISCOVER",
     title: "우리 팀에 필요한 혜택을 알려주세요",
-    description: "필요한 솔루션 명, 세부 내용과 이유를 남기면 SparkLabs 운영진이 검토하고 혜택 파트너 발굴에 활용합니다.",
+    description: "필요한 혜택의 솔루션 명, 세부 내용과 이유를 남기면 운영진이 파트너 발굴에 활용합니다.",
     page: "overview",
     target: "#memberBenefitSurveyForm",
     targetLabel: "Claw Member 혜택 수요 입력",
@@ -85,7 +85,7 @@ export const ARENA_GUIDE_TUTORIAL_STEPS = Object.freeze([
     number: "08",
     label: "DISCOVER",
     title: "Company Directory에서 전체 참가기업을 둘러보세요",
-    description: "SparkLabs가 안전한 공개 필드를 확인한 참가기업을 회사명, 산업과 형태로 탐색합니다. 기업 카드를 열면 팀 경쟁력, 정량 근거와 해결 가능한 Task를 자세히 확인할 수 있습니다.",
+    description: "회사명과 산업으로 참가기업을 찾고, 카드를 열어 역량과 공개 근거를 확인합니다.",
     page: "teams",
     target: "#teamsPage",
     pageOverview: true,
@@ -97,7 +97,7 @@ export const ARENA_GUIDE_TUTORIAL_STEPS = Object.freeze([
     number: "09",
     label: "DISCOVER",
     title: "Task-driven Search에서 해결할 업무로 기업을 찾으세요",
-    description: "회사명을 몰라도 계약서 검토, 품질 검사, 고객 상담이나 수요 예측처럼 해결할 Task를 입력할 수 있습니다. 공개 프로필의 Task 근거와 기술·검증 정보를 기준으로 후보를 좁혀보세요.",
+    description: "회사명을 몰라도 해결할 업무를 입력해 공개 근거가 있는 후보를 좁힐 수 있습니다.",
     page: "discover",
     target: "#discoverPage",
     pageOverview: true,
@@ -109,7 +109,7 @@ export const ARENA_GUIDE_TUTORIAL_STEPS = Object.freeze([
     number: "10",
     label: "DISCOVER",
     title: "Compare에서 선택한 기업의 차이를 같은 기준으로 확인하세요",
-    description: "최대 3개 기업을 나란히 놓고 산업, 서비스, 해결 Task와 공개 근거를 비교합니다. 클로이 비교 분석을 실행하면 순위나 종합 점수 없이 기업별 핵심 차이를 정리합니다.",
+    description: "최대 3개 기업을 같은 기준으로 비교하고 각 기업의 강점과 공개 근거 차이를 확인합니다.",
     page: "compare",
     target: "#comparePage",
     pageOverview: true,
@@ -121,7 +121,7 @@ export const ARENA_GUIDE_TUTORIAL_STEPS = Object.freeze([
     number: "11",
     label: "COMMUNITY",
     title: "Community 전체 화면에서 대화의 흐름을 확인하세요",
-    description: "글 작성, 맞춤 추천 질문, 클로이 게시 설정, 채널과 Community Feed가 한 페이지에서 어떻게 연결되는지 먼저 보여드립니다. 다음 단계부터 작성과 참여 방법을 안내합니다.",
+    description: "질문과 경험을 공유하고, 다른 팀의 글에 댓글과 반응을 남기는 흐름을 확인합니다.",
     page: "community",
     target: "#communityPage",
     pageOverview: true,
@@ -182,7 +182,7 @@ export const ARENA_GUIDE_TUTORIAL_STEPS = Object.freeze([
     number: "16",
     label: "BOUNTY",
     title: "Bounty 전체 화면과 공개 준비 상태를 확인하세요",
-    description: "실제 기업 문제를 과제로 만들고 결과를 검증해 Pilot 기회로 연결하는 전체 구조입니다. 현재는 실제 Sponsor Brief 승인 전 준비 단계이며, 다음 단계에서 운영 흐름을 간단히 설명합니다.",
+    description: "승인된 기업 과제를 결과로 검증해 Pilot으로 연결합니다. 현재는 공개 준비 중입니다.",
     page: "arena",
     target: "#arenaPage",
     pageOverview: true,
@@ -206,7 +206,7 @@ export const ARENA_GUIDE_TUTORIAL_STEPS = Object.freeze([
     number: "18",
     label: "MY LOG",
     title: "My Log 전체 화면에서 내 활동 흐름을 확인하세요",
-    description: "매치 요청, Community 활동, Bounty 진행과 최신 로그가 한곳에 모입니다. 먼저 전체 구성을 보여드린 뒤 각 박스가 무엇을 기록하는지 차례대로 안내합니다.",
+    description: "매치 요청, Community 활동, Bounty 진행과 최신 기록을 내 계정 기준으로 확인합니다.",
     page: "workspace",
     target: "#workspacePage",
     pageOverview: true,
@@ -229,7 +229,7 @@ export const ARENA_GUIDE_TUTORIAL_STEPS = Object.freeze([
     number: "20",
     label: "MY LOG",
     title: "지금 할 일에서 다음 행동을 놓치지 마세요",
-    description: "답변을 기다리는 협업 요청, 이어갈 Community 대화, 확인할 Bounty 진행 상태처럼 지금 처리할 항목을 모아 보여줍니다. 각 항목을 누르면 관련 화면으로 바로 이동합니다.",
+    description: "답변을 기다리는 요청과 이어갈 대화 등 지금 처리할 항목에서 다음 화면으로 바로 이동합니다.",
     page: "workspace",
     target: "#workspaceActions",
     targetLabel: "내 다음 행동을 모은 Next Actions",
@@ -246,13 +246,165 @@ export const ARENA_GUIDE_TUTORIAL_STEPS = Object.freeze([
     fallbackTarget: "#myLogTimeline",
     targetLabel: "가장 최근 활동부터 보여주는 개인 기록",
     actionLabel: "Recent Activity 보기"
+  }),
+  Object.freeze({
+    key: "discover-advisors",
+    label: "DISCOVER",
+    title: "Global Advisors & Faculty를 확인하세요",
+    description: "글로벌 기술·산업·투자 리더의 전문 분야를 보고 필요한 관점을 빠르게 찾습니다.",
+    page: "advisors",
+    target: "#advisorsPage",
+    pageOverview: true,
+    targetLabel: "Global Advisors & Faculty",
+    actionLabel: "Advisors 보기"
+  }),
+  Object.freeze({
+    key: "admin-bounty-operations",
+    label: "BOUNTY",
+    title: "Bounty 운영 상태를 관리하세요",
+    description: "승인된 Brief의 설계, 평가와 Pilot 전환 상태를 운영 화면에서 확인합니다.",
+    page: "arena",
+    target: "#arenaStaffPanel",
+    fallbackTarget: "#arenaHowItWorks",
+    targetLabel: "SparkLabs Bounty 운영 화면",
+    actionLabel: "Bounty 운영 보기"
+  }),
+  Object.freeze({
+    key: "admin-discovery-intake",
+    label: "MY LOG",
+    title: "새 탐색 Brief를 놓치지 마세요",
+    description: "첫 화면에서 접수된 탐색 Brief와 확인할 다음 행동을 My Log에서 모니터링합니다.",
+    page: "workspace",
+    target: "#myLogBriefs",
+    fallbackTarget: "#workspaceActions",
+    targetLabel: "관리자 탐색 Brief 접수",
+    actionLabel: "탐색 Brief 보기"
+  }),
+  Object.freeze({
+    key: "admin-benefit-queue",
+    label: "MY LOG",
+    title: "멤버 혜택 수요를 확인하세요",
+    description: "Claw Member가 새로 요청한 혜택을 운영 Queue에서 확인하고 파트너 발굴에 활용합니다.",
+    page: "workspace",
+    target: "#staffMarketQueue",
+    fallbackTarget: "#workspaceActions",
+    targetLabel: "혜택·파트너십 Queue",
+    actionLabel: "혜택 Queue 보기"
+  }),
+  Object.freeze({
+    key: "admin-activity",
+    label: "MY LOG",
+    title: "전체 사용자 활동을 점검하세요",
+    description: "Activity Explorer에서 사용자, 영역, 행위와 기간별 운영 로그를 확인합니다.",
+    page: "workspace",
+    target: "#adminActivityExplorer",
+    targetLabel: "전체 사용자 Activity Explorer",
+    actionLabel: "Activity Explorer 보기"
+  }),
+  Object.freeze({
+    key: "partner-events-perks",
+    label: "EVENTS & PERKS",
+    title: "공개 일정과 파트너 혜택 사례를 확인하세요",
+    description: "8월 13일 OT 이후의 공개 일정과 다른 파트너사가 제공하는 Verified Perks를 확인합니다.",
+    page: "calendar",
+    target: "#calendarPage",
+    pageOverview: true,
+    targetLabel: "외부 파트너 Events & Perks",
+    actionLabel: "Events & Perks 보기"
+  }),
+  Object.freeze({
+    key: "partner-bounty-studio",
+    label: "BOUNTY",
+    title: "기업 문제를 Bounty Brief로 등록하세요",
+    description: "문제, 성공 기준, 평가 방식과 공개 범위를 한 번에 설정해 제출합니다.",
+    page: "partnerships",
+    target: "#bountyBriefPanel",
+    targetLabel: "파트너 Bounty Brief Studio",
+    actionLabel: "Bounty Brief 등록"
+  }),
+  Object.freeze({
+    key: "partner-bounty-pipeline",
+    label: "BOUNTY",
+    title: "Brief에서 Pilot까지 추적하세요",
+    description: "제출한 Brief의 검토, 공개, 평가와 Pilot 전환 상태를 한 흐름에서 확인합니다.",
+    page: "partnerships",
+    target: "#partnershipPipelinePanel",
+    targetLabel: "파트너 Bounty Pipeline",
+    actionLabel: "Bounty Pipeline 보기"
   })
 ]);
+
+const ARENA_GUIDE_TUTORIAL_KEYS_BY_ROLE = Object.freeze({
+  member: Object.freeze([
+    "discover-overview",
+    "discover-spark-ai",
+    "discover-company-directory",
+    "discover-advisors",
+    "discover-benefit",
+    "community-overview",
+    "bounty-overview",
+    "my-log-overview",
+    "my-log-actions"
+  ]),
+  staff: Object.freeze([
+    "discover-overview",
+    "discover-company-directory",
+    "discover-advisors",
+    "community-overview",
+    "admin-bounty-operations",
+    "admin-discovery-intake",
+    "admin-benefit-queue",
+    "admin-activity"
+  ]),
+  partner: Object.freeze([
+    "discover-overview",
+    "discover-company-directory",
+    "discover-task-driven-search",
+    "discover-compare",
+    "community-overview",
+    "partner-events-perks",
+    "partner-bounty-studio",
+    "partner-bounty-pipeline",
+    "my-log-overview"
+  ])
+});
+
+const ARENA_GUIDE_TUTORIAL_ROLE_COPY = Object.freeze({
+  member: Object.freeze({ label: "SparkClaw 멤버", title: "SparkClaw 멤버 빠른 시작" }),
+  staff: Object.freeze({ label: "SparkLabs 관리자", title: "SparkLabs 관리자 빠른 시작" }),
+  partner: Object.freeze({ label: "외부 파트너", title: "외부 파트너 빠른 시작" })
+});
+
+const ARENA_GUIDE_TUTORIAL_CATALOG_BY_KEY = new Map(ARENA_GUIDE_TUTORIAL_CATALOG.map((step) => [step.key, step]));
+
+export function normalizeArenaGuideTutorialRole(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (["sparklabs", "admin"].includes(normalized)) return "staff";
+  if (normalized === "b2b_partner") return "partner";
+  return "member";
+}
+
+export function getArenaGuideTutorialSteps(role) {
+  const normalizedRole = normalizeArenaGuideTutorialRole(role);
+  return Object.freeze(ARENA_GUIDE_TUTORIAL_KEYS_BY_ROLE[normalizedRole].map((key, index) => Object.freeze({
+    ...ARENA_GUIDE_TUTORIAL_CATALOG_BY_KEY.get(key),
+    number: String(index + 1).padStart(2, "0")
+  })));
+}
+
+export const ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE = Object.freeze({
+  member: getArenaGuideTutorialSteps("member"),
+  staff: getArenaGuideTutorialSteps("sparklabs"),
+  partner: getArenaGuideTutorialSteps("b2b_partner")
+});
+
+export const ARENA_GUIDE_TUTORIAL_STEPS = ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE.member;
 
 const ARENA_GUIDE_TUTORIAL_CHAPTERS = Object.freeze([
   Object.freeze({ key: "discover", label: "DISCOVER" }),
   Object.freeze({ key: "community", label: "COMMUNITY" }),
   Object.freeze({ key: "bounty", label: "BOUNTY" }),
+  Object.freeze({ key: "events-perks", label: "EVENTS & PERKS" }),
   Object.freeze({ key: "my-log", label: "MY LOG" })
 ]);
 
@@ -273,8 +425,12 @@ export function initArenaGuideTutorial(options = {}) {
   const description = tutorial?.querySelector("[data-guide-tutorial-description]");
   const progress = tutorial?.querySelector("[data-guide-tutorial-progress]");
   const nav = tutorial?.querySelector("[data-guide-tutorial-nav]") || tutorial?.querySelector("nav");
+  const startSummary = root?.querySelector("[data-guide-tutorial-summary]");
+  const roleTitle = tutorial?.querySelector("[data-guide-tutorial-role-title]");
   const spotlight = createSpotlight(doc);
   let dots = [];
+  let tutorialSteps = ARENA_GUIDE_TUTORIAL_STEPS;
+  let tutorialRole = "";
   let activeIndex = 0;
   let activeTarget = null;
   let activeIncludedTargets = [];
@@ -283,15 +439,15 @@ export function initArenaGuideTutorial(options = {}) {
   let chapterAnimationTimer = 0;
 
   if (!root || !panel || !startButton || !tutorial) {
-    return { start() {}, reset() {}, close() {}, isOpen: () => false };
+    return { start() {}, reset() {}, close() {}, refreshRole() {}, isOpen: () => false };
   }
 
-  buildStepNavigation();
+  refreshRole();
   startButton.addEventListener("click", start);
   closeButton?.addEventListener("click", close);
   previousButton?.addEventListener("click", () => showStep(activeIndex - 1));
   nextButton?.addEventListener("click", () => {
-    if (activeIndex >= ARENA_GUIDE_TUTORIAL_STEPS.length - 1) close();
+    if (activeIndex >= tutorialSteps.length - 1) close();
     else showStep(activeIndex + 1);
   });
   pageButton?.addEventListener("click", revealActiveStep);
@@ -299,12 +455,31 @@ export function initArenaGuideTutorial(options = {}) {
   win?.addEventListener("scroll", positionSpotlight, true);
   doc?.addEventListener?.("arena:community-draft-ready", revealGeneratedResult);
 
+  function refreshRole() {
+    const nextRole = normalizeArenaGuideTutorialRole(options.getRole?.());
+    const nextSteps = ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE[nextRole];
+    const roleChanged = tutorialRole !== nextRole;
+    tutorialRole = nextRole;
+    tutorialSteps = nextSteps;
+    if (roleChanged || dots.length !== tutorialSteps.length) {
+      activeIndex = 0;
+      buildStepNavigation();
+    }
+    const roleCopy = ARENA_GUIDE_TUTORIAL_ROLE_COPY[tutorialRole];
+    if (startSummary) startSummary.textContent = `${roleCopy.label}에게 필요한 핵심 기능을 ${tutorialSteps.length}단계로 안내합니다.`;
+    if (roleTitle) roleTitle.textContent = roleCopy.title;
+    if (nav) nav.setAttribute("aria-label", `${roleCopy.label} 튜토리얼 ${tutorialSteps.length}단계`);
+    tutorial.dataset.guideTutorialRole = tutorialRole;
+    render();
+  }
+
   function buildStepNavigation() {
     if (!nav || !doc?.createElement) return;
     nav.replaceChildren?.();
-    nav.style.setProperty("--guide-step-count", String(ARENA_GUIDE_TUTORIAL_STEPS.length));
+    dots = [];
+    nav.style.setProperty("--guide-step-count", String(tutorialSteps.length));
     let previousLabel = "";
-    ARENA_GUIDE_TUTORIAL_STEPS.forEach((step, index) => {
+    tutorialSteps.forEach((step, index) => {
       const dot = doc.createElement("button");
       dot.type = "button";
       dot.dataset.guideTutorialStep = String(index);
@@ -318,6 +493,7 @@ export function initArenaGuideTutorial(options = {}) {
   }
 
   function start() {
+    refreshRole();
     panel.hidden = false;
     root.dataset.guideState = "open";
     root.dataset.guideMode = "tutorial";
@@ -348,13 +524,13 @@ export function initArenaGuideTutorial(options = {}) {
   }
 
   function showStep(index) {
-    activeIndex = Math.max(0, Math.min(ARENA_GUIDE_TUTORIAL_STEPS.length - 1, Number(index) || 0));
+    activeIndex = Math.max(0, Math.min(tutorialSteps.length - 1, Number(index) || 0));
     render();
     revealActiveStep();
   }
 
   function revealActiveStep() {
-    const step = ARENA_GUIDE_TUTORIAL_STEPS[activeIndex];
+    const step = tutorialSteps[activeIndex];
     clearRevealTimer();
     hideSpotlight();
     const currentPage = options.getCurrentPage?.() || "";
@@ -395,7 +571,7 @@ export function initArenaGuideTutorial(options = {}) {
 
   function revealGeneratedResult() {
     if (tutorial.hidden || root.dataset.guideMode !== "tutorial") return;
-    const step = ARENA_GUIDE_TUTORIAL_STEPS[activeIndex];
+    const step = tutorialSteps[activeIndex];
     if (!step.resultTarget) return;
     const resultTarget = findVisibleTarget(step.resultTarget);
     if (!resultTarget) return;
@@ -490,17 +666,18 @@ export function initArenaGuideTutorial(options = {}) {
   }
 
   function render() {
-    const step = ARENA_GUIDE_TUTORIAL_STEPS[activeIndex];
+    const step = tutorialSteps[activeIndex];
+    if (!step) return;
     if (!tutorial.hidden && root.dataset.guideMode === "tutorial") updateChapterHighlight(step);
-    const chapterSteps = ARENA_GUIDE_TUTORIAL_STEPS.filter((item) => item.label === step.label);
+    const chapterSteps = tutorialSteps.filter((item) => item.label === step.label);
     const chapterIndex = chapterSteps.findIndex((item) => item.key === step.key) + 1;
     if (number) number.textContent = step.number;
     if (label) label.textContent = `${step.label} · ${chapterIndex}/${chapterSteps.length}`;
     if (title) title.textContent = step.title;
     if (description) description.textContent = step.description;
-    if (progress) progress.textContent = `${activeIndex + 1} / ${ARENA_GUIDE_TUTORIAL_STEPS.length}`;
+    if (progress) progress.textContent = `${activeIndex + 1} / ${tutorialSteps.length}`;
     if (previousButton) previousButton.disabled = activeIndex === 0;
-    if (nextButton) nextButton.textContent = activeIndex === ARENA_GUIDE_TUTORIAL_STEPS.length - 1 ? "튜토리얼 마치기" : "다음 단계 →";
+    if (nextButton) nextButton.textContent = activeIndex === tutorialSteps.length - 1 ? "튜토리얼 마치기" : "다음 단계 →";
     if (pageButton) pageButton.textContent = `${step.actionLabel} →`;
     dots.forEach((dot, index) => {
       const current = index === activeIndex;
@@ -512,7 +689,7 @@ export function initArenaGuideTutorial(options = {}) {
   }
 
   render();
-  return { start, reset, close, isOpen: () => !tutorial.hidden };
+  return { start, reset, close, refreshRole, isOpen: () => !tutorial.hidden };
 }
 
 function createSpotlight(doc) {

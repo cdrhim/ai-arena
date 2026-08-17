@@ -6,7 +6,9 @@ const css = readFileSync("public/arena/arena.css", "utf8");
 const js = readFileSync("public/arena/arena.js", "utf8");
 
 test("narrow screens stack editorial copy and logo without clipping the company name", () => {
-  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.featured-spotlight-head p\s*\{[\s\S]*?display:\s*none;/);
+  assert.match(css, /\.featured-spotlight-head > div\s*\{[\s\S]*?grid-template-columns:\s*max-content max-content;[\s\S]*?justify-content:\s*start;[\s\S]*?column-gap:\s*clamp\(6px, 1vw, 12px\);/);
+  assert.match(css, /\.featured-spotlight-head p\s*\{[\s\S]*?grid-column:\s*2;[\s\S]*?justify-self:\s*start;[\s\S]*?text-align:\s*left;[\s\S]*?white-space:\s*nowrap;/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.featured-spotlight-head p\s*\{[\s\S]*?display:\s*block;/);
   assert.doesNotMatch(css, /\.program-hero-copy #cohortBadge,\s*\n\s*\.program-hero-copy > p,\s*\n\s*\.featured-spotlight-head p/);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.program-hero\s*\{[\s\S]*?row-gap:\s*36px;/);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.program-hero-copy #cohortBadge\s*\{[\s\S]*?display:\s*inline-flex;/);

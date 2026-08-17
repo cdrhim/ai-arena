@@ -6,7 +6,7 @@ import { communityHighlightItems, communityHighlightsForViewer } from "./feature
 import { communityLiveCopy } from "./community-live.js";
 import { sortCommunityThreads } from "./community-sort.js";
 
-const SESSION_KEY = "sparkclaw-program-hub-session-v1";
+const SESSION_KEY = "sparkclaw-program-hub-session-gfmummaahlrnmrgnirxu-v1";
 const FOUNDER_POST_TYPES = {
   ask: {
     label: "Ask",

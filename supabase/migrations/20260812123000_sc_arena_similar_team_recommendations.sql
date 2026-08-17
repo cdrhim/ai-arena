@@ -1,5 +1,5 @@
 -- SparkClaw AI Arena: persisted Claw Member similar-team recommendations.
--- Target project guard: ilsoatwwizyahhlzapie (SparkClaw AI Arena auth/data project).
+-- Target project guard: gfmummaahlrnmrgnirxu (SparkClaw AI Arena auth/data project).
 
 begin;
 

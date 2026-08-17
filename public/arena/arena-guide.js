@@ -1,4 +1,4 @@
-import { initArenaGuideTutorial } from "./arena-guide-tutorial.js?v=ai-arena-20260817-prompt-transfer-v104";
+import { initArenaGuideTutorial } from "./arena-guide-tutorial.js?v=ai-arena-20260817-role-tutorial-v113";
 
 const ALLOWED_PAGES = new Set(["overview", "teams", "discover", "compare", "community", "arena", "workspace"]);
 
@@ -19,6 +19,7 @@ export function initArenaGuide(options = {}) {
     root,
     panel,
     getCurrentPage: pageFromHash,
+    getRole: () => options.getRole?.(),
     navigate: (page, navigationOptions) => options.navigate?.(page, navigationOptions),
     onClose: () => window.requestAnimationFrame(() => input.focus())
   });
@@ -134,7 +135,8 @@ export function initArenaGuide(options = {}) {
 
   function setVisible(visible) {
     root.hidden = !visible;
-    if (!visible) reset();
+    if (visible) tutorial.refreshRole();
+    else reset();
   }
 
   return { reset, setVisible, open: () => setOpen(true) };
@@ -142,7 +144,19 @@ export function initArenaGuide(options = {}) {
 
 function pageFromHash() {
   const value = window.location.hash.replace(/^#\/?/u, "").trim();
-  const map = { discover: "overview", "company-directory": "teams", "task-driven-search": "discover", compare: "compare", community: "community", bounty: "arena", "my-log": "workspace" };
+  const map = {
+    discover: "overview",
+    "global-advisors": "advisors",
+    "company-directory": "teams",
+    "task-driven-search": "discover",
+    compare: "compare",
+    partnerships: "partnerships",
+    community: "community",
+    bounty: "arena",
+    calendar: "calendar",
+    benefits: "benefits",
+    "my-log": "workspace"
+  };
   return map[value] || "overview";
 }
 

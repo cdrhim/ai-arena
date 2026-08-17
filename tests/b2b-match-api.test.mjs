@@ -39,7 +39,7 @@ test("B2B match endpoint requires login and rate limits authenticated users", as
         user_metadata: { organization: "Retail Buyer" }
       });
     }
-    if (String(url).includes("/rest/v1/arena_submissions")) {
+    if (String(url).includes("/rest/v1/sc_arena_submissions")) {
       return Response.json([]);
     }
     return originalFetch(url);
@@ -138,10 +138,10 @@ test("external partner discovery evaluates every eligible Program DB participant
         user_metadata: { organization: "Enterprise Buyer" }
       });
     }
-    if (value.startsWith("https://arena.example") && value.includes("/rest/v1/arena_submissions")) {
+    if (value.startsWith("https://arena.example") && value.includes("/rest/v1/sc_arena_submissions")) {
       return Response.json([]);
     }
-    if (value.startsWith("https://arena.example") && value.includes("/rest/v1/arena_team_keywords")) {
+    if (value.startsWith("https://arena.example") && value.includes("/rest/v1/sc_arena_team_keywords")) {
       return Response.json([]);
     }
     if (value.startsWith("https://program.example") && value.includes("/rest/v1/teams")) {
@@ -209,8 +209,8 @@ test("Program DB participants are recognized as members and can discover every o
     if (value.startsWith("https://arena.example") && value.includes("/auth/v1/user")) {
       return Response.json({ id: `participant-${Date.now()}`, email: participantEmail, app_metadata: {}, user_metadata: {} });
     }
-    if (value.startsWith("https://arena.example") && value.includes("/rest/v1/arena_submissions")) return Response.json([]);
-    if (value.startsWith("https://arena.example") && value.includes("/rest/v1/arena_team_keywords")) return Response.json([]);
+    if (value.startsWith("https://arena.example") && value.includes("/rest/v1/sc_arena_submissions")) return Response.json([]);
+    if (value.startsWith("https://arena.example") && value.includes("/rest/v1/sc_arena_team_keywords")) return Response.json([]);
     if (value.startsWith("https://program.example") && value.includes("/rest/v1/teams")) {
       return Response.json([
         { id: 1, name: "Viewer Company", email: participantEmail, sector: "SaaS", one_liner: "Own company", service_summary: "Own profile", status: "active" },

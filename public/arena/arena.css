@@ -9452,8 +9452,23 @@ body .arena-guide-panel {
 }
 
 @media (max-width: 640px) {
+  .app-header .brand {
+    gap: 8px;
+  }
+
   .app-header .brand-copy {
-    display: none;
+    min-width: 0;
+    display: block;
+  }
+
+  .app-header .brand-copy strong {
+    font-size: 14px;
+  }
+
+  .app-header .brand-copy small {
+    margin-top: 3px;
+    font-size: 12px;
+    letter-spacing: 0.12em;
   }
 
   .ecosystem-switcher-menu {
@@ -9470,13 +9485,19 @@ body .arena-guide-panel {
   }
 
   body .arena-guide {
-    left: 61px;
+    left: clamp(158px, 44vw, 178px);
   }
 
   body .arena-guide-launcher {
-    min-width: 138px;
+    width: 46px;
+    min-width: 46px;
     min-height: 46px;
-    padding-right: 9px;
+    gap: 0;
+    padding: 4px;
+  }
+
+  body .arena-guide-launcher > span:not(.arena-guide-avatar) {
+    display: none;
   }
 
   body .arena-guide-launcher .arena-guide-avatar {
@@ -12903,11 +12924,36 @@ body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card {
   grid-template-columns: 1fr;
 }
 
+.featured-spotlight-head {
+  padding-bottom: 18px;
+}
+
+.featured-spotlight-head > div {
+  width: 100%;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  align-items: baseline;
+  justify-content: start;
+  column-gap: clamp(6px, 1vw, 12px);
+}
+
+.featured-spotlight-head .featured-spotlight-kicker {
+  grid-column: 1 / -1;
+}
+
+.featured-spotlight-head h2 {
+  grid-column: 1;
+}
+
 .featured-spotlight-head p {
-  margin: 5px 0 0;
+  grid-column: 2;
+  justify-self: start;
+  margin: 3px 0 0;
   color: rgba(205, 224, 247, 0.74);
   font-size: 12px;
   line-height: 1.35;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .featured-spotlight-cluster {
@@ -13424,9 +13470,13 @@ body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card {
 
   .featured-spotlight-head p {
     max-width: 440px;
-    margin-top: 5px;
+    margin-top: 3px;
     font-size: 13px;
     line-height: 1.5;
+  }
+
+  .featured-spotlight-head {
+    padding-bottom: 23px;
   }
 
   .featured-spotlight-cluster {
@@ -13494,6 +13544,7 @@ body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card {
 
   .featured-spotlight-head {
     align-items: flex-start;
+    padding-bottom: 25px;
   }
 
   .featured-spotlight-kicker {
@@ -13518,7 +13569,7 @@ body.is-claw-member #overviewPage > .metric-grid > .collaboration-fit-card {
   }
 
   .featured-spotlight-head p {
-    margin-top: 6px;
+    margin-top: 4px;
     color: rgba(205, 224, 247, 0.74);
     font-size: 14px;
   }
@@ -14408,8 +14459,21 @@ body .arena-guide[data-guide-mode="tutorial"] .arena-guide-tutorial > article h4
 }
 
 @media (max-width: 640px) {
+  .featured-spotlight-head {
+    padding-bottom: 18px;
+  }
+
+  .featured-spotlight-head > div {
+    column-gap: 6px;
+  }
+
   .featured-spotlight-head p {
-    display: none;
+    display: block;
+    max-width: none;
+    margin-top: 2px;
+    font-size: clamp(8px, 2.15vw, 10px);
+    line-height: 1.25;
+    letter-spacing: -0.035em;
   }
 
   .program-hero {

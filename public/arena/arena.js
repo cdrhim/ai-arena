@@ -45,9 +45,9 @@ import {
   publicBriefUrl,
   resolvePublicBriefLanguage
 } from "./public-brief-i18n.js";
-import { initArenaGuide } from "./arena-guide.js?v=ai-arena-20260817-prompt-transfer-v104";
+import { initArenaGuide } from "./arena-guide.js?v=ai-arena-20260817-role-tutorial-v113";
 
-const SESSION_KEY = "sparkclaw-program-hub-session-v1";
+const SESSION_KEY = "sparkclaw-program-hub-session-gfmummaahlrnmrgnirxu-v1";
 const ARENA_HISTORY_MARKER = "sparkclaw-arena-history-v1";
 const ARENA_PAGE_HASHES = Object.freeze({
   overview: "discover",
@@ -349,6 +349,7 @@ const els = {
 const arenaGuide = initArenaGuide({
   getAuthHeaders: () => authHeaders(),
   isAuthenticated: () => Boolean(authSession?.access_token),
+  getRole: () => (isAdminViewer() ? "admin" : hub?.viewer?.role || "member"),
   navigate: (page, navigationOptions = {}) => showPage(page, {
     skipScroll: Boolean(navigationOptions.skipScroll)
   })

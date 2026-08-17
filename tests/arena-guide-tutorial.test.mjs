@@ -2,29 +2,41 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { ARENA_GUIDE_TUTORIAL_STEPS, initArenaGuideTutorial } from "../public/arena/arena-guide-tutorial.js";
+import {
+  ARENA_GUIDE_TUTORIAL_STEPS,
+  ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE,
+  getArenaGuideTutorialSteps,
+  initArenaGuideTutorial,
+  normalizeArenaGuideTutorialRole
+} from "../public/arena/arena-guide-tutorial.js";
 
-test("클로이 튜토리얼은 각 메뉴의 전체 화면을 먼저 보여준 뒤 실제 기능을 안내한다", () => {
-  assert.equal(ARENA_GUIDE_TUTORIAL_STEPS.length, 21);
+test("클로이 튜토리얼은 세 역할을 9단계 이내의 서로 다른 빠른 시작으로 안내한다", () => {
   assert.deepEqual(
-    ARENA_GUIDE_TUTORIAL_STEPS.map((step) => step.label),
-    ["DISCOVER", "DISCOVER", "DISCOVER", "DISCOVER", "DISCOVER", "DISCOVER", "DISCOVER", "DISCOVER", "DISCOVER", "DISCOVER", "COMMUNITY", "COMMUNITY", "COMMUNITY", "COMMUNITY", "COMMUNITY", "BOUNTY", "BOUNTY", "MY LOG", "MY LOG", "MY LOG", "MY LOG"]
+    Object.fromEntries(Object.entries(ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE).map(([role, steps]) => [role, steps.length])),
+    { member: 9, staff: 8, partner: 9 }
   );
-  assert.deepEqual(ARENA_GUIDE_TUTORIAL_STEPS.map((step) => step.number), Array.from({ length: 21 }, (_, index) => String(index + 1).padStart(2, "0")));
+  for (const steps of Object.values(ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE)) {
+    assert.ok(steps.length <= 9);
+    assert.deepEqual(steps.map((step) => step.number), Array.from({ length: steps.length }, (_, index) => String(index + 1).padStart(2, "0")));
+    assert.ok(steps.every((step) => step.description.length <= 110));
+  }
+  assert.equal(ARENA_GUIDE_TUTORIAL_STEPS, ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE.member);
   assert.deepEqual(
-    ARENA_GUIDE_TUTORIAL_STEPS.slice(7, 10).map((step) => [step.key, step.page, step.target]),
-    [
-      ["discover-company-directory", "teams", "#teamsPage"],
-      ["discover-task-driven-search", "discover", "#discoverPage"],
-      ["discover-compare", "compare", "#comparePage"]
-    ]
+    ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE.member.map((step) => step.key),
+    ["discover-overview", "discover-spark-ai", "discover-company-directory", "discover-advisors", "discover-benefit", "community-overview", "bounty-overview", "my-log-overview", "my-log-actions"]
   );
   assert.deepEqual(
-    ARENA_GUIDE_TUTORIAL_STEPS.filter((step) => step.pageOverview).map((step) => step.target),
-    ["#overviewPage", "#teamsPage", "#discoverPage", "#comparePage", "#communityPage", "#arenaPage", "#workspacePage"]
+    ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE.staff.map((step) => step.key),
+    ["discover-overview", "discover-company-directory", "discover-advisors", "community-overview", "admin-bounty-operations", "admin-discovery-intake", "admin-benefit-queue", "admin-activity"]
   );
-  assert.match(ARENA_GUIDE_TUTORIAL_STEPS[16].description, /Release 준비 중/);
-  assert.match(ARENA_GUIDE_TUTORIAL_STEPS[13].description, /제목·채널·공개 범위/);
+  assert.deepEqual(
+    ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE.partner.map((step) => step.key),
+    ["discover-overview", "discover-company-directory", "discover-task-driven-search", "discover-compare", "community-overview", "partner-events-perks", "partner-bounty-studio", "partner-bounty-pipeline", "my-log-overview"]
+  );
+  assert.equal(normalizeArenaGuideTutorialRole("sparklabs"), "staff");
+  assert.equal(normalizeArenaGuideTutorialRole("admin"), "staff");
+  assert.equal(normalizeArenaGuideTutorialRole("b2b_partner"), "partner");
+  assert.equal(getArenaGuideTutorialSteps("member").length, 9);
   assert.equal(typeof initArenaGuideTutorial, "function");
 });
 
@@ -34,6 +46,8 @@ test("튜토리얼은 단계 이동, 직접 화면 이동, 닫기 동작을 분�
   assert.match(source, /data-guide-tutorial-next/);
   assert.match(source, /data-guide-tutorial-page/);
   assert.match(source, /buildStepNavigation/);
+  assert.match(source, /function refreshRole/);
+  assert.match(source, /data-guide-tutorial-summary/);
   assert.match(source, /const currentPage = options\.getCurrentPage\?\.\(\) \|\| ""/);
   assert.match(source, /const pageChanged = currentPage !== step\.page/);
   assert.match(source, /if \(pageChanged\) options\.navigate\?\.\(step\.page, \{ skipScroll: true \}\)/);
@@ -75,6 +89,7 @@ test("튜토리얼의 대분류 전환은 별도 메뉴 없이 기존 상단 내
   assert.match(html, /data-guide-chapter="discover"/);
   assert.match(html, /data-guide-chapter="community"/);
   assert.match(html, /data-guide-chapter="bounty"/);
+  assert.match(html, /data-guide-chapter="events-perks"/);
   assert.match(html, /data-guide-chapter="my-log"/);
   assert.match(css, /\.nav-menu\.is-guide-chapter-active > \.nav-link/);
   assert.match(css, /@keyframes arena-guide-nav-arrive/);
