@@ -18,15 +18,12 @@ test("Arena Updates remains preserved but hidden from every viewer", () => {
   );
 });
 
-test("Our Partners is hidden only from administrators while member and partner variants remain available", () => {
+test("Our Partners and the retired Perk request area are hidden from Claw Members", () => {
   assert.match(
     html,
-    /class="panel partner-callout" data-hide-from-admin hidden>[\s\S]*?class="partner-callout-provider" data-hide-from-claw-member[\s\S]*?OUR PARTNERS/
+    /class="panel partner-callout" data-hide-from-admin data-hide-from-claw-member hidden>[\s\S]*?class="partner-callout-provider" data-hide-from-claw-member[\s\S]*?OUR PARTNERS/
   );
-  assert.match(
-    html,
-    /id="memberBenefitSurveyForm"[\s\S]*?data-show-for-claw-member/
-  );
+  assert.doesNotMatch(html, /id="memberBenefitSurveyForm"|data-show-for-claw-member/);
 });
 
 test("Community Map is hidden from SparkLabs administrators and Claw Members", () => {

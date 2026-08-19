@@ -57,6 +57,7 @@ test("Program DB participant logins receive Claw Member Community access", async
     if (value.startsWith("https://program.example") && value.includes("/rest/v1/teams")) {
       return Response.json([{ id: 11, name: "Program Member", email: participantEmail, status: "active" }]);
     }
+    if (value.startsWith("https://program.example") && value.includes("/rest/v1/team_members")) return Response.json([]);
     return originalFetch(url);
   };
 
@@ -98,7 +99,7 @@ test("Program DB participant logins receive Claw Member Community access", async
   }
 });
 
-test("Community links a unique company email domain to its company and service name", async () => {
+test("Community does not link a secondary same-domain email to a company account", async () => {
   const previous = captureEnv([
     "SPARKCLAW_ENABLE_FORUM",
     "SUPABASE_URL",
@@ -121,6 +122,7 @@ test("Community links a unique company email domain to its company and service n
     if (value.startsWith("https://program-domain.example") && value.includes("/rest/v1/teams")) {
       return Response.json([{ id: 12, name: "고로켓컴퍼니 / Oing", email: "founder@gorocket.me", status: "active" }]);
     }
+    if (value.startsWith("https://program-domain.example") && value.includes("/rest/v1/team_members")) return Response.json([]);
     return originalFetch(url);
   };
 
@@ -130,7 +132,7 @@ test("Community links a unique company email domain to its company and service n
     }));
     const payload = await response.json();
     assert.equal(response.status, 200, JSON.stringify(payload));
-    assert.equal(payload.viewer.displayName, "고로켓컴퍼니 / Oing");
+    assert.equal(payload.viewer.displayName, "Gorocket");
   } finally {
     global.fetch = originalFetch;
     restoreEnv(previous);

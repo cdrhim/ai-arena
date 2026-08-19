@@ -17,6 +17,7 @@ test("login and logout always clear discovery results before another account can
 
   assert.match(login, /spark-arena:discovery-reset/);
   assert.match(logout, /spark-arena:discovery-reset/);
+  assert.match(logout, /await revokeSupabaseSession\(authSession\)/);
   assert.match(community, /window\.addEventListener\("spark-arena:discovery-reset", resetAgenticDiscovery\)/);
   assert.match(reset, /discoveryRequestId \+= 1/);
   assert.match(reset, /setDiscoveryPending\(false\)/);

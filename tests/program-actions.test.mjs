@@ -12,7 +12,7 @@ const GAMMA = { id: 3, name: "Gamma", companyName: "Gamma Inc.", group: "Discove
 const T1 = "2026-08-04T01:00:00.000Z";
 const T2 = "2026-08-04T02:00:00.000Z";
 
-test("only a linked member can update its own team card visibility", () => {
+test("a linked member updates only its own card while SparkLabs staff can update every Directory card", () => {
   const initial = buildProgramActionSnapshot(makeHub(), [], MEMBER);
   const updated = createProgramActionEvent(
     "updateTeamCardVisibility",
@@ -41,12 +41,34 @@ test("only a linked member can update its own team card visibility", () => {
   assert.equal(ownerView.viewerTeam.cardVisibility.canEdit, true);
   assert.equal(ownerView.viewerTeam.cardVisibility.fields.capabilities, "private");
 
+  const staffHub = buildProgramActionSnapshot(makeHub({ viewer: STAFF, team: null }), [updated], STAFF);
+  const staffUpdate = createProgramActionEvent(
+    "updateTeamCardVisibility",
+    { teamId: BETA.id, fields: { introduction: "private", website: "private" } },
+    staffHub,
+    STAFF,
+    T2
+  );
+  assert.equal(staffUpdate.visibility.teamId, String(BETA.id));
+  assert.equal(staffUpdate.visibility.fields.website, "private");
+  assert.equal(staffUpdate.visibility.updatedByUserId, STAFF.id);
+
   assert.throws(
     () => createProgramActionEvent(
       "updateTeamCardVisibility",
-      { fields: { introduction: "private" } },
-      makeHub({ viewer: STAFF, team: null }),
+      { teamId: 999, fields: { introduction: "private" } },
+      staffHub,
       STAFF,
+      T2
+    ),
+    (error) => error.status === 404
+  );
+  assert.throws(
+    () => createProgramActionEvent(
+      "updateTeamCardVisibility",
+      { teamId: BETA.id, fields: { introduction: "private" } },
+      makeHub({ viewer: OTHER_MEMBER, team: null }),
+      OTHER_MEMBER,
       T2
     ),
     (error) => error.status === 403

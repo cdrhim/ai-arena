@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  arenaAccountAccessDecision,
   arenaAuthConfig,
   authorizeArenaAction,
+  loadArenaViewerAccess,
   publicArenaAuthConfig,
-  viewerFromUser
+  viewerFromUser,
+  viewerWithArenaAccess
 } from "../netlify/lib/supabase-auth.mjs";
 
 test("arena auth config reads Supabase and SparkLabs role settings", () => {
@@ -20,6 +23,7 @@ test("arena auth config reads Supabase and SparkLabs role settings", () => {
   assert.equal(config.supabaseUrl, "https://example.supabase.co");
   assert.deepEqual(config.adminDomains, ["sparklabs.co.kr", "example.com"]);
   assert.deepEqual(config.adminEmails, ["admin@sparklabs.co.kr"]);
+  assert.equal(config.strictAccountAllowlist, true);
   assert.equal(config.googleAdminLoginEnabled, false);
   assert.equal(config.features.bounties, false);
 });
@@ -28,6 +32,7 @@ test("public arena auth config exposes only client-safe settings", () => {
   const config = publicArenaAuthConfig({
     SUPABASE_URL: "https://example.supabase.co",
     SUPABASE_ANON_KEY: "anon",
+    SUPABASE_SECRET_KEY: "server-secret",
     SPARKLABS_ARENA_ADMIN_EMAILS: "secret@sparklabs.co.kr"
   });
 
@@ -35,6 +40,154 @@ test("public arena auth config exposes only client-safe settings", () => {
   assert.equal(config.supabaseAnonKey, "anon");
   assert.equal(config.googleAdminLoginEnabled, false);
   assert.equal(Object.hasOwn(config, "adminEmails"), false);
+  assert.equal(Object.hasOwn(config, "secretKey"), false);
+});
+
+test("Arena access lookup reads the service-only membership projection", async () => {
+  const requests = [];
+  const access = await loadArenaViewerAccess(
+    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_ANON_KEY: "anon",
+      SUPABASE_SECRET_KEY: "sb_secret_test"
+    },
+    async (url, options) => {
+      requests.push({ url: String(url), options });
+      return Response.json([{
+        access_found: true,
+        membership_role: "partner",
+        membership_status: "active",
+        organization_name: "Partner Co",
+        partner_profile_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        partner_profile_status: "active",
+        focus_categories: ["Manufacturing"]
+      }]);
+    }
+  );
+
+  assert.equal(access.available, true);
+  assert.equal(access.record.membership_role, "partner");
+  assert.match(requests[0].url, /sc_arena_resolve_viewer_access$/);
+  assert.equal(requests[0].options.headers.apikey, "sb_secret_test");
+  assert.equal(Object.hasOwn(requests[0].options.headers, "Authorization"), false);
+});
+
+test("database membership is authoritative for internal and external Arena roles", () => {
+  const base = viewerFromUser(
+    { id: "u_access", email: "account@example.com" },
+    arenaAuthConfig({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_ANON_KEY: "anon" })
+  );
+  const internal = viewerWithArenaAccess(base, {
+    configured: true,
+    available: true,
+    record: { access_found: true, membership_role: "claw_member", membership_status: "active" }
+  });
+  const partner = viewerWithArenaAccess(base, {
+    configured: true,
+    available: true,
+    record: {
+      access_found: true,
+      membership_role: "partner",
+      membership_status: "active",
+      organization_name: "Partner Co",
+      partner_profile_id: "profile-1",
+      partner_profile_status: "active",
+      focus_categories: ["Manufacturing"]
+    }
+  });
+  const pendingPartner = viewerWithArenaAccess(base, {
+    configured: true,
+    available: true,
+    record: {
+      access_found: true,
+      membership_role: "partner",
+      membership_status: "active",
+      partner_profile_status: "pending"
+    }
+  });
+  const unknown = viewerWithArenaAccess(base, {
+    configured: true,
+    available: true,
+    record: { access_found: false }
+  });
+
+  assert.equal(internal.role, "member");
+  assert.equal(internal.canSubmitProducts, true);
+  assert.equal(partner.role, "b2b_partner");
+  assert.equal(partner.canRequestConnections, true);
+  assert.equal(partner.organization, "Partner Co");
+  assert.equal(partner.b2bProfileId, "profile-1");
+  assert.deepEqual(partner.b2bFocusCategories, ["Manufacturing"]);
+  assert.equal(pendingPartner.role, "public");
+  assert.equal(unknown.role, "public");
+});
+
+test("authenticated Arena access admits only marked Program applicants, SparkLabs admins, and active partners", () => {
+  const applicantAccess = {
+    configured: true,
+    available: true,
+    record: { access_found: true, membership_role: "claw_member", membership_status: "active" }
+  };
+  const publicViewer = { canScore: false };
+
+  assert.equal(arenaAccountAccessDecision({
+    app_metadata: { arena_access_source: "program_applicant", program_team_id: "team-75" }
+  }, publicViewer, applicantAccess).allowed, true);
+  assert.equal(arenaAccountAccessDecision({ app_metadata: {} }, publicViewer, applicantAccess).allowed, false);
+  assert.equal(arenaAccountAccessDecision({}, { canScore: true }, { configured: false }).allowed, true);
+  assert.equal(arenaAccountAccessDecision({}, publicViewer, {
+    configured: true,
+    available: true,
+    record: {
+      access_found: true,
+      membership_role: "partner",
+      membership_status: "active",
+      partner_profile_status: "active"
+    }
+  }).allowed, true);
+  assert.equal(arenaAccountAccessDecision({}, publicViewer, {
+    configured: true,
+    available: true,
+    record: {
+      access_found: true,
+      membership_role: "partner",
+      membership_status: "active",
+      partner_profile_status: "pending"
+    }
+  }).allowed, false);
+});
+
+test("the exact isolated test account is admitted without membership but remains read-only", () => {
+  const user = {
+    id: "55555555-5555-4555-8555-555555555555",
+    email: "haeryong.rhim@gmail.com",
+    app_metadata: { arena_access_source: "isolated_test", isolated_test: true }
+  };
+  const config = arenaAuthConfig({
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_ANON_KEY: "anon"
+  });
+  const base = viewerFromUser(user, config);
+  const access = { configured: true, available: true, record: null };
+  const viewer = viewerWithArenaAccess(base, access);
+
+  assert.equal(base.isIsolatedTest, true);
+  assert.equal(arenaAccountAccessDecision(user, base, access).allowed, true);
+  assert.equal(viewer.role, "member");
+  assert.equal(viewer.accessSource, "isolated_test");
+  assert.equal(viewer.organization, "");
+  assert.equal(viewer.canSubmitProducts, false);
+  assert.equal(viewer.canRequestConnections, false);
+  assert.throws(() => authorizeArenaAction("saveSubmissionDraft", viewer), /read-only/);
+
+  const forged = {
+    ...user,
+    email: "someone-else@gmail.com"
+  };
+  const forgedViewer = viewerFromUser(forged, config);
+  assert.equal(forgedViewer.isIsolatedTest, false);
+  assert.equal(arenaAccountAccessDecision(forged, forgedViewer, access).allowed, false);
 });
 
 test("Google admin login is exposed only through its explicit public feature flag", () => {
@@ -209,7 +362,7 @@ test("B2B match profile fields ignore user metadata and accept trusted app metad
   assert.equal(untrustedOnly.b2bThesis, "");
 });
 
-test("user metadata cannot self-escalate into privileged Arena roles", () => {
+test("user metadata cannot self-escalate and ordinary authenticated users remain internal members", () => {
   const config = arenaAuthConfig({
     SUPABASE_URL: "https://example.supabase.co",
     SUPABASE_ANON_KEY: "anon",
@@ -242,14 +395,14 @@ test("user metadata cannot self-escalate into privileged Arena roles", () => {
 
   assert.equal(staffClaim.canScore, false);
   assert.equal(staffClaim.canSubmitHumanReviews, false);
-  assert.equal(staffClaim.role, "public");
+  assert.equal(staffClaim.role, "member");
   assert.equal(b2bClaim.canRequestConnections, false);
-  assert.equal(b2bClaim.role, "public");
-  assert.equal(memberClaim.canSubmitProducts, false);
-  assert.equal(memberClaim.role, "public");
+  assert.equal(b2bClaim.role, "member");
+  assert.equal(memberClaim.canSubmitProducts, true);
+  assert.equal(memberClaim.role, "member");
 });
 
-test("membership requires an explicit allowlist entry or trusted app metadata", () => {
+test("authenticated Program accounts default to internal members", () => {
   const config = arenaAuthConfig({
     SUPABASE_URL: "https://example.supabase.co",
     SUPABASE_ANON_KEY: "anon",
@@ -264,8 +417,9 @@ test("membership requires an explicit allowlist entry or trusted app metadata", 
     config
   );
 
-  assert.equal(arbitrary.role, "public");
-  assert.equal(arbitrary.canSubmitProducts, false);
+  assert.equal(arbitrary.role, "member");
+  assert.equal(arbitrary.canRequestConnections, false);
+  assert.equal(arbitrary.canSubmitProducts, true);
   assert.equal(allowlisted.role, "member");
   assert.equal(allowlisted.canSubmitProducts, true);
   assert.equal(trustedMetadata.role, "member");

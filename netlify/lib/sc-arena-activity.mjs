@@ -1,4 +1,8 @@
 import { arenaAuthConfig, bearerToken, viewerFromUser } from "./supabase-auth.mjs";
+import {
+  isIsolatedArenaTestEmail,
+  isIsolatedArenaTestViewer
+} from "./isolated-test-account.mjs";
 
 const WORKSPACE_SLUG = "sparkclaw-ai-arena";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -33,6 +37,7 @@ export function scArenaActivityConfig(env = process.env) {
 }
 
 export function activityMembershipForViewer(viewer, context = {}) {
+  if (isIsolatedArenaTestViewer(viewer)) return null;
   const role = activityMembershipRole(viewer);
   const userId = cleanText(viewer?.id, 64);
   if (!UUID_PATTERN.test(userId) || !role) return null;
@@ -122,6 +127,7 @@ export function activityRecordForSource(sourceSystem, event, viewer, context = {
 }
 
 export async function recordScArenaActivity({ sourceSystem, event, viewer, context = {}, env = process.env, fetchImpl = fetch }) {
+  if (isIsolatedArenaTestViewer(viewer, env)) return { stored: false, reason: "isolated_test" };
   const record = activityRecordForSource(sourceSystem, event, viewer, context);
   if (!record) return { stored: false, reason: "not_loggable" };
   return appendScArenaActivityRecord(record, env, fetchImpl);
@@ -136,6 +142,7 @@ export async function recordScArenaClientActivity({
   env = process.env,
   fetchImpl = fetch
 }) {
+  if (isIsolatedArenaTestViewer(viewer, env)) return { stored: false, reason: "isolated_test" };
   const membership = activityMembershipForViewer(viewer, context);
   const eventId = cleanText(clientEventId, 180);
   const normalizedAction = cleanText(action, 40).toLowerCase();
@@ -159,7 +166,7 @@ export async function recordScArenaClientActivity({
   if (normalizedAction === "page_viewed" && !pageLabels[normalizedPage]) {
     return { stored: false, reason: "invalid_page" };
   }
-  if (!new Set(["session_started", "page_viewed"]).has(normalizedAction)) {
+  if (!new Set(["auth_login", "auth_logout", "session_started", "page_viewed"]).has(normalizedAction)) {
     return { stored: false, reason: "unsupported_client_action" };
   }
 
@@ -167,7 +174,30 @@ export async function recordScArenaClientActivity({
     context.viewerTeam?.name || context.viewerTeamName || viewer.organization || roleLabel(membership.role),
     160
   );
+  const isAuthLogin = normalizedAction === "auth_login";
+  const isAuthLogout = normalizedAction === "auth_logout";
   const isSession = normalizedAction === "session_started";
+  const eventType = isAuthLogin
+    ? "system.auth_login"
+    : isAuthLogout
+      ? "system.auth_logout"
+      : isSession
+        ? "system.session_started"
+        : "system.page_viewed";
+  const title = isAuthLogin
+    ? "AI Arena 계정 로그인"
+    : isAuthLogout
+      ? "AI Arena 계정 로그아웃"
+      : isSession
+        ? "AI Arena 세션 시작"
+        : `${pageLabels[normalizedPage]} 열람`;
+  const summary = isAuthLogin
+    ? "Supabase 인증을 거쳐 AI Arena에 로그인했습니다."
+    : isAuthLogout
+      ? "AI Arena에서 로그아웃하고 Supabase 세션을 종료했습니다."
+      : isSession
+        ? "SparkClaw AI Arena 세션을 시작했습니다."
+        : `${pageLabels[normalizedPage]} 페이지를 열었습니다.`;
   const record = {
     sourceSystem: "arena_client",
     sourceEventId: eventId,
@@ -178,15 +208,19 @@ export async function recordScArenaClientActivity({
     actorOrganizationKey: membership.organizationKey,
     actorOrganizationName: membership.organizationName,
     actorOrganizationType: membership.organizationType,
-    eventType: isSession ? "system.session_started" : "system.page_viewed",
+    eventType,
     primaryEntityType: null,
     primaryEntityKey: null,
     primaryEntityLabel: null,
-    audienceScope: "actor_only",
-    title: isSession ? "AI Arena 로그인" : `${pageLabels[normalizedPage]} 열람`,
-    summary: isSession ? "SparkClaw AI Arena 세션을 시작했습니다." : `${pageLabels[normalizedPage]} 페이지를 열었습니다.`,
-    routeTarget: isSession ? "workspace" : normalizedPage,
-    metadata: isSession ? { client: "web" } : { page: normalizedPage },
+    audienceScope: isAuthLogin || isAuthLogout ? "staff" : "actor_only",
+    title,
+    summary,
+    routeTarget: isAuthLogin || isAuthLogout ? "operations" : isSession ? "workspace" : normalizedPage,
+    metadata: isAuthLogin || isAuthLogout
+      ? { client: "web", authAction: isAuthLogin ? "login" : "logout" }
+      : isSession
+        ? { client: "web" }
+        : { page: normalizedPage },
     relatedEntities: [],
     viewerUserIds: [],
     occurredAt: new Date().toISOString()
@@ -236,6 +270,9 @@ export async function loadScArenaMyLog({
   env = process.env,
   fetchImpl = fetch
 }) {
+  if (isIsolatedArenaTestViewer(viewer, env)) {
+    return { available: true, events: [], nextCursor: null, reason: "" };
+  }
   const config = scArenaActivityConfig(env);
   const token = bearerToken(req);
   if (!config.readConfigured || !token || !UUID_PATTERN.test(cleanText(viewer?.id, 64))) {
@@ -317,7 +354,7 @@ export async function loadScArenaAdminActivity({
   const token = bearerToken(req);
   const viewerId = cleanText(viewer?.id, 64);
   if (!config.readConfigured || !token || !UUID_PATTERN.test(viewerId)) {
-    return { available: false, users: [], events: [], nextCursor: null, reason: "unconfigured" };
+    return { available: false, users: [], events: [], totalCount: 0, nextCursor: null, reason: "unconfigured" };
   }
   const membership = activityMembershipForViewer(viewer, {
     viewerTeamId,
@@ -327,19 +364,6 @@ export async function loadScArenaAdminActivity({
     const error = new Error("SparkLabs 관리자만 전체 사용자 활동을 열람할 수 있습니다.");
     error.status = 403;
     throw error;
-  }
-
-  const membershipResponse = await activityFetch(fetchImpl, `${config.supabaseUrl}/rest/v1/rpc/sc_arena_sync_membership`, {
-    method: "POST",
-    headers: serviceHeaders(config.secretKey),
-    body: JSON.stringify(membershipRpcPayload(membership))
-  }, config.requestTimeoutMs);
-  const membershipPayload = await safeJson(membershipResponse);
-  if (!membershipResponse.ok) {
-    if (missingSchema(membershipResponse, membershipPayload)) {
-      return { available: false, users: [], events: [], nextCursor: null, reason: "schema_missing" };
-    }
-    throw new Error(membershipPayload?.message || "Arena membership could not be synchronized.");
   }
 
   const authHeaders = {
@@ -357,14 +381,21 @@ export async function loadScArenaAdminActivity({
     const usersPayload = await safeJson(usersResponse);
     if (!usersResponse.ok) {
       if (missingSchema(usersResponse, usersPayload)) {
-        return { available: false, users: [], events: [], nextCursor: null, reason: "schema_missing" };
+        return { available: false, users: [], events: [], totalCount: 0, nextCursor: null, reason: "schema_missing" };
       }
       const error = new Error(usersPayload?.message || usersPayload?.error || "Arena users could not be loaded.");
       error.status = usersResponse.status;
       throw error;
     }
-    users = (Array.isArray(usersPayload) ? usersPayload : []).map(publicAdminActivityUser).filter(Boolean);
+    users = (Array.isArray(usersPayload) ? usersPayload : [])
+      .map(publicAdminActivityUser)
+      .filter((user) => user && !isIsolatedArenaTestEmail(user.email, env));
   }
+
+  const directoryUsers = await loadSupabaseAuthDirectory(config, env, fetchImpl);
+  const isolatedUserIds = new Set(
+    directoryUsers.filter((user) => user.isIsolatedTest).map((user) => user.userId)
+  );
 
   const boundedLimit = Math.min(Math.max(Number(limit) || 100, 1), 200);
   const cursorValue = parseCursor(cursor);
@@ -373,7 +404,7 @@ export async function loadScArenaAdminActivity({
   const normalizedEventType = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/.test(cleanText(eventType, 100))
     ? cleanText(eventType, 100)
     : null;
-  const response = await activityFetch(fetchImpl, `${config.supabaseUrl}/rest/v1/rpc/sc_arena_admin_activity`, {
+  const response = await activityFetch(fetchImpl, `${config.supabaseUrl}/rest/v1/rpc/sc_arena_admin_activity_page`, {
     method: "POST",
     headers: authHeaders,
     body: JSON.stringify({
@@ -385,34 +416,48 @@ export async function loadScArenaAdminActivity({
       p_occurred_to: isValidTimestamp(occurredTo) ? new Date(occurredTo).toISOString() : null,
       p_before_occurred_at: cursorValue?.occurredAt || null,
       p_before_id: cursorValue?.id || null,
-      p_limit: boundedLimit
+      p_limit: boundedLimit,
+      p_excluded_actor_user_ids: [...isolatedUserIds]
     })
   }, config.requestTimeoutMs);
   const payload = await safeJson(response);
   if (!response.ok) {
     if (missingSchema(response, payload)) {
-      return { available: false, users, events: [], nextCursor: null, reason: "schema_missing" };
+      return { available: false, users, events: [], totalCount: 0, nextCursor: null, reason: "schema_missing" };
     }
     const error = new Error(payload?.message || payload?.error || "Arena activity could not be loaded.");
     error.status = response.status;
     throw error;
   }
   const rows = Array.isArray(payload) ? payload : [];
-  const events = rows.map(publicAdminActivityEvent).filter(Boolean);
+  const totalCount = includeUsers ? nonNegativeSafeInteger(rows[0]?.total_count) : null;
+  const events = rows
+    .map(publicAdminActivityEvent)
+    .filter((event) => event
+      && !isolatedUserIds.has(event.actorUserId)
+      && !isIsolatedArenaTestEmail(event.actorEmail, env));
   const lastRow = rows.length === boundedLimit ? rows[rows.length - 1] : null;
   if (includeUsers) {
-    const directoryUsers = await loadSupabaseAuthDirectory(config, env, fetchImpl);
-    users = mergeAdminActivityUsers(users, directoryUsers);
+    users = mergeAdminActivityUsers(
+      users,
+      directoryUsers.filter((user) => !user.isIsolatedTest)
+    ).map(({ isIsolatedTest: _isolated, isArchived: _archived, ...user }) => user);
   }
   return {
     available: true,
     users,
     events,
+    totalCount,
     nextCursor: lastRow && isValidTimestamp(lastRow.occurred_at) && Number.isSafeInteger(Number(lastRow.id))
       ? encodeCursor(lastRow.occurred_at, Number(lastRow.id))
       : null,
     reason: ""
   };
+}
+
+function nonNegativeSafeInteger(value) {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 async function loadSupabaseAuthDirectory(config, env, fetchImpl) {
@@ -423,7 +468,9 @@ async function loadSupabaseAuthDirectory(config, env, fetchImpl) {
     const payload = await safeJson(response);
     if (!response.ok || !Array.isArray(payload?.users)) return [];
     const authConfig = arenaAuthConfig(env);
-    return payload.users.map((user) => publicAuthDirectoryUser(user, authConfig)).filter(Boolean);
+    return payload.users
+      .map((user) => publicAuthDirectoryUser(user, authConfig))
+      .filter((user) => user && !user.isArchived);
   } catch {
     // The activity ledger remains usable if the Auth Admin directory is
     // temporarily unavailable. Its users will be merged on the next refresh.
@@ -438,8 +485,15 @@ function publicAuthDirectoryUser(user, authConfig) {
   const role = activityMembershipRole(viewer) || "registered";
   const email = cleanText(viewer.email, 320);
   const organizationName = cleanText(viewer.organization, 240);
+  const appMetadata = user?.app_metadata && typeof user.app_metadata === "object"
+    ? user.app_metadata
+    : {};
+  const isArchived = cleanText(appMetadata.arena_access_source, 80).toLowerCase() === "archived"
+    || Boolean(appMetadata.arena_archived_at);
   return {
     userId,
+    isIsolatedTest: viewer.isIsolatedTest === true,
+    isArchived,
     email,
     label: organizationName || email || "Arena account",
     role,

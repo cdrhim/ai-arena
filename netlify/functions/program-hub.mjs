@@ -38,7 +38,8 @@ async function programHub(req) {
         : null
     };
     const role = loadedHub.viewer?.role || "public";
-    if (!loadedHub.viewer?.canScore && ["public", "member"].includes(role) && !loadedHub.viewerTeam) {
+    const isolatedTest = loadedHub.viewer?.isIsolatedTest === true;
+    if (!isolatedTest && !loadedHub.viewer?.canScore && ["public", "member"].includes(role) && !loadedHub.viewerTeam) {
       return json({ error: "This login is not linked to a SparkClaw program team." }, 403);
     }
     let partnerProfile = null;
@@ -49,7 +50,7 @@ async function programHub(req) {
         { audience: "owner" }
       );
     }
-    const baseHub = ["b2b_partner", "human_validator"].includes(role)
+    const baseHub = isolatedTest || ["b2b_partner", "human_validator"].includes(role)
       ? externalViewerShell(loadedHub, partnerProfile)
       : loadedHub;
     const current = buildProgramActionSnapshot(baseHub, eventsBefore, baseHub.viewer);
@@ -79,7 +80,11 @@ async function programHub(req) {
 export default withScArenaDevelopmentLogging("program-hub", programHub);
 
 function externalViewerShell(hub, partnerProfile = null) {
-  const teams = Array.isArray(hub.partnerDirectory) ? hub.partnerDirectory : [];
+  const teams = Array.isArray(hub.partnerDirectory)
+    ? hub.partnerDirectory
+    : Array.isArray(hub.memberDirectory)
+      ? hub.memberDirectory
+      : [];
   const sectors = sectorSummary(teams);
   const profilesReady = teams.filter((team) => team.oneLiner && team.serviceSummary && team.websiteUrl).length;
   const collaborationFit = hub.viewer?.role === "b2b_partner"

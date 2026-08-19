@@ -60,7 +60,7 @@ export function projectTeamCardVisibility(hub = {}, visibilityByTeam = new Map()
     viewerTeam: projectedViewerTeam,
     permissions: {
       ...(hub.permissions || {}),
-      canEditTeamCardVisibility: Boolean(ownerTeamId && viewer?.role === "member")
+      canEditTeamCardVisibility: Boolean(staff || (ownerTeamId && viewer?.role === "member"))
     }
   };
 }
@@ -96,7 +96,7 @@ function projectTeam(team = {}, visibilityByTeam, ownerTeamId, staff) {
     cardVisibility: canSeePrivate
       ? {
           fields,
-          canEdit: owner,
+          canEdit: Boolean(staff || owner),
           updatedAt: setting?.updatedAt || null
         }
       : null

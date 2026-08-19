@@ -65,7 +65,9 @@ const COMPARE_SUMMARY_PROGRESS_STEPS = [
   "프로필 근거에 맞게 요약을 정리하고 있습니다."
 ];
 const ADMIN_ACTIVITY_ACTIONS = [
-  ["system", "system.session_started", "로그인·세션 시작"],
+  ["system", "system.auth_login", "인증 로그인"],
+  ["system", "system.auth_logout", "인증 로그아웃"],
+  ["system", "system.session_started", "Arena 세션 시작"],
   ["system", "system.page_viewed", "페이지 열람"],
   ["discover", "discover.connection_requested", "기업 연결 요청"],
   ["discover", "discover.connection_status_changed", "기업 연결 상태 변경"],
@@ -1760,32 +1762,25 @@ function renderProgramWorkspace(role) {
     .join("");
   const challengeById = new Map((competition().challenges || []).map((item) => [item.id, item]));
   const recent = [
-    ...collaborationReviews.map((item) => ({
+    ...(!staff ? collaborationReviews.map((item) => ({
       source: "DISCOVER",
       title: `${item.requesterTeamName || "요청 팀"} → ${item.targetTeamName || "대상 팀"}`,
       status: item.status,
       at: item.updatedAt || item.createdAt
-    })),
-    ...connections.map((item) => ({ source: "DISCOVER", title: `${item.organization || "기업 파트너"} 소개 요청`, status: item.status, at: item.updatedAt || item.createdAt })),
-    ...bountyRequests.map((item) => ({ source: "BOUNTY", title: item.problemTitle || "Bounty Brief", status: item.status, at: item.updatedAt || item.createdAt })),
-    ...submissions.map((item) => ({ source: "BOUNTY", title: challengeById.get(item.challengeId)?.title || "Bounty 제출", status: item.status, at: item.scoredAt || item.submittedAt })),
-    ...opportunities.map((item) => ({ source: "BOUNTY", title: challengeById.get(item.challengeId)?.title || "Bounty 기회 연결", status: item.status, at: item.updatedAt || item.requestedAt })),
+    })) : []),
+    ...(!staff ? connections.map((item) => ({ source: "DISCOVER", title: `${item.organization || "기업 파트너"} 소개 요청`, status: item.status, at: item.updatedAt || item.createdAt })) : []),
+    ...(!staff ? bountyRequests.map((item) => ({ source: "BOUNTY", title: item.problemTitle || "Bounty Brief", status: item.status, at: item.updatedAt || item.createdAt })) : []),
+    ...(!staff ? submissions.map((item) => ({ source: "BOUNTY", title: challengeById.get(item.challengeId)?.title || "Bounty 제출", status: item.status, at: item.scoredAt || item.submittedAt })) : []),
+    ...(!staff ? opportunities.map((item) => ({ source: "BOUNTY", title: challengeById.get(item.challengeId)?.title || "Bounty 기회 연결", status: item.status, at: item.updatedAt || item.requestedAt })) : []),
     ...communityRecentActivity()
-  ].sort((left, right) => Date.parse(right.at || 0) - Date.parse(left.at || 0)).slice(0, 8);
-  const publicBriefActivity = publicBriefs.map((item) => ({
-    source: "DISCOVER",
-    title: `${item.organization || "외부 기업"} 탐색 Brief 접수`,
-    status: publicBriefStatusLabel(item.status),
-    at: item.updatedAt || item.createdAt
-  }));
-  renderWorkspaceActivity(recent, publicBriefActivity);
+  ].sort((left, right) => Date.parse(right.at || 0) - Date.parse(left.at || 0));
+  renderWorkspaceActivity(recent);
   renderMyLogTimeline({
-    collaborationReviews: staff ? collaborationQueue : collaborationReviews,
-    connections,
-    bountyRequests,
-    submissions,
-    opportunities,
-    publicBriefs
+    collaborationReviews: staff ? [] : collaborationReviews,
+    connections: staff ? [] : connections,
+    bountyRequests: staff ? [] : bountyRequests,
+    submissions: staff ? [] : submissions,
+    opportunities: staff ? [] : opportunities
   });
   renderMyLogDetails({
     role,
@@ -1833,17 +1828,25 @@ function workspaceActivityLogMarkup(item, index) {
 
 function renderWorkspaceActivity(fallbackItems = [], supplementalItems = []) {
   if (!els.workspaceActivity) return;
-  if (myLogCanonicalState.status === "loading" && !myLogCanonicalState.available) {
+  if (["idle", "loading"].includes(myLogCanonicalState.status) && !myLogCanonicalState.available) {
     els.workspaceActivity.innerHTML = `<div class="market-empty">SparkClaw AI Arena 전용 활동 원장을 불러오고 있습니다.</div>`;
     return;
   }
   const canonicalItems = myLogCanonicalState.available
     ? myLogCanonicalState.events.map(canonicalMyLogRawActivity).filter(Boolean)
     : [];
-  const activity = [...(myLogCanonicalState.available ? canonicalItems : fallbackItems), ...supplementalItems]
+  const seen = new Set();
+  const activity = [...canonicalItems, ...fallbackItems, ...supplementalItems]
     .filter((item) => item?.title)
-    .sort((left, right) => Date.parse(right.at || 0) - Date.parse(left.at || 0))
-    .slice(0, 8);
+    .filter((item) => {
+      const parsedTime = Date.parse(item.at || "");
+      const timeKey = Number.isFinite(parsedTime) ? Math.floor(parsedTime / 1000) : String(item.at || "");
+      const key = `${String(item.source || "ACTIVITY").toUpperCase()}\u0000${String(item.title).trim()}\u0000${timeKey}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => Date.parse(right.at || 0) - Date.parse(left.at || 0));
   els.workspaceActivity.innerHTML = activity.length
     ? activity.map(workspaceActivityLogMarkup).join("")
     : `<div class="market-empty">아직 AI Arena 활동 기록이 없습니다. Discover, Community 또는 Bounty에서 첫 활동을 시작해 보세요.</div>`;
@@ -1875,19 +1878,10 @@ function rawLogTimestamp(value) {
   }).format(new Date(parsed)).replace(" ", "T")}+09:00`;
 }
 
-function renderMyLogTimeline({ collaborationReviews = [], connections = [], bountyRequests = [], submissions = [], opportunities = [], publicBriefs = [] }) {
+function renderMyLogTimeline({ collaborationReviews = [], connections = [], bountyRequests = [], submissions = [], opportunities = [] }) {
   if (!els.myLogTimelineList || !els.myLogTimelineFilters) return;
   const challengeById = new Map((competition().challenges || []).map((item) => [item.id, item]));
   const discoverItems = [
-    ...publicBriefs.map((item) => ({
-      sourceSystem: "public_brief",
-      sourceEventId: item.id,
-      category: "discover",
-      title: `${item.organization || "외부 기업"} 탐색 Brief 접수`,
-      detail: `${publicBriefStatusLabel(item.status)}${item.problemSummary ? ` · ${item.problemSummary}` : ""}`,
-      at: item.updatedAt || item.createdAt,
-      target: "myLogBriefs"
-    })),
     ...collaborationReviews.map((item) => ({
       sourceSystem: "program_actions",
       sourceEventId: item.id,
@@ -2159,6 +2153,7 @@ function emptyAdminActivityState(identity = "") {
     loadingMore: false,
     users: [],
     events: [],
+    totalCount: 0,
     nextCursor: null,
     error: "",
     loadedFilterKey: ""
@@ -2282,6 +2277,9 @@ async function loadAdminActivity({ reset = false, append = false, force = false 
     const available = result?.available === true;
     const incomingEvents = available && Array.isArray(result.events) ? result.events : [];
     const incomingUsers = available && Array.isArray(result.users) ? result.users : [];
+    const incomingTotalCount = Number.isSafeInteger(Number(result?.totalCount)) && Number(result.totalCount) >= 0
+      ? Number(result.totalCount)
+      : incomingEvents.length;
     adminActivityState = {
       identity,
       status: "ready",
@@ -2290,6 +2288,7 @@ async function loadAdminActivity({ reset = false, append = false, force = false 
       loadingMore: false,
       users: append ? existing.users : incomingUsers,
       events: append ? mergeAdminActivityEvents(existing.events, incomingEvents) : mergeAdminActivityEvents([], incomingEvents),
+      totalCount: append ? existing.totalCount : incomingTotalCount,
       nextCursor: available ? result.nextCursor || null : null,
       error: available ? "" : "활동 데이터베이스 연결을 확인해 주세요.",
       loadedFilterKey: filterKey
@@ -2329,10 +2328,19 @@ function renderAdminActivityExplorer() {
   const state = adminActivityState;
   const latest = state.events[0]?.occurredAt || state.users[0]?.lastActivityAt;
   if (els.adminActivitySummary) {
+    const displayedCount = state.events.length;
+    const totalCount = Math.max(state.totalCount, displayedCount);
+    const representativeCount = state.users.filter((user) =>
+      ["claw_member", "member"].includes(String(user?.role || "").toLowerCase())
+    ).length;
+    const expectedRepresentativeCount = 75;
+    const representativeCopy = representativeCount < expectedRepresentativeCount
+      ? `${formatNumber(expectedRepresentativeCount - representativeCount)}개사 최초 로그인 대기 · 운영진 제외`
+      : "1개사 1계정 · 운영진 제외";
     els.adminActivitySummary.innerHTML = [
-      ["조회된 활동", `${formatNumber(state.events.length)}건`, "현재 필터에서 불러온 Arena 활동"],
-      ["등록 계정", `${formatNumber(state.users.length)}명`, "Supabase에 등록된 Arena 사용자"],
-      ["최근 기록", latest ? formatDateTime(latest) : "—", "페이지 열람과 주요 실행 기록"]
+      ["전체 활동", `${formatNumber(totalCount)}건`, totalCount > displayedCount ? `${formatNumber(displayedCount)}건 표시 · 아래에서 계속 불러오기` : "현재 필터의 전체 Arena 활동"],
+      ["참여사 대표 계정", `${formatNumber(representativeCount)} / ${formatNumber(expectedRepresentativeCount)}개사`, representativeCopy],
+      ["최근 기록", latest ? formatDateTime(latest) : "—", "인증 로그인·로그아웃과 주요 실행 기록"]
     ].map(([label, value, copy]) => `<article><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(copy)}</small></article>`).join("");
   }
   if (els.adminActivityTableBody) {
@@ -2347,7 +2355,11 @@ function renderAdminActivityExplorer() {
   }
   setText(
     els.adminActivityStatus,
-    state.error || (state.status === "loading" ? "Arena 전용 활동 원장을 조회하고 있습니다." : state.events.length ? `${formatNumber(state.events.length)}건 표시 중` : "")
+    state.error || (state.status === "loading"
+      ? "Arena 전용 활동 원장을 조회하고 있습니다."
+      : state.events.length
+        ? `${formatNumber(state.events.length)} / ${formatNumber(Math.max(state.totalCount, state.events.length))}건 표시 중`
+        : "")
   );
 }
 
@@ -2370,7 +2382,7 @@ function adminActivityActionLabel(eventType) {
 }
 
 function adminActivityDomainLabel(domain) {
-  return ({ system: "로그인·페이지", discover: "Discover", community: "Community", bounty: "Bounty" })[domain] || "System";
+  return ({ system: "인증·시스템", discover: "Discover", community: "Community", bounty: "Bounty" })[domain] || "System";
 }
 
 function renderMyLogTimelineItems() {
@@ -2629,7 +2641,7 @@ function renderStaffQueue() {
   const collaborationAuditLogs = context.hub?.programAuditLogs || [];
   els.staffMarketQueueContent.innerHTML = `
     <div class="staff-queue-columns">
-      <section><div class="staff-queue-section-head"><h3>혜택 신청</h3>${staffBenefitQueueBadge()}</div>${staffBenefitQueueMarkup()}</section>
+      <section><div class="staff-queue-section-head"><h3>혜택 문의</h3>${staffBenefitQueueBadge()}</div>${staffBenefitQueueMarkup()}</section>
       <section><h3>Partnerships</h3>${connections.length ? connections.slice(0, 8).map((item) => `<article class="staff-queue-item"><div><strong>${escapeHtml(startupById(item.startupId)?.name || "Team")}</strong><span>${escapeHtml(item.organization || "")} · ${escapeHtml(PIPELINE_LABELS[item.status] || item.status)}</span></div><button data-market-page="partnerships" type="button">Pipeline →</button></article>`).join("") : `<div class="market-empty">연결 요청 없음</div>`}</section>
     </div>
     <div class="staff-collaboration-grid">
@@ -2674,7 +2686,7 @@ async function loadStaffBenefitQueue({ force = false } = {}) {
     const payload = await safeJson(response);
     if (requestId !== staffBenefitQueueRequestId) return;
     if (!response.ok || payload?.available === false || !payload?.staffSummary) {
-      throw new Error(payload?.error || "혜택 신청을 불러오지 못했습니다.");
+      throw new Error(payload?.error || "혜택 문의를 불러오지 못했습니다.");
     }
     staffBenefitQueueState = {
       identity,
@@ -2685,7 +2697,7 @@ async function loadStaffBenefitQueue({ force = false } = {}) {
     };
   } catch (error) {
     if (requestId !== staffBenefitQueueRequestId) return;
-    staffBenefitQueueState = { ...emptyStaffBenefitQueueState(identity), status: "error", error: error.message || "혜택 신청을 불러오지 못했습니다." };
+    staffBenefitQueueState = { ...emptyStaffBenefitQueueState(identity), status: "error", error: error.message || "혜택 문의를 불러오지 못했습니다." };
   }
   renderStaffQueue();
 }
@@ -2698,7 +2710,7 @@ function staffBenefitQueueBadge() {
 
 function staffBenefitQueueMarkup() {
   if (["idle", "loading"].includes(staffBenefitQueueState.status)) {
-    return `<div class="market-empty">Claw Member 혜택 신청을 확인하고 있습니다.</div>`;
+    return `<div class="market-empty">Claw Member 혜택 문의를 확인하고 있습니다.</div>`;
   }
   if (staffBenefitQueueState.status === "error") {
     return `<div class="market-empty">${escapeHtml(staffBenefitQueueState.error)}</div>`;
@@ -2713,7 +2725,7 @@ function staffBenefitQueueMarkup() {
   const count = Math.max(0, Number(staffBenefitQueueState.summary?.newRequestCount) || 0);
   return count
     ? `<div class="market-empty"><strong>${formatNumber(count)}건의 신규 신청이 있습니다.</strong><span>최근 신청 상세를 준비하고 있습니다.</span></div>`
-    : `<div class="market-empty">새로운 혜택 신청이 없습니다.</div>`;
+    : `<div class="market-empty">새로운 혜택 문의가 없습니다.</div>`;
 }
 
 function collaborationAuditActionLabel(action) {

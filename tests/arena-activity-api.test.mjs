@@ -47,6 +47,27 @@ test("Arena activity API records only allowlisted authenticated client activity"
   assert.equal(Object.hasOwn(received, "bodyMarkdown"), false);
   assert.deepEqual(await response.json(), { stored: true, reason: "" });
 });
+
+test("Arena activity API accepts only self-bound authentication lifecycle events", async () => {
+  const actions = [];
+  for (const action of ["auth_login", "auth_logout"]) {
+    const response = await arenaActivity(new Request("https://arena.test/api/arena-activity", {
+      method: "POST",
+      headers: { authorization: "Bearer member-token", "content-type": "application/json" },
+      body: JSON.stringify({ action, clientEventId: `${action}:${MEMBER.id}`, actorUserId: STAFF.id })
+    }), {
+      verifyRequest: async () => ({ ok: true, viewer: MEMBER }),
+      recordClientActivity: async (input) => {
+        actions.push(input);
+        return { stored: true };
+      }
+    });
+    assert.equal(response.status, 200);
+  }
+  assert.deepEqual(actions.map((input) => input.action), ["auth_login", "auth_logout"]);
+  assert.equal(actions.every((input) => input.viewer === MEMBER), true);
+  assert.equal(actions.some((input) => Object.hasOwn(input, "actorUserId")), false);
+});
 test("Arena activity API rejects unauthenticated and unsupported writes", async () => {
   let recorded = false;
   const unauthorized = await arenaActivity(new Request("https://arena.test/api/arena-activity", { method: "POST" }), {
@@ -89,6 +110,7 @@ test("cross-user activity reads require SparkLabs staff and normalize filters", 
         available: true,
         users: [],
         events: [{ id: 10, eventType: "community.comment_created" }],
+        totalCount: 321,
         nextCursor: "next-page"
       };
     }
@@ -104,6 +126,7 @@ test("cross-user activity reads require SparkLabs staff and normalize filters", 
   assert.equal(received.occurredFrom, "2026-08-01T00:00:00.000Z");
   assert.equal(received.occurredTo, "2026-08-18T00:00:00.000Z");
   assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.equal((await response.json()).totalCount, 321);
 });
 
 test("Arena activity route exposes a bounded GET/POST CORS contract", async () => {

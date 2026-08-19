@@ -70,8 +70,8 @@ test("public discovery Brief monitoring is rendered only in the SparkLabs My Log
   assert.match(html, /id="myLogBriefList"/);
   assert.match(market, /function renderMyLogPublicBriefs/);
   assert.match(market, /\["sparklabs", "admin"\]\.includes\(role\)/);
-  assert.match(market, /sourceSystem: "public_brief"/);
-  assert.match(market, /target: "myLogBriefs"/);
+  assert.match(market, /const items = monitor\.items \|\| \[\]/);
+  assert.match(market, /els\.myLogBriefList\.innerHTML = items\.length/);
   assert.match(css, /\.my-log-public-brief-panel\s*\{[\s\S]*?grid-column:\s*1 \/ -1/);
 });
 
@@ -99,6 +99,15 @@ test("Recent activity is presented as a readable raw log stream", () => {
   assert.match(market, /source: "COMMUNITY"/);
   assert.match(market, /function renderWorkspaceActivity/);
   assert.match(market, /myLogCanonicalState\.events\.map\(canonicalMyLogRawActivity\)/);
+  assert.match(market, /\["idle", "loading"\]\.includes\(myLogCanonicalState\.status\)/);
+  const recentActivityRenderer = market.slice(market.indexOf("function renderWorkspaceActivity"), market.indexOf("function canonicalMyLogRawActivity"));
+  assert.doesNotMatch(recentActivityRenderer, /\.slice\(0, 8\)/);
+  assert.match(recentActivityRenderer, /\[\.\.\.canonicalItems, \.\.\.fallbackItems, \.\.\.supplementalItems\]/);
+  assert.match(recentActivityRenderer, /const seen = new Set\(\)/);
+  assert.doesNotMatch(recentActivityRenderer, /myLogCanonicalState\.available \? canonicalItems : fallbackItems/);
+  assert.match(html, /id="workspaceActivity"[^>]*tabindex="0"[^>]*role="feed"/);
+  assert.match(css, /\.workspace-activity\s*\{[\s\S]*?max-height:\s*420px;[\s\S]*?overflow-y:\s*auto/);
+  assert.match(css, /\.workspace-activity:focus-visible/);
   assert.doesNotMatch(market, /source: "REPORT"/);
   assert.doesNotMatch(market, /source: "PERK"/);
   assert.doesNotMatch(market, /source: "EVENT"/);
@@ -109,6 +118,20 @@ test("Recent activity is presented as a readable raw log stream", () => {
   assert.match(css, /content: "stdout \/ activity\.stream \/ newest_first"/);
   assert.match(css, /\.workspace-activity article\s*\{[\s\S]*?grid-template-columns: 3ch 19ch 12ch minmax\(0, 1fr\) auto/);
   assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.workspace-log-line strong/);
+});
+
+test("staff Recent Activity stays personal and excludes operational intake monitoring", () => {
+  const programWorkspace = market.slice(market.indexOf("function renderProgramWorkspace"), market.indexOf("function workspaceActionMarkup"));
+  const timelineRenderer = market.slice(market.indexOf("function renderMyLogTimeline"), market.indexOf("async function loadCanonicalMyLog"));
+  assert.match(programWorkspace, /renderWorkspaceActivity\(recent\)/);
+  assert.doesNotMatch(programWorkspace, /renderWorkspaceActivity\(recent, publicBriefActivity\)/);
+  assert.doesNotMatch(programWorkspace, /title: `\$\{item\.organization \|\| "외부 기업"\} 탐색 Brief 접수`/);
+  assert.match(programWorkspace, /!staff \? collaborationReviews\.map/);
+  assert.match(programWorkspace, /collaborationReviews: staff \? \[\] : collaborationReviews/);
+  assert.match(programWorkspace, /connections: staff \? \[\] : connections/);
+  assert.match(programWorkspace, /bountyRequests: staff \? \[\] : bountyRequests/);
+  assert.doesNotMatch(timelineRenderer, /publicBriefs/);
+  assert.doesNotMatch(timelineRenderer, /sourceSystem: "public_brief"/);
 });
 
 test("My Log exposes one reverse-chronological activity window with source filters", () => {

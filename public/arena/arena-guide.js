@@ -1,4 +1,4 @@
-import { initArenaGuideTutorial } from "./arena-guide-tutorial.js?v=ai-arena-20260817-role-tutorial-v113";
+import { initArenaGuideTutorial } from "./arena-guide-tutorial.js?v=ai-arena-20260818-member-perk-walkthrough-v125";
 
 const ALLOWED_PAGES = new Set(["overview", "teams", "discover", "compare", "community", "arena", "workspace"]);
 

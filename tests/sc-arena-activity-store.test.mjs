@@ -142,6 +142,29 @@ test("client activity binds the authenticated viewer and stores no credentials o
   assert.equal(Object.hasOwn(body.p_metadata, "token"), false);
 });
 
+test("verified login and explicit logout become staff-only Supabase activity rows", async () => {
+  const bodies = [];
+  for (const action of ["auth_login", "auth_logout"]) {
+    const result = await recordScArenaClientActivity({
+      action,
+      clientEventId: `${action}:11111111-1111-4111-8111-111111111111`,
+      viewer: { id: ACTOR_ID, role: "member", email: "private@example.com", organization: "테스트 팀" },
+      context: { viewerTeam: { id: "team-1", name: "테스트 팀" } },
+      env: env(),
+      fetchImpl: async (_url, options) => {
+        bodies.push(JSON.parse(options.body));
+        return jsonResponse(89);
+      }
+    });
+    assert.equal(result.stored, true);
+  }
+
+  assert.deepEqual(bodies.map((body) => body.p_event_type), ["system.auth_login", "system.auth_logout"]);
+  assert.deepEqual(bodies.map((body) => body.p_audience_scope), ["staff", "staff"]);
+  assert.deepEqual(bodies.map((body) => body.p_route_target), ["operations", "operations"]);
+  assert.equal(JSON.stringify(bodies).includes("private@example.com"), false);
+});
+
 test("writes use opaque secret keys correctly and strip nested metadata", async () => {
   const calls = [];
   const result = await recordScArenaActivity({
@@ -262,10 +285,13 @@ test("My Log accepts only SparkClaw AI Arena Discover, Community, and Bounty eve
   assert.equal(isScArenaPlatformActivity({ domain: "community", event_type: "community.comment_created" }), true);
   assert.equal(isScArenaPlatformActivity({ domain: "bounty", event_type: "bounty.submission_created" }), true);
   assert.equal(isScArenaPlatformActivity({ domain: "events", event_type: "events.registration_created" }), false);
+  assert.equal(isScArenaPlatformActivity({ domain: "system", event_type: "system.auth_login" }), false);
+  assert.equal(isScArenaPlatformActivity({ domain: "system", event_type: "system.auth_logout" }), false);
+  assert.equal(isScArenaPlatformActivity({ domain: "system", event_type: "system.session_started" }), false);
   assert.equal(isScArenaPlatformActivity({ domain: "community", event_type: "discover.connection_requested" }), false);
 });
 
-test("admin activity syncs staff membership and reads cross-user rows with the staff JWT", async () => {
+test("admin activity relies on the verified staff membership and reads cross-user rows with the staff JWT", async () => {
   const calls = [];
   const req = new Request("https://arena.test/api/arena-activity", {
     headers: { authorization: "Bearer staff-access-token" }
@@ -281,8 +307,7 @@ test("admin activity syncs staff membership and reads cross-user rows with the s
     limit: 999,
     env: env(),
     fetchImpl: async (url, options) => {
-      calls.push({ url, options, body: JSON.parse(options.body) });
-      if (url.endsWith("sc_arena_sync_membership")) return jsonResponse([{ workspace_id: "workspace-1" }]);
+      calls.push({ url, options, body: options.body ? JSON.parse(options.body) : null });
       if (url.endsWith("sc_arena_admin_activity_users")) return jsonResponse([{
         user_id: AUTHOR_ID,
         email: "member@example.com",
@@ -293,6 +318,7 @@ test("admin activity syncs staff membership and reads cross-user rows with the s
         first_activity_at: "2026-08-12T00:00:00.000Z",
         last_activity_at: "2026-08-12T01:00:00.000Z"
       }]);
+      if (url.includes("/auth/v1/admin/users")) return jsonResponse({ users: [] });
       return jsonResponse([{
         id: 15,
         event_uid: "33333333-3333-4333-8333-333333333333",
@@ -310,6 +336,7 @@ test("admin activity syncs staff membership and reads cross-user rows with the s
         source_system: "forum",
         occurred_at: "2026-08-12T01:00:00.000Z",
         recorded_at: "2026-08-12T01:00:01.000Z",
+        total_count: 321,
         metadata: { threadId: "thread-1" }
       }]);
     }
@@ -318,14 +345,15 @@ test("admin activity syncs staff membership and reads cross-user rows with the s
   assert.equal(result.available, true);
   assert.equal(result.users[0].email, "member@example.com");
   assert.equal(result.events[0].actorUserId, AUTHOR_ID);
-  assert.equal(calls[0].options.headers.apikey, "sb_secret_server");
-  assert.equal(Object.hasOwn(calls[0].options.headers, "Authorization"), false);
-  assert.equal(calls[1].options.headers.Authorization, "Bearer staff-access-token");
+  assert.equal(result.totalCount, 321);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0].options.headers.Authorization, "Bearer staff-access-token");
   assert.equal(calls[2].options.headers.Authorization, "Bearer staff-access-token");
   assert.equal(calls[2].body.p_actor_user_id, AUTHOR_ID);
   assert.equal(calls[2].body.p_domain, "community");
   assert.equal(calls[2].body.p_event_type, "community.comment_created");
   assert.equal(calls[2].body.p_limit, 200);
+  assert.deepEqual(calls[2].body.p_excluded_actor_user_ids, []);
 });
 
 test("admin activity includes existing Supabase Auth users before they create ledger events", async () => {
@@ -338,7 +366,6 @@ test("admin activity includes existing Supabase Auth users before they create le
     viewer: { id: ACTOR_ID, role: "sparklabs", canScore: true, organization: "SparkLabs" },
     env: env(),
     fetchImpl: async (url) => {
-      if (url.endsWith("sc_arena_sync_membership")) return jsonResponse([{ workspace_id: "workspace-1" }]);
       if (url.endsWith("sc_arena_admin_activity_users")) return jsonResponse([{
         user_id: AUTHOR_ID,
         email: "member@example.com",
@@ -359,6 +386,14 @@ test("admin activity includes existing Supabase Auth users before they create le
         email: "new@example.com",
         app_metadata: {},
         user_metadata: { companyName: "New Team" }
+      }, {
+        id: "55555555-5555-4555-8555-555555555555",
+        email: "archived@example.com",
+        app_metadata: {
+          arena_access_source: "archived",
+          arena_archived_at: "2026-08-19T01:00:00.000Z"
+        },
+        user_metadata: { companyName: "Archived Team" }
       }] });
       return jsonResponse([]);
     }
@@ -366,14 +401,97 @@ test("admin activity includes existing Supabase Auth users before they create le
 
   assert.equal(result.available, true);
   assert.equal(result.users.length, 2);
+  assert.equal(result.users.some((user) => user.email === "archived@example.com"), false);
   assert.equal(result.users[0].userId, AUTHOR_ID);
   assert.equal(result.users[0].label, "Ledger Team");
   assert.equal(result.users[0].eventCount, 5);
   assert.equal(result.users[1].userId, accountWithoutActivityId);
-  assert.equal(result.users[1].role, "registered");
+  assert.equal(result.users[1].role, "claw_member");
   assert.equal(result.users[1].eventCount, 0);
   assert.equal(JSON.stringify(result.users).includes("privateNote"), false);
   assert.equal(JSON.stringify(result.users).includes("provider"), false);
+});
+
+test("isolated test accounts produce no activity and are excluded from the admin explorer", async () => {
+  const isolatedId = "55555555-5555-4555-8555-555555555555";
+  const isolatedViewer = {
+    id: isolatedId,
+    email: "haeryong.rhim@gmail.com",
+    role: "member",
+    isIsolatedTest: true
+  };
+  let writes = 0;
+  const writeResult = await recordScArenaActivity({
+    sourceSystem: "forum",
+    event: { id: "isolated-post", type: "forum_thread_created", thread: { id: "t1", title: "hidden" } },
+    viewer: isolatedViewer,
+    env: env(),
+    fetchImpl: async () => {
+      writes += 1;
+      return jsonResponse({});
+    }
+  });
+  assert.deepEqual(writeResult, { stored: false, reason: "isolated_test" });
+  assert.equal(writes, 0);
+
+  const privateLog = await loadScArenaMyLog({
+    req: new Request("https://arena.test/api/my-log", {
+      headers: { authorization: "Bearer isolated-token" }
+    }),
+    viewer: isolatedViewer,
+    env: env(),
+    fetchImpl: async () => {
+      throw new Error("isolated My Log must not touch the ledger");
+    }
+  });
+  assert.deepEqual(privateLog, { available: true, events: [], nextCursor: null, reason: "" });
+
+  const result = await loadScArenaAdminActivity({
+    req: new Request("https://arena.test/api/arena-activity", {
+      headers: { authorization: "Bearer staff-access-token" }
+    }),
+    viewer: { id: ACTOR_ID, role: "sparklabs", canScore: true, organization: "SparkLabs" },
+    env: env(),
+    fetchImpl: async (url) => {
+      if (url.endsWith("sc_arena_admin_activity_users")) return jsonResponse([{
+        user_id: isolatedId,
+        email: isolatedViewer.email,
+        actor_label: "Hidden Test",
+        role: "claw_member",
+        organization_name: "Hidden Test",
+        event_count: 1,
+        first_activity_at: "2026-08-18T01:00:00.000Z",
+        last_activity_at: "2026-08-18T01:00:00.000Z"
+      }]);
+      if (url.includes("/auth/v1/admin/users")) return jsonResponse({ users: [{
+        id: isolatedId,
+        email: isolatedViewer.email,
+        app_metadata: { arena_access_source: "isolated_test", isolated_test: true },
+        user_metadata: {}
+      }] });
+      return jsonResponse([{
+        id: 99,
+        event_uid: "99999999-9999-4999-8999-999999999999",
+        actor_user_id: isolatedId,
+        actor_email: isolatedViewer.email,
+        actor_label: "Hidden Test",
+        actor_role: "claw_member",
+        organization_name: "Hidden Test",
+        domain: "system",
+        event_type: "system.auth_login",
+        event_label: "로그인",
+        title: "AI Arena 계정 로그인",
+        summary: "hidden",
+        route_target: "operations",
+        source_system: "arena_client",
+        occurred_at: "2026-08-18T01:00:00.000Z",
+        recorded_at: "2026-08-18T01:00:01.000Z",
+        metadata: {}
+      }]);
+    }
+  });
+  assert.deepEqual(result.users, []);
+  assert.deepEqual(result.events, []);
 });
 
 test("auxiliary activity requests abort at the configured timeout", async () => {

@@ -5,6 +5,7 @@ import { deriveTeamKeywords } from "./team-keywords.mjs";
 import { SPARKCLAW_APPLICANT_STARTUPS } from "./sparkclaw-applicant-seed.mjs";
 import { rankedTaskDetails, TASK_KEYWORD_PENDING } from "../../public/arena/task-keywords.js";
 import { isCommunityEventFromOrientation, partnerVisibleProgramEvents } from "../../public/arena/event-timeline.js";
+import { isIsolatedArenaTestViewer } from "./isolated-test-account.mjs";
 
 const PROGRAM_TABLES = {
   teams: [
@@ -38,7 +39,7 @@ const PROGRAM_TABLES = {
     "is_test_account",
     "mentor_id"
   ],
-  team_members: ["id", "team_id", "is_founder", "title"],
+  team_members: ["id", "team_id", "email", "is_founder", "title"],
   mentors: ["id", "name", "affiliation", "booking_url", "color"],
   hypotheses: ["id", "team_id", "week_number", "created_at"],
   customer_interviews: ["id", "hypothesis_id", "team_id", "interview_date", "pain_level", "created_at"],
@@ -136,7 +137,9 @@ export async function loadProgramDirectoryContext(viewer, env = process.env, fet
     readFixedTable(config, "teams", PROGRAM_TABLES.teams, fetchImpl),
     loadTeamKeywordRows(env, fetchImpl)
   ]);
-  const viewerTeamRow = viewerTeamRowForEmail(rows, viewer?.email);
+  const viewerTeamRow = isIsolatedArenaTestViewer(viewer, env)
+    ? null
+    : viewerTeamRowForEmail(rows, viewer?.email);
   return {
     directory: projectPartnerDirectory(rows, keywordRows),
     viewer: effectiveProgramViewer(viewer, viewerTeamRow),
@@ -224,14 +227,57 @@ export async function resolveProgramParticipantViewer(viewer, env = process.env,
   if (!viewer) return { viewer, viewerTeamId: null, isParticipant: false, communityDisplayNames: new Map() };
   const config = programDatabaseConfig(env);
   assertConfigured(config);
-  const rows = await readFixedTable(config, "teams", PROGRAM_TABLES.teams, fetchImpl);
-  const canResolveParticipant = ["public", "member"].includes(viewer.role);
+  const [rows, memberRows] = await Promise.all([
+    readFixedTable(config, "teams", PROGRAM_TABLES.teams, fetchImpl),
+    readFixedTable(config, "team_members", PROGRAM_TABLES.team_members, fetchImpl)
+  ]);
+  const canResolveParticipant = !isIsolatedArenaTestViewer(viewer, env)
+    && ["public", "member", "b2b_partner"].includes(viewer.role);
   const viewerTeamRow = canResolveParticipant ? viewerTeamRowForEmail(rows, viewer.email) : null;
   return {
     viewer: effectiveProgramViewer(viewer, viewerTeamRow),
     viewerTeamId: viewerTeamRow?.id == null ? null : String(viewerTeamRow.id),
     isParticipant: Boolean(viewerTeamRow),
-    communityDisplayNames: programCommunityDisplayNames(rows)
+    communityDisplayNames: programCommunityDisplayNames(rows, memberRows)
+  };
+}
+
+// Login authorization is intentionally stricter than the directory viewer
+// resolver. Only an exact email recorded on one of the currently eligible
+// Program team's original application email may enter AI Arena as a member.
+// Corporate-domain inference is useful for discovery UX, but must never grant
+// account access. team_members rows are intentionally excluded so each company
+// has exactly one member login.
+export async function resolveEligibleProgramApplicantEmail(email, env = process.env, fetchImpl = fetch) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return { eligible: false, reason: "missing_email", team: null };
+
+  const config = programDatabaseConfig(env);
+  assertConfigured(config);
+  const rows = await readFixedTable(config, "teams", PROGRAM_TABLES.teams, fetchImpl);
+  const eligibleTeams = (Array.isArray(rows) ? rows : []).filter((team) => !isExcludedPartnerTeam(team));
+  const matches = new Map();
+
+  for (const team of eligibleTeams) {
+    if (teamEmailMatches(team.email, normalizedEmail)) matches.set(String(team.id), team);
+  }
+
+  if (matches.size !== 1) {
+    return {
+      eligible: false,
+      reason: matches.size > 1 ? "ambiguous_email" : "not_registered",
+      team: null
+    };
+  }
+  const team = [...matches.values()][0];
+  return {
+    eligible: true,
+    reason: "exact_registered_email",
+    team: {
+      id: String(team.id),
+      name: directoryDisplayName(team),
+      organizationType: "startup"
+    }
   };
 }
 
@@ -282,7 +328,9 @@ export async function loadProgramHub(viewer, env = process.env, fetchImpl = fetc
   const mentorsById = new Map(data.mentors.map((mentor) => [String(mentor.id), mentor]));
   const activityByTeam = buildActivityByTeam(data);
   const staff = Boolean(viewer?.canScore);
-  const viewerTeamRow = viewerTeamRowForEmail(data.teams, viewer?.email);
+  const viewerTeamRow = isIsolatedArenaTestViewer(viewer, env)
+    ? null
+    : viewerTeamRowForEmail(data.teams, viewer?.email);
   const effectiveViewer = effectiveProgramViewer(viewer, viewerTeamRow);
   const safeProgramDirectory = projectPartnerDirectory(data.teams, keywordRows, activityByTeam);
   const partnerDirectory = effectiveViewer?.role === "b2b_partner"
@@ -293,6 +341,7 @@ export async function loadProgramHub(viewer, env = process.env, fetchImpl = fetc
     : null;
 
   const teams = data.teams
+    .filter((team) => !isExcludedPartnerTeam(team))
     .map((team) => {
       const mentor = team.mentor_id ? mentorsById.get(String(team.mentor_id)) : null;
       const isViewerTeam = sameId(team.id, viewerTeamRow?.id);
@@ -530,7 +579,7 @@ async function readFixedTable(config, table, columns, fetchImpl) {
   const response = await fetchImpl(url, {
     headers: {
       apikey: config.key,
-      Authorization: `Bearer ${config.key}`,
+      ...(!String(config.key).startsWith("sb_secret_") ? { Authorization: `Bearer ${config.key}` } : {}),
       "user-agent": SERVER_USER_AGENT,
       Prefer: "count=exact"
     }
@@ -1125,21 +1174,14 @@ function emailDomain(value) {
 
 function viewerTeamRowForEmail(rows = [], viewerEmail) {
   const teams = Array.isArray(rows) ? rows : [];
-  const exact = teams.find((team) => teamEmailMatches(team.email, viewerEmail));
-  if (exact) return exact;
-
-  const domain = emailDomain(viewerEmail);
-  if (!domain || SHARED_EMAIL_DOMAINS.has(domain)) return null;
-  const matches = teams.filter((team) =>
-    normalizedTeamEmails(team.email).some((email) => emailDomain(email) === domain)
-  );
-  return matches.length === 1 ? matches[0] : null;
+  return teams.find((team) => teamEmailMatches(team.email, viewerEmail)) || null;
 }
 
-export function programCommunityDisplayNames(rows = []) {
+export function programCommunityDisplayNames(rows = [], memberRows = []) {
   const displayNames = new Map();
   const domainCandidates = new Map();
-  for (const team of Array.isArray(rows) ? rows : []) {
+  const teams = Array.isArray(rows) ? rows : [];
+  for (const team of teams) {
     const displayName = directoryDisplayName(team);
     if (!displayName) continue;
     for (const email of normalizedTeamEmails(team.email)) {
@@ -1150,6 +1192,12 @@ export function programCommunityDisplayNames(rows = []) {
       domainCandidates.get(domain).add(displayName);
     }
   }
+  for (const member of Array.isArray(memberRows) ? memberRows : []) {
+    const team = teams.find((candidate) => sameId(candidate.id, member.team_id));
+    const displayName = directoryDisplayName(team);
+    if (!displayName) continue;
+    for (const email of normalizedTeamEmails(member.email)) displayNames.set(email, displayName);
+  }
   for (const [domain, names] of domainCandidates) {
     if (names.size === 1) displayNames.set(`@${domain}`, [...names][0]);
   }
@@ -1157,13 +1205,15 @@ export function programCommunityDisplayNames(rows = []) {
 }
 
 function effectiveProgramViewer(viewer, viewerTeamRow) {
-  const effectiveViewer = viewerTeamRow && viewer?.role === "public"
+  const effectiveViewer = viewerTeamRow && ["public", "member", "b2b_partner"].includes(viewer?.role)
     ? {
         ...viewer,
         role: "member",
         roleLabel: "Approved member",
         canSubmitProducts: true,
-        canViewPartnerRequests: true
+        canRequestConnections: false,
+        canViewPartnerRequests: true,
+        canConnect: false
       }
     : viewer;
   const communityDisplayName = viewerTeamRow ? directoryDisplayName(viewerTeamRow) : "";

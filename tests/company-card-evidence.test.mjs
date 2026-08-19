@@ -22,8 +22,8 @@ test("기업 카드와 상세 화면은 팀 소개와 구체적인 Task 설명�
   assert.match(js, /specialtyTasks/);
   assert.match(js, /공개 근거/);
   assert.match(js, /task-detail-list/);
-  assert.match(js, /const clawMemberViewer = isClawMemberViewer\(\)/);
-  assert.match(js, /clawMemberViewer \? "" : `<p class="controlled-intro-note is-evidence">경력·학력·성과/);
+  assert.doesNotMatch(js, /경력·학력·성과는 팀 제출 지원자료/);
+  assert.doesNotMatch(js, /controlled-intro-note is-evidence/);
 
   const tasks = taskDetails({
     description: "계약서 OCR 문서 검토 자동화와 고객 상담을 지원하는 AI agent"

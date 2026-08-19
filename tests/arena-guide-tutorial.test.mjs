@@ -13,7 +13,7 @@ import {
 test("클로이 튜토리얼은 세 역할을 9단계 이내의 서로 다른 빠른 시작으로 안내한다", () => {
   assert.deepEqual(
     Object.fromEntries(Object.entries(ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE).map(([role, steps]) => [role, steps.length])),
-    { member: 9, staff: 8, partner: 9 }
+    { member: 8, staff: 8, partner: 9 }
   );
   for (const steps of Object.values(ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE)) {
     assert.ok(steps.length <= 9);
@@ -23,7 +23,7 @@ test("클로이 튜토리얼은 세 역할을 9단계 이내의 서로 다른 �
   assert.equal(ARENA_GUIDE_TUTORIAL_STEPS, ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE.member);
   assert.deepEqual(
     ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE.member.map((step) => step.key),
-    ["discover-overview", "discover-spark-ai", "discover-company-directory", "discover-advisors", "discover-benefit", "community-overview", "bounty-overview", "my-log-overview", "my-log-actions"]
+    ["discover-overview", "discover-spark-ai", "discover-company-directory", "discover-advisors", "community-overview", "bounty-overview", "my-log-overview", "my-log-actions"]
   );
   assert.deepEqual(
     ARENA_GUIDE_TUTORIAL_STEPS_BY_ROLE.staff.map((step) => step.key),
@@ -36,7 +36,7 @@ test("클로이 튜토리얼은 세 역할을 9단계 이내의 서로 다른 �
   assert.equal(normalizeArenaGuideTutorialRole("sparklabs"), "staff");
   assert.equal(normalizeArenaGuideTutorialRole("admin"), "staff");
   assert.equal(normalizeArenaGuideTutorialRole("b2b_partner"), "partner");
-  assert.equal(getArenaGuideTutorialSteps("member").length, 9);
+  assert.equal(getArenaGuideTutorialSteps("member").length, 8);
   assert.equal(typeof initArenaGuideTutorial, "function");
 });
 

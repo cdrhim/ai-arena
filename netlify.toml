@@ -22,6 +22,11 @@ to = "/.netlify/functions/arena-auth"
 status = 200
 
 [[redirects]]
+from = "/api/arena-login"
+to = "/.netlify/functions/arena-login"
+status = 200
+
+[[redirects]]
 from = "/api/arena-public"
 to = "/.netlify/functions/arena-public"
 status = 200
@@ -109,6 +114,11 @@ status = 200
 [[redirects]]
 from = "/api/arena-activity"
 to = "/.netlify/functions/arena-activity"
+status = 200
+
+[[redirects]]
+from = "/api/arena-interactions"
+to = "/.netlify/functions/arena-interactions"
 status = 200
 
 [[redirects]]

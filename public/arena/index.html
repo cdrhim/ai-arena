@@ -19,8 +19,8 @@
   <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png?v=ai-arena-20260811">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=ai-arena-20260811">
   <title>SparkLabs AI Arena</title>
-  <link rel="stylesheet" href="/arena/arena.css?v=ai-arena-20260817-mobile-brand-v114">
-  <link rel="stylesheet" href="/arena/market.css?v=ai-arena-20260817-mobile-brand-v114">
+  <link rel="stylesheet" href="/arena/arena.css?v=ai-arena-20260818-member-perk-walkthrough-v125">
+  <link rel="stylesheet" href="/arena/market.css?v=ai-arena-20260818-member-perk-walkthrough-v125">
 </head>
 <body class="is-booting">
   <div id="bootScreen" class="boot-screen" aria-live="polite">
@@ -256,7 +256,7 @@
                 <small>program teams</small>
               </div>
               <div class="orbit-card orbit-card-top"><strong id="heroSectorCount">—</strong><small>task areas</small></div>
-              <div class="orbit-card orbit-card-bottom"><strong id="heroBenefitCount">—</strong><small id="heroBenefitLabel">active benefits</small></div>
+              <div class="orbit-card orbit-card-bottom"><strong id="heroBenefitCount">—</strong><small id="heroBenefitLabel">total interactions</small></div>
             </div>
           </div>
         </div>
@@ -363,7 +363,7 @@
             <div class="panel-head"><div><span class="section-kicker">ARENA UPDATES</span><h2>Arena 소식</h2></div><button class="text-link" data-go-page="community" type="button">커뮤니티 보기 →</button></div>
             <div id="featuredNews" class="featured-news-list"></div>
           </article>
-          <article class="panel partner-callout" data-hide-from-admin hidden>
+          <article class="panel partner-callout" data-hide-from-admin data-hide-from-claw-member hidden>
             <div class="partner-callout-provider" data-hide-from-claw-member>
               <span class="section-kicker">OUR PARTNERS</span>
               <h2>Build a perk founders will actually use.</h2>
@@ -371,36 +371,6 @@
               <div id="partnerLogoRail" class="partner-logo-rail" aria-label="파트너 예시"></div>
               <button class="secondary-button compact" data-go-page="partnerships" type="button">Feature a perk</button>
             </div>
-            <form id="memberBenefitSurveyForm" class="member-benefit-survey" data-show-for-claw-member hidden aria-describedby="memberBenefitSurveyHelp memberBenefitSurveyStatus">
-              <div class="member-benefit-survey-intro">
-                <span class="section-kicker">BENEFIT NEEDS</span>
-                <h2>필요한 혜택을 알려주세요.</h2>
-                <p id="memberBenefitSurveyHelp">팀에 필요한 솔루션과 그 이유를 SparkLabs가 검토하고 혜택 파트너 발굴에 활용합니다.</p>
-              </div>
-
-              <div class="member-benefit-survey-response">
-                <label class="member-benefit-survey-field" for="memberBenefitSurveyName">
-                  <span>필요한 솔루션 명</span>
-                  <input id="memberBenefitSurveyName" name="solutionName" type="text" minlength="2" maxlength="100" placeholder="예: 고객지원 AI 도구 Pro" required>
-                </label>
-
-                <label class="member-benefit-survey-field member-benefit-survey-detail" for="memberBenefitSurveyDetails">
-                  <span>솔루션 세부 내용</span>
-                  <textarea id="memberBenefitSurveyDetails" name="solutionDetails" rows="3" minlength="10" maxlength="500" placeholder="필요한 기능·지원 범위와 사용 상황을 적어주세요." required></textarea>
-                </label>
-
-                <label class="member-benefit-survey-field member-benefit-survey-reason" for="memberBenefitSurveyReason">
-                  <span>필요한 이유</span>
-                  <textarea id="memberBenefitSurveyReason" name="solutionReason" rows="3" minlength="10" maxlength="500" placeholder="현재 문제와 기대 효과를 구체적으로 적어주세요." required></textarea>
-                </label>
-
-                <div class="member-benefit-survey-actions">
-                  <button class="secondary-button compact" type="submit" data-idle-label="혜택 수요 저장하기 →">혜택 수요 저장하기 →</button>
-                  <small>입력 내용은 비공개로 저장되며 SparkLabs 운영진만 검토합니다.</small>
-                </div>
-                <p id="memberBenefitSurveyStatus" class="member-benefit-survey-status" role="status" aria-live="polite" hidden></p>
-              </div>
-            </form>
           </article>
         </section>
 
@@ -1040,7 +1010,7 @@
           </section>
           <section class="panel workspace-activity-panel">
             <div class="panel-head"><div><span class="section-kicker">RECENT ACTIVITY</span><h2>내 진행 현황</h2></div><span class="workspace-log-live"><i aria-hidden="true"></i>LIVE LOG</span></div>
-            <div id="workspaceActivity" class="workspace-activity"></div>
+            <div id="workspaceActivity" class="workspace-activity" tabindex="0" role="feed" aria-label="내 계정 Recent Activity 전체 기록"></div>
           </section>
         </div>
         <section id="myLogTimeline" class="panel my-log-timeline-panel" aria-labelledby="myLogTimelineTitle">
@@ -1431,7 +1401,7 @@
                   <th>인터뷰</th>
                   <th>PMF 응답</th>
                   <th>행사 등록</th>
-                  <th>혜택 신청</th>
+                  <th>혜택 문의</th>
                 </tr>
               </thead>
               <tbody id="teamActivityBody"></tbody>
@@ -1637,9 +1607,9 @@
     </section>
   </aside>
 
-  <script type="module" src="/arena/arena-activity-client.js?v=ai-arena-20260817-mobile-brand-v114"></script>
-  <script type="module" src="/arena/arena.js?v=ai-arena-20260817-mobile-brand-v114"></script>
-  <script type="module" src="/arena/market.js?v=ai-arena-20260817-mobile-brand-v114"></script>
-  <script type="module" src="/arena/community.js?v=ai-arena-20260817-mobile-brand-v114"></script>
+  <script type="module" src="/arena/arena-activity-client.js?v=ai-arena-20260818-member-perk-walkthrough-v125"></script>
+  <script type="module" src="/arena/arena.js?v=ai-arena-20260818-member-perk-walkthrough-v125"></script>
+  <script type="module" src="/arena/market.js?v=ai-arena-20260818-member-perk-walkthrough-v125"></script>
+  <script type="module" src="/arena/community.js?v=ai-arena-20260818-member-perk-walkthrough-v125"></script>
 </body>
 </html>

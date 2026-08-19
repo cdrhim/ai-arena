@@ -7,7 +7,7 @@ import { verifyArenaRequest } from "../lib/supabase-auth.mjs";
 
 const STAFF_ROLES = new Set(["admin", "sparklabs"]);
 const ALLOWED_DOMAINS = new Set(["discover", "community", "bounty", "system"]);
-const CLIENT_ACTIONS = new Set(["session_started", "page_viewed"]);
+const CLIENT_ACTIONS = new Set(["auth_login", "auth_logout", "session_started", "page_viewed"]);
 
 async function arenaActivity(req, options = {}) {
   if (req.method === "OPTIONS") return corsResponse(null, 204);
@@ -62,11 +62,18 @@ async function arenaActivity(req, options = {}) {
       available: Boolean(result?.available),
       users: Array.isArray(result?.users) ? result.users : [],
       events: Array.isArray(result?.events) ? result.events : [],
+      totalCount: nonNegativeInteger(result?.totalCount),
       nextCursor: result?.nextCursor || null,
       reason: result?.available ? "" : limitedValue(result?.reason || "unavailable", 80)
     });
   } catch (error) {
     const status = Number(error?.status) || 500;
+    console.error("[arena-activity] request failed", {
+      status,
+      name: limitedValue(error?.name || "Error", 80),
+      code: limitedValue(error?.code || "", 80),
+      message: limitedValue(error?.message || "unknown", 320)
+    });
     return json({ error: status < 500 ? error.message : "활동 기록을 불러오지 못했습니다." }, status);
   }
 }
@@ -92,6 +99,11 @@ function timestampOrNull(value) {
 function boundedLimit(value) {
   const parsed = Number.parseInt(String(value || "100"), 10);
   return Math.min(Math.max(Number.isFinite(parsed) ? parsed : 100, 1), 200);
+}
+
+function nonNegativeInteger(value) {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 function limitedValue(value, maxLength) {

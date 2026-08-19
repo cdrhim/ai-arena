@@ -70,17 +70,6 @@ const ARENA_GUIDE_TUTORIAL_CATALOG = Object.freeze([
     actionLabel: "Community Map 보기"
   }),
   Object.freeze({
-    key: "discover-benefit",
-    number: "07",
-    label: "DISCOVER",
-    title: "우리 팀에 필요한 혜택을 알려주세요",
-    description: "필요한 혜택의 솔루션 명, 세부 내용과 이유를 남기면 운영진이 파트너 발굴에 활용합니다.",
-    page: "overview",
-    target: "#memberBenefitSurveyForm",
-    targetLabel: "Claw Member 혜택 수요 입력",
-    actionLabel: "혜택 요청 보기"
-  }),
-  Object.freeze({
     key: "discover-company-directory",
     number: "08",
     label: "DISCOVER",
@@ -340,7 +329,6 @@ const ARENA_GUIDE_TUTORIAL_KEYS_BY_ROLE = Object.freeze({
     "discover-spark-ai",
     "discover-company-directory",
     "discover-advisors",
-    "discover-benefit",
     "community-overview",
     "bounty-overview",
     "my-log-overview",

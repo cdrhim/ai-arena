@@ -23,6 +23,16 @@ test("hero timestamp reflects page data retrieval in KST instead of claiming a s
   assert.match(js, /const sectorNames = \(hub\.sectors \|\| \[\]\)/);
 });
 
+test("hero reports the authenticated Management and Arena interaction total without a false zero", () => {
+  assert.match(html, /id="heroBenefitCount">—<\/strong><small id="heroBenefitLabel">total interactions<\/small>/);
+  assert.match(js, /fetch\("\/api\/arena-interactions"/);
+  assert.match(js, /INTERACTION_SUMMARY_REFRESH_MS = 5 \* 60 \* 1000/);
+  assert.match(js, /Management \$\{formatNumber\(management\)\} · AI Arena/);
+  assert.match(js, /els\.heroBenefitLabel\.textContent = "total interactions"/);
+  assert.match(js, /els\.heroBenefitLabel\.textContent = "other teams"/);
+  assert.doesNotMatch(js, /heroBenefitLabel\.textContent = clawMemberViewer \? "other teams" : "active benefits"/);
+});
+
 test("floating hero motion remains responsive and reduced-motion safe", () => {
   assert.match(css, /@keyframes hero-planet-orbit/);
   assert.match(css, /@keyframes hero-node-orbit/);

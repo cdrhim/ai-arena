@@ -1,5 +1,10 @@
 import { splitList } from "./core.mjs";
 import { trustedExternalPartnerAccount } from "./external-partner-directory.mjs";
+import {
+  isolatedArenaTestEmails,
+  isIsolatedArenaTestUser,
+  isIsolatedArenaTestViewer
+} from "./isolated-test-account.mjs";
 
 const SCORE_ACTIONS = new Set(["submitBenchmark", "recordVote"]);
 const STAFF_REVIEW_ACTIONS = new Set([
@@ -24,6 +29,9 @@ const HUMAN_VALIDATOR_METADATA_KEYS = ["humanValidator", "human_validator", "isH
 export function arenaAuthConfig(env = process.env) {
   const supabaseUrl = String(env.SUPABASE_URL || env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
   const anonKey = String(env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || "");
+  const secretKey = String(
+    env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY || ""
+  ).trim();
   const adminDomains = splitList(env.SPARKLABS_ARENA_ADMIN_DOMAINS || "sparklabs.co.kr").map((item) =>
     item.toLowerCase()
   );
@@ -37,7 +45,9 @@ export function arenaAuthConfig(env = process.env) {
   return {
     supabaseUrl,
     anonKey,
+    secretKey,
     configured: Boolean(supabaseUrl && anonKey),
+    accessConfigured: Boolean(supabaseUrl && secretKey),
     adminDomains,
     adminEmails,
     memberDomains,
@@ -46,6 +56,8 @@ export function arenaAuthConfig(env = process.env) {
     b2bPartnerEmails,
     humanValidatorDomains,
     humanValidatorEmails,
+    isolatedTestEmails: isolatedArenaTestEmails(env),
+    strictAccountAllowlist: envFlag(env.SPARKCLAW_STRICT_ACCOUNT_ALLOWLIST, true),
     googleAdminLoginEnabled: envFlag(env.SPARKLABS_ARENA_GOOGLE_ADMIN_LOGIN_ENABLED),
     features: {
       arena: envFlag(env.SPARKCLAW_ENABLE_ARENA),
@@ -93,7 +105,103 @@ export async function verifyArenaRequest(req, env = process.env) {
     return { ok: false, status: 401, error: payload?.msg || payload?.error_description || "Invalid login session." };
   }
 
-  return { ok: true, user: payload, viewer: viewerFromUser(payload, config) };
+  const baseViewer = viewerFromUser(payload, config);
+  const access = await loadArenaViewerAccess(payload?.id, env);
+  const decision = arenaAccountAccessDecision(payload, baseViewer, access, env);
+  if (config.strictAccountAllowlist && !decision.allowed) {
+    return {
+      ok: false,
+      status: decision.retryable ? 503 : 403,
+      error: decision.retryable
+        ? "AI Arena access could not be verified."
+        : "This account is not registered for SparkClaw AI Arena."
+    };
+  }
+  const viewer = viewerWithArenaAccess(baseViewer, access);
+  if (isIsolatedArenaTestViewer(viewer, env) && !new Set(["GET", "HEAD", "OPTIONS"]).has(req.method)) {
+    return {
+      ok: false,
+      status: 403,
+      error: "This isolated test account is read-only."
+    };
+  }
+  return { ok: true, user: payload, viewer };
+}
+
+export function arenaAccountAccessDecision(user, viewer, access, env = process.env) {
+  if (isIsolatedArenaTestUser(user, env)) {
+    return { allowed: true, reason: "isolated_test", retryable: false };
+  }
+  if (viewer?.canScore) return { allowed: true, reason: "sparklabs_administrator", retryable: false };
+  if (!access?.configured || !access?.available) {
+    return { allowed: false, reason: "membership_unavailable", retryable: true };
+  }
+  const record = access.record;
+  const role = String(record?.membership_role || "").toLowerCase();
+  if (!record?.access_found || record.membership_status !== "active") {
+    return { allowed: false, reason: "inactive_membership", retryable: false };
+  }
+  if (role === "partner" && record.partner_profile_status === "active") {
+    return { allowed: true, reason: "approved_external_partner", retryable: false };
+  }
+  const appMetadata = user?.app_metadata && typeof user.app_metadata === "object" ? user.app_metadata : {};
+  if (
+    role === "claw_member" &&
+    appMetadata.arena_access_source === "program_applicant" &&
+    String(appMetadata.program_team_id || "").trim()
+  ) {
+    return { allowed: true, reason: "program_applicant", retryable: false };
+  }
+  return { allowed: false, reason: "account_not_allowlisted", retryable: false };
+}
+
+export async function loadArenaViewerAccess(userId, env = process.env, fetchImpl = fetch) {
+  const config = arenaAuthConfig(env);
+  if (!config.accessConfigured || !userId) {
+    return { configured: false, available: false, record: null };
+  }
+
+  try {
+    const response = await fetchImpl(`${config.supabaseUrl}/rest/v1/rpc/sc_arena_resolve_viewer_access`, {
+      method: "POST",
+      headers: serviceHeaders(config.secretKey),
+      body: JSON.stringify({ p_user_id: userId, p_workspace_slug: "sparkclaw-ai-arena" })
+    });
+    const payload = await safeJson(response);
+    if (!response.ok) return { configured: true, available: false, record: null };
+    const row = Array.isArray(payload) ? payload[0] : payload;
+    return {
+      configured: true,
+      available: true,
+      record: row && typeof row === "object" ? row : null
+    };
+  } catch {
+    return { configured: true, available: false, record: null };
+  }
+}
+
+export function viewerWithArenaAccess(viewer, access) {
+  if (isIsolatedArenaTestViewer(viewer)) return isolatedTestViewer(viewer);
+  if (!viewer || !access?.configured) return viewer;
+  if (viewer.canScore) return viewer;
+  if (!access.available) return viewerForDatabaseRole(viewer, "public");
+
+  const record = access.record;
+  if (!record?.access_found || record.membership_status !== "active") {
+    return viewerForDatabaseRole(viewer, "public");
+  }
+
+  const databaseRole = ({
+    admin: "admin",
+    staff: "sparklabs",
+    partner: "b2b_partner",
+    claw_member: "member",
+    human_validator: "human_validator"
+  })[String(record.membership_role || "").toLowerCase()] || "public";
+  if (databaseRole === "b2b_partner" && record.partner_profile_status !== "active") {
+    return viewerForDatabaseRole(viewer, "public");
+  }
+  return viewerForDatabaseRole(viewer, databaseRole, record);
 }
 
 export function viewerFromUser(user, config = arenaAuthConfig()) {
@@ -101,6 +209,7 @@ export function viewerFromUser(user, config = arenaAuthConfig()) {
   const domain = email.includes("@") ? email.split("@").pop() : "";
   const userMetadata = user?.user_metadata || {};
   const appMetadata = user?.app_metadata || {};
+  const isolatedTest = isIsolatedArenaTestUser(user, config.isolatedTestEmails || []);
   const metadata = mergedMetadata(user);
   const trustedPartner = trustedExternalPartnerAccount(user);
   const trustedProfile = trustedPartner?.profile || null;
@@ -121,14 +230,30 @@ export function viewerFromUser(user, config = arenaAuthConfig()) {
     !b2bPartner &&
     !selectedHumanValidator &&
     (MEMBER_ROLES.has(requestedRole) || config.memberEmails.includes(email) || config.memberDomains.includes(domain));
-  const role = canAdmin ? "admin" : canScore ? "sparklabs" : b2bPartner ? "b2b_partner" : selectedHumanValidator ? "human_validator" : member ? "member" : "public";
-  const organization = limitedMetadata(trustedProfile?.organizationName, 120) || limitedMetadata(metadataValue(metadata, ["organization", "company", "companyName", "company_name", "org"]), 120) || organizationFromEmail(email);
+  const authenticatedAccount = Boolean(user?.id && email);
+  const role = canAdmin
+    ? "admin"
+    : canScore
+      ? "sparklabs"
+      : b2bPartner
+        ? "b2b_partner"
+        : selectedHumanValidator
+          ? "human_validator"
+          : member
+            ? "member"
+            : authenticatedAccount
+              ? "member"
+              : "public";
+  const organization = isolatedTest
+    ? ""
+    : limitedMetadata(trustedProfile?.organizationName, 120) || limitedMetadata(metadataValue(metadata, ["organization", "company", "companyName", "company_name", "org"]), 120) || organizationFromEmail(email);
   const canSubmitProducts = role === "member";
   const canRequestConnections = role === "b2b_partner";
   const validatorType = normalizeRole(metadataValue(metadata, ["validatorType", "validator_type", "humanValidatorType", "human_validator_type"])) || (canScore ? "staff" : selectedHumanValidator ? "mentor" : "");
   return {
     id: user?.id || null,
     email,
+    isIsolatedTest: isolatedTest,
     role,
     roleLabel: roleLabel(role),
     organization,
@@ -154,6 +279,11 @@ export function viewerFromUser(user, config = arenaAuthConfig()) {
 }
 
 export function authorizeArenaAction(action, viewer) {
+  if (isIsolatedArenaTestViewer(viewer)) {
+    const error = new Error("This isolated test account is read-only.");
+    error.status = 403;
+    throw error;
+  }
   if (DISABLED_ACTIONS.has(action)) {
     const error = new Error("Peer popularity voting is disabled. Teams are compared with evidence, not social votes.");
     error.status = 410;
@@ -262,4 +392,64 @@ function titleCase(value) {
 function envFlag(value, fallback = false) {
   if (value === undefined || value === null || String(value).trim() === "") return fallback;
   return ["1", "true", "yes", "on", "enabled"].includes(String(value || "").trim().toLowerCase());
+}
+
+function viewerForDatabaseRole(viewer, role, record = null) {
+  const canScore = role === "admin" || role === "sparklabs";
+  const humanValidator = canScore || role === "human_validator";
+  const partner = role === "b2b_partner";
+  const member = role === "member";
+  return {
+    ...viewer,
+    role,
+    roleLabel: roleLabel(role),
+    organization: limitedMetadata(record?.organization_name, 120) || viewer.organization,
+    b2bProfileId: partner ? limitedMetadata(record?.partner_profile_id, 80) : "",
+    b2bFocusCategories: partner ? metadataList(record?.focus_categories) : [],
+    b2bTargetStages: partner ? metadataList(record?.target_stages) : [],
+    b2bPreferredRegions: partner ? metadataList(record?.preferred_regions) : [],
+    b2bThesis: partner ? limitedMetadata(record?.thesis, 500) : "",
+    humanValidatorStatus: humanValidator ? "active" : "inactive",
+    canAdmin: role === "admin",
+    canScore,
+    canSubmitProducts: member,
+    canRequestConnections: partner,
+    canSubmitHumanReviews: humanValidator,
+    canViewPartnerRequests: canScore || member,
+    canConnect: partner,
+    canEnterBounties: Boolean(canScore || viewer.canEnterBounties),
+    canViewPartners: canScore || member || partner,
+    accessSource: "sc_arena_memberships"
+  };
+}
+
+function isolatedTestViewer(viewer) {
+  return {
+    ...viewer,
+    role: "member",
+    roleLabel: "Isolated test",
+    organization: "",
+    b2bProfileId: "",
+    b2bFocusCategories: [],
+    b2bTargetStages: [],
+    b2bPreferredRegions: [],
+    b2bThesis: "",
+    humanValidatorStatus: "inactive",
+    canAdmin: false,
+    canScore: false,
+    canSubmitProducts: false,
+    canRequestConnections: false,
+    canSubmitHumanReviews: false,
+    canViewPartnerRequests: false,
+    canConnect: false,
+    canEnterBounties: false,
+    canViewPartners: false,
+    accessSource: "isolated_test"
+  };
+}
+
+function serviceHeaders(secretKey) {
+  const headers = { apikey: secretKey, "content-type": "application/json" };
+  if (!String(secretKey).startsWith("sb_secret_")) headers.Authorization = `Bearer ${secretKey}`;
+  return headers;
 }

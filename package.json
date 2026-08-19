@@ -1,11 +1,11 @@
 {
   "name": "sparklabs-ai-arena",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "scripts": {
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --import ./tests/test-environment.mjs --test tests/*.test.mjs",
     "sync:company-logos:db": "node scripts/sync-company-logo-assets.mjs",
     "deploy": "pnpm run deploy:prod",
     "deploy:preview": "netlify deploy --site a1199605-0f40-4eb8-88d8-cd5445271841 --skip-functions-cache",

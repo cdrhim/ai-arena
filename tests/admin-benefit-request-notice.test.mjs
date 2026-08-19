@@ -44,7 +44,9 @@ test("benefit request summary RPC exposes counts and time only to the service ro
 
 test("staff My Log replaces duplicate review and bounty intake cards with benefit requests", () => {
   assert.match(html, /<h2>혜택·파트너십 Queue<\/h2>/);
-  assert.match(marketClient, /<h3>혜택 신청<\/h3>/);
+  assert.match(marketClient, /<h3>혜택 문의<\/h3>/);
+  assert.match(marketClient, /새로운 혜택 문의가 없습니다/);
+  assert.doesNotMatch(marketClient, /혜택 신청/);
   assert.match(marketClient, /payload\.staffSummary\.requests/);
   assert.match(marketClient, /solutionName/);
   assert.match(marketClient, /solutionDetails/);

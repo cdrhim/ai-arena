@@ -150,6 +150,7 @@ test("external partner discovery evaluates every eligible Program DB participant
         { id: 8, name: "Private Vision", sector: "Computer Vision", one_liner: "Private profile", service_summary: "Not consented", team_group: "Seed", website_url: "https://private.example", status: "active" }
       ]);
     }
+    if (value.startsWith("https://program.example") && value.includes("/rest/v1/team_members")) return Response.json([]);
     return originalFetch(url);
   };
 
@@ -218,6 +219,7 @@ test("Program DB participants are recognized as members and can discover every o
         { id: 3, name: "Peer Docs", email: "docs@example.com", sector: "Document AI", one_liner: "Document workflow automation", service_summary: "Automates enterprise document review", status: "active" }
       ]);
     }
+    if (value.startsWith("https://program.example") && value.includes("/rest/v1/team_members")) return Response.json([]);
     return originalFetch(url);
   };
 

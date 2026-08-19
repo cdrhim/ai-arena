@@ -11,7 +11,7 @@ test("Claw members do not see Events & Perks navigation or Discover entry points
     html,
     /data-page="calendar" data-nav-roles="b2b_partner,human_validator"/
   );
-  assert.equal((html.match(/data-hide-from-claw-member/g) || []).length, 7);
+  assert.equal((html.match(/data-hide-from-claw-member/g) || []).length, 8);
   assert.match(html, /data-nav-page="overview" role="menuitem"[^>]*>[\s\S]*?<strong>Discover Home<\/strong>/);
   assert.doesNotMatch(html, /data-nav-page="overview"[^>]*data-hide-from-claw-member/);
   assert.match(html, /data-nav-page="discover" data-hide-from-claw-member[\s\S]*?>Task-driven Search</);
@@ -24,7 +24,8 @@ test("Claw members do not see Events & Perks navigation or Discover entry points
   assert.match(js, /function isClawMemberViewer\(\)[\s\S]*?=== "member"/);
   assert.match(js, /element\.hidden = clawMemberViewer/);
   assert.match(js, /\[data-hide-from-admin-or-claw-member\][\s\S]*?element\.hidden = adminViewer \|\| clawMemberViewer/);
-  assert.match(html, /id="memberBenefitSurveyForm"[\s\S]*?data-show-for-claw-member/);
+  assert.doesNotMatch(html, /id="memberBenefitSurveyForm"|data-show-for-claw-member/);
+  assert.match(html, /class="panel partner-callout"[^>]*data-hide-from-claw-member/);
   assert.match(js, /\[data-show-for-claw-member\][\s\S]*?element\.hidden = !clawMemberViewer/);
   assert.match(js, /clawMemberViewer[\s\S]*?기업 둘러보기[\s\S]*?: `<button[\s\S]*?혜택 확인/);
 });

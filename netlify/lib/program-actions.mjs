@@ -141,13 +141,17 @@ export function createProgramActionEvent(action, payload, hub, viewer, now = new
   const team = hub?.viewerTeam;
 
   if (action === "updateTeamCardVisibility") {
-    requireMemberTeam(viewer, team);
+    const targetTeam = staff
+      ? findProgramDirectoryTeam(hub, requiredText(payload, "teamId", 120))
+      : team;
+    if (staff && !targetTeam) throw statusError("Company Directory에서 대상 팀을 찾을 수 없습니다.", 404);
+    if (!staff) requireMemberTeam(viewer, targetTeam);
     const fields = normalizeTeamCardVisibility(payload.fields);
     return {
-      id: eventId("team_card_visibility", `${team.id}:${viewer.id || viewer.email}`, now),
+      id: eventId("team_card_visibility", `${targetTeam.id}:${viewer.id || viewer.email}`, now),
       type: "team_card_visibility_updated",
       visibility: {
-        teamId: String(team.id),
+        teamId: String(targetTeam.id),
         fields,
         updatedByUserId: viewer.id || null,
         updatedAt: now
@@ -706,6 +710,14 @@ function requireMemberTeam(viewer, team) {
 
 function requireStaff(staff) {
   if (!staff) throw statusError("Only SparkLabs staff can manage program operations.", 403);
+}
+
+function findProgramDirectoryTeam(hub, teamId) {
+  for (const items of [hub?.teams, hub?.memberDirectory, hub?.partnerDirectory]) {
+    const match = (Array.isArray(items) ? items : []).find((item) => sameId(item?.id, teamId));
+    if (match) return match;
+  }
+  return null;
 }
 
 function isPast(value) {

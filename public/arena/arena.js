@@ -45,7 +45,7 @@ import {
   publicBriefUrl,
   resolvePublicBriefLanguage
 } from "./public-brief-i18n.js";
-import { initArenaGuide } from "./arena-guide.js?v=ai-arena-20260817-role-tutorial-v113";
+import { initArenaGuide } from "./arena-guide.js?v=ai-arena-20260818-member-perk-walkthrough-v125";
 
 const SESSION_KEY = "sparkclaw-program-hub-session-gfmummaahlrnmrgnirxu-v1";
 const ARENA_HISTORY_MARKER = "sparkclaw-arena-history-v1";
@@ -88,7 +88,7 @@ const TABLE_LABELS = {
   events: "일정",
   event_registrations: "행사 등록",
   benefits: "혜택",
-  benefit_applications: "혜택 신청",
+  benefit_applications: "혜택 문의",
   report_reminders: "리포트 알림",
   weekly_report_notice: "주간 안내"
 };
@@ -123,6 +123,9 @@ let collaborationFitReasonRequestKey = "";
 let collaborationFitReasonPending = false;
 let collaborationFitReasonsById = new Map();
 let ecosystemSwitcherCloseTimer = 0;
+let interactionSummary = null;
+let interactionSummaryRequestId = 0;
+let interactionSummaryRefreshTimer = 0;
 let activeArenaPage = "overview";
 let activeArenaNavTarget = "";
 let restoringArenaHistory = false;
@@ -173,6 +176,7 @@ const EVENT_RECOMMENDATION_PROGRESS_STEPS = [
   "클로이가 예정 일정과 검증된 혜택의 활용도를 비교하고 있습니다.",
   "지금 실행할 순서와 준비 사항을 정리하고 있습니다."
 ];
+const INTERACTION_SUMMARY_REFRESH_MS = 5 * 60 * 1000;
 
 const els = {
   bootScreen: document.querySelector("#bootScreen"),
@@ -650,6 +654,7 @@ async function consumeOAuthSessionFromUrl() {
     return { handled: true, error: validationError };
   }
   saveStoredSession(session);
+  await recordAuthenticationActivity("auth_login", session);
   return { handled: true, error: "" };
 }
 
@@ -690,6 +695,26 @@ async function revokeSupabaseSession(session) {
   }
 }
 
+async function recordAuthenticationActivity(action, session = authSession) {
+  if (!new Set(["auth_login", "auth_logout"]).has(action) || !session?.access_token) return;
+  try {
+    await fetch("/api/arena-activity", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        action,
+        clientEventId: `${action}:${crypto.randomUUID()}`
+      }),
+      keepalive: true
+    });
+  } catch {
+    // Authentication must remain usable if auxiliary audit recording fails.
+  }
+}
+
 function clearOAuthCallbackUrl() {
   const url = new URL(window.location.href);
   url.hash = "";
@@ -716,10 +741,9 @@ async function handleLogin(event) {
   });
 
   try {
-    const response = await fetch(`${authConfig.supabaseUrl}/auth/v1/token?grant_type=password`, {
+    const response = await fetch("/api/arena-login", {
       method: "POST",
       headers: {
-        apikey: authConfig.supabaseAnonKey,
         "content-type": "application/json"
       },
       body: JSON.stringify({ email, password })
@@ -730,6 +754,7 @@ async function handleLogin(event) {
     }
     advanceProcessStatus(els.authStatus, progressToken, 1);
     saveStoredSession(session);
+    await recordAuthenticationActivity("auth_login", session);
     arenaGuide.reset();
     await loadProgramHub({ allowRefresh: false, bootstrap: true });
     els.loginForm.reset();
@@ -777,6 +802,7 @@ async function loadProgramHub({ allowRefresh = true, quiet = false, bootstrap = 
     databaseSchema = null;
     renderHub();
     showApp();
+    startInteractionSummaryRefresh();
     loadLatestArenaAnnouncement();
     void hydrateProgramHubInBackground(loadGeneration);
     return;
@@ -797,6 +823,7 @@ async function loadProgramHub({ allowRefresh = true, quiet = false, bootstrap = 
   databaseSchema = null;
   renderHub();
   showApp();
+  startInteractionSummaryRefresh();
   loadLatestArenaAnnouncement();
   if (!quiet) showToast("프로그램 DB의 최신 내용을 반영했습니다.");
 }
@@ -827,6 +854,7 @@ async function hydrateProgramHubInBackground(loadGeneration) {
     }
     databaseSchema = null;
     renderHub();
+    startInteractionSummaryRefresh();
     loadLatestArenaAnnouncement();
   } catch {
     // Keep the fast authenticated bootstrap usable if secondary data is slow
@@ -1387,10 +1415,7 @@ function renderOverview() {
   els.cohortBadge.textContent = partnerProfile ? `${organizationName} 파트너 공간` : publicViewer ? "CURATED AI NETWORK" : `${cohort.toUpperCase()} COHORT`;
   els.heroTeamCount.textContent = formatNumber(metrics.teams);
   els.heroSectorCount.textContent = formatNumber(metrics.sectors);
-  els.heroBenefitCount.textContent = clawMemberViewer
-    ? formatNumber(Math.max(0, Number(metrics.teams || 0) - 1))
-    : formatNumber(activeBenefitCount);
-  if (els.heroBenefitLabel) els.heroBenefitLabel.textContent = clawMemberViewer ? "other teams" : "active benefits";
+  renderHeroInteractionMetric();
   renderHeroLiveNetwork(partnerProfile);
   els.metricTeams.textContent = formatNumber(metrics.teams);
   els.metricTeamStatus.textContent = partnerProfile
@@ -3219,7 +3244,7 @@ function teamCardMarkup(team) {
       ${investorMetrics.length ? `<div class="team-investor-metrics" aria-label="핵심 정량 근거">${investorMetrics.map((metric) => `<span>${escapeHtml(metric)}</span>`).join("")}</div>` : ""}
       <div class="team-card-tags">
         <span class="stage-tag"><small>현단계</small>${escapeHtml(stage)}</span>
-        ${team.isViewerTeam && team.cardVisibility?.canEdit ? `<span class="type-tag is-privacy">내 카드 · 공개범위 설정 가능</span>` : ""}
+        ${team.cardVisibility?.canEdit ? `<span class="type-tag is-privacy">${isAdminViewer() ? "관리자 · 공개범위 설정 가능" : "내 카드 · 공개범위 설정 가능"}</span>` : ""}
         ${publicViewer ? `<span class="evidence-tag is-${escapeHtml(team.evidenceLevel || "needs_verification")}">${escapeHtml(evidenceLevelLabel(team.evidenceLevel))}</span>` : ""}
         ${team.privateDetailsVisible && team.isBuilder ? `<span class="type-tag">Builder</span>` : ""}
         ${team.privateDetailsVisible && team.isIncorporated ? `<span class="type-tag">법인</span>` : ""}
@@ -3233,9 +3258,9 @@ function teamCardMarkup(team) {
       <p class="privacy-note">${partnerViewer ? "Program Supabase의 공개 가능한 프로필·집계만 표시합니다. 인터뷰 원문과 연락처는 비공개입니다." : "공개 가능한 팀 정보와 집계값만 표시합니다."}</p>
       <div class="team-card-footer">
         <span>Program DB · ${escapeHtml(stage)}</span>
-        <div class="team-card-footer-actions">
+      <div class="team-card-footer-actions">
           ${partnerViewer ? `<button class="team-compare-button" data-compare-program-team="${escapeHtml(team.id)}" type="button">비교하기</button>` : ""}
-          <button class="team-detail-button" data-team-id="${escapeHtml(team.id)}" type="button">${team.isViewerTeam && team.cardVisibility?.canEdit ? "내 카드 공개 설정 →" : "팀 상세보기 →"}</button>
+          <button class="team-detail-button" data-team-id="${escapeHtml(team.id)}" type="button">${team.cardVisibility?.canEdit ? (isAdminViewer() ? "카드 공개 설정 →" : "내 카드 공개 설정 →") : "팀 상세보기 →"}</button>
         </div>
       </div>
     </article>
@@ -3310,7 +3335,6 @@ function openTeamDialog(team, { recordHistory = true } = {}) {
   const tasks = teamCapabilityTasks(team, investor);
   const stage = teamProgramStage(team);
   const publicViewer = isPublicViewer();
-  const clawMemberViewer = isClawMemberViewer();
   const partnerViewer = hub?.viewer?.role === "b2b_partner";
   const canRequestCollaborationReview = Boolean(hub?.permissions?.canRequestCollaborationReview && !team.isViewerTeam);
   const pendingCollaborationReview = (hub?.collaborationReviews || []).find(
@@ -3321,7 +3345,7 @@ function openTeamDialog(team, { recordHistory = true } = {}) {
       ? `<button class="primary-button compact" type="button" disabled>협업 검토 답변 대기 중</button>`
       : `<button class="primary-button compact" data-collaboration-review-team="${escapeHtml(String(team.id || ""))}" type="button">이 회사에 협업 검토 요청</button>`
     : `<button class="primary-button compact" data-brief-company="${escapeHtml(team.name || team.companyName || "AI company")}" type="button">이 회사와 협업 검토</button>`;
-  const visibilityEditor = team.isViewerTeam && hub?.permissions?.canEditTeamCardVisibility
+  const visibilityEditor = team.cardVisibility?.canEdit && hub?.permissions?.canEditTeamCardVisibility
     ? teamCardVisibilityEditorMarkup(team)
     : "";
   const introductionHidden = (team.cardHiddenFields || []).includes("introduction");
@@ -3363,7 +3387,6 @@ function openTeamDialog(team, { recordHistory = true } = {}) {
         ${collaborationAction}
       </div>
       <p class="controlled-intro-note">요청을 보내면 소개 의사가 기록되고 상대 팀 My Log에 전달됩니다. 대상 스타트업이 승인한 뒤에도 연락처는 자동 공개하지 않으며, SparkLabs가 소개 범위와 다음 단계를 확인합니다.</p>
-      ${clawMemberViewer ? "" : `<p class="controlled-intro-note is-evidence">경력·학력·성과는 팀 제출 지원자료와 Program Supabase의 공개 가능한 집계에서만 구성했습니다. 내부 심사점수, 고객 인터뷰 원문, 주간 리포트 본문, 이메일, 연락처와 내부 운영 메모는 노출하지 않습니다.${investor.sourceLabel ? ` 근거: ${escapeHtml(investor.sourceLabel)}.` : ""}</p>`}
       ${publicViewer ? `<p class="profile-updated-note">정보 기준 · ${team.updatedAt ? escapeHtml(formatDate(team.updatedAt)) : "최근 업데이트일 확인 필요"}</p>` : ""}
     </div>
   `;
@@ -3378,6 +3401,8 @@ function openTeamDialog(team, { recordHistory = true } = {}) {
 
 function teamCardVisibilityEditorMarkup(team = {}) {
   const fields = team.cardVisibility?.fields || {};
+  const adminEditor = isAdminViewer();
+  const teamName = team.name || team.companyName || "선택한 팀";
   const options = [
     ["introduction", "팀·서비스 소개", "카드 소개 문장과 상세 서비스 설명"],
     ["achievements", "정량 성과·검증 숫자", "매출·고객·인터뷰 등 공개 가능한 집계"],
@@ -3387,11 +3412,11 @@ function teamCardVisibilityEditorMarkup(team = {}) {
   ];
   return `<section class="team-card-visibility-panel">
     <div class="team-card-visibility-head">
-      <div><span class="eyebrow">MY TEAM CARD</span><h2>내 카드 공개 범위</h2></div>
+      <div><span class="eyebrow">${adminEditor ? "SPARKLABS CARD CONTROL" : "MY TEAM CARD"}</span><h2>${adminEditor ? `${escapeHtml(teamName)} 카드 공개 범위` : "내 카드 공개 범위"}</h2></div>
       <span class="privacy-safety-badge">연락처·내부 원문은 항상 비공개</span>
     </div>
-    <p>공개 항목은 승인된 Arena 회원과 산업 파트너에게 표시됩니다. 비공개 항목은 본인 팀과 SparkLabs 운영진만 확인할 수 있습니다.</p>
-    <form data-team-card-visibility-form>
+    <p>${adminEditor ? "SparkLabs 관리자 권한으로 이 팀 카드의 공개 범위를 관리합니다." : "공개 항목은 승인된 Arena 회원과 산업 파트너에게 표시됩니다."} 비공개 항목은 본인 팀과 SparkLabs 운영진만 확인할 수 있습니다.</p>
+    <form data-team-card-visibility-form data-team-id="${escapeHtml(String(team.id || ""))}" data-team-name="${escapeHtml(teamName)}">
       <div class="team-card-visibility-grid">
         ${options.map(([name, label, description]) => `<label>
           <span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(description)}</small></span>
@@ -3415,6 +3440,8 @@ async function handleTeamCardVisibilitySubmit(event) {
   if (programActionPending) return;
   const form = event.currentTarget;
   const status = form.querySelector("[data-team-card-visibility-status]");
+  const teamId = String(form.dataset.teamId || "").trim();
+  const teamName = String(form.dataset.teamName || "선택한 팀").trim();
   const fields = Object.fromEntries(
     ["introduction", "achievements", "capabilities", "aiIdea", "website"].map((name) => [
       name,
@@ -3433,12 +3460,12 @@ async function handleTeamCardVisibilitySubmit(event) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 30000);
   try {
-    const result = await postProgramAction("updateTeamCardVisibility", { fields }, { signal: controller.signal });
+    const result = await postProgramAction("updateTeamCardVisibility", { teamId, fields }, { signal: controller.signal });
     hub = result.snapshot;
     if (usesProgramDirectoryForViewer()) marketData = marketDataFromProgramHub(hub, marketData);
     renderHub();
     finishProcessStatus(status, progressToken, "저장했습니다. 다른 회원과 파트너 화면에도 즉시 반영됩니다.", "success");
-    showToast("내 팀 카드 공개 범위를 저장했습니다.");
+    showToast(`${teamName} 카드 공개 범위를 저장했습니다.`);
   } catch (error) {
     const message = error?.name === "AbortError"
       ? "30초 안에 저장 완료를 확인하지 못했습니다. 잠시 후 카드를 다시 열어 반영 여부를 확인해 주세요."
@@ -4641,7 +4668,10 @@ async function handleRefresh() {
     interval: 1500
   });
   try {
-    if (isAuthenticatedViewer()) await loadProgramHub({ allowRefresh: true });
+    if (isAuthenticatedViewer()) {
+      await loadProgramHub({ allowRefresh: true });
+      await refreshInteractionSummary({ quiet: true });
+    }
     else showLogin("세션이 만료되었습니다. 다시 로그인해 주세요.");
     if (isAuthenticatedViewer() && document.querySelector('[data-page-panel="database"]').classList.contains("is-active")) {
       await Promise.all([loadDatabaseSchema(), loadApplicantExportMetadata()]);
@@ -4659,15 +4689,12 @@ async function handleLogout() {
   programHubLoadGeneration += 1;
   window.dispatchEvent(new CustomEvent("spark-arena:discovery-reset"));
   if (authSession?.access_token && authConfig?.authConfigured) {
-    fetch(`${authConfig.supabaseUrl}/auth/v1/logout`, {
-      method: "POST",
-      headers: {
-        apikey: authConfig.supabaseAnonKey,
-        Authorization: `Bearer ${authSession.access_token}`
-      }
-    }).catch(() => {});
+    await recordAuthenticationActivity("auth_logout", authSession);
+    await revokeSupabaseSession(authSession);
   }
   clearStoredSession();
+  stopInteractionSummaryRefresh();
+  interactionSummary = null;
   hub = null;
   arenaData = null;
   marketData = null;
@@ -4720,6 +4747,8 @@ function showApp() {
 }
 
 function showPublicBriefGate(message = "", tone = "", { historyMode = "none" } = {}) {
+  stopInteractionSummaryRefresh();
+  interactionSummary = null;
   renderPartnerBriefExperience(null);
   mountPublicBrief("public");
   closeMemberAccess({ restoreFocus: false });
@@ -4739,6 +4768,80 @@ function showPublicBriefGate(message = "", tone = "", { historyMode = "none" } =
   document.querySelector("[data-public-brief-login]")?.removeAttribute("hidden");
   if (message) setAuthStatus(message, tone);
   if (historyMode === "replace") replacePublicArenaHistory();
+}
+
+function startInteractionSummaryRefresh() {
+  stopInteractionSummaryRefresh();
+  if (!authSession?.access_token || !hub) return;
+  void refreshInteractionSummary();
+  interactionSummaryRefreshTimer = window.setInterval(() => {
+    if (!document.hidden) void refreshInteractionSummary();
+  }, INTERACTION_SUMMARY_REFRESH_MS);
+}
+
+function stopInteractionSummaryRefresh() {
+  if (interactionSummaryRefreshTimer) window.clearInterval(interactionSummaryRefreshTimer);
+  interactionSummaryRefreshTimer = 0;
+  interactionSummaryRequestId += 1;
+}
+
+async function refreshInteractionSummary({ quiet = true } = {}) {
+  if (!authSession?.access_token || !hub) return;
+  const requestId = ++interactionSummaryRequestId;
+  try {
+    const response = await fetch("/api/arena-interactions", {
+      headers: { Accept: "application/json", ...authHeaders() }
+    });
+    const payload = await safeJson(response);
+    if (!response.ok) throw new Error(payload?.error || "상호작용 집계를 불러오지 못했습니다.");
+    if (requestId !== interactionSummaryRequestId || !hub) return;
+    const totalInteractions = Number(payload?.totalInteractions);
+    const managementInteractions = Number(payload?.managementInteractions);
+    const arenaInteractions = Number(payload?.arenaInteractions);
+    if (![totalInteractions, managementInteractions, arenaInteractions].every((value) => Number.isFinite(value) && value >= 0)) {
+      throw new Error("상호작용 집계 응답이 올바르지 않습니다.");
+    }
+    interactionSummary = {
+      totalInteractions: Math.trunc(totalInteractions),
+      managementInteractions: Math.trunc(managementInteractions),
+      arenaInteractions: Math.trunc(arenaInteractions),
+      generatedAt: payload?.generatedAt || ""
+    };
+    renderHeroInteractionMetric();
+  } catch (error) {
+    console.warn("[interaction-summary] refresh unavailable", error.message || "unknown error");
+    if (!quiet) showToast(error.message || "상호작용 집계를 불러오지 못했습니다.");
+  }
+}
+
+function renderHeroInteractionMetric() {
+  if (!els.heroBenefitCount || !els.heroBenefitLabel) return;
+  const card = els.heroBenefitCount.closest(".orbit-card");
+  if (isClawMemberViewer()) {
+    const otherTeams = Math.max(0, Number(hub?.metrics?.teams || 0) - 1);
+    els.heroBenefitCount.textContent = formatNumber(otherTeams);
+    els.heroBenefitLabel.textContent = "other teams";
+    card?.removeAttribute("title");
+    card?.setAttribute("aria-label", `다른 참여 팀 ${formatNumber(otherTeams)}개`);
+    return;
+  }
+
+  const total = Number(interactionSummary?.totalInteractions);
+  if (!Number.isFinite(total) || total < 0) {
+    els.heroBenefitCount.textContent = "—";
+    els.heroBenefitLabel.textContent = "total interactions";
+    card?.setAttribute("title", "Management와 AI Arena 상호작용을 집계하고 있습니다.");
+    card?.setAttribute("aria-label", "Management와 AI Arena 상호작용 집계 중");
+    return;
+  }
+
+  const management = Number(interactionSummary.managementInteractions || 0);
+  const arena = Number(interactionSummary.arenaInteractions || 0);
+  const breakdown = `Management ${formatNumber(management)} · AI Arena ${formatNumber(arena)} · 총 ${formatNumber(total)}`;
+  els.heroBenefitCount.textContent = formatNumber(total);
+  els.heroBenefitLabel.textContent = "total interactions";
+  card?.setAttribute("title", breakdown);
+  card?.setAttribute("aria-label", breakdown);
 }
 
 function mountPublicBrief(target) {

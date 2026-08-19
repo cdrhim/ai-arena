@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import programHub from "../netlify/functions/program-hub.mjs";
-import { loadPartnerDirectory, loadProgramHub, loadProgramHubBootstrap } from "../netlify/lib/program-hub.mjs";
+import {
+  loadPartnerDirectory,
+  loadProgramHub,
+  loadProgramHubBootstrap,
+  resolveEligibleProgramApplicantEmail,
+  resolveProgramParticipantViewer
+} from "../netlify/lib/program-hub.mjs";
 
 const PROGRAM_ENV = {
   SPARKCLAW_PROGRAM_SUPABASE_URL: "https://program.supabase.co",
@@ -49,7 +55,7 @@ test("program hub projects team data and aggregates activity without writes", as
   assert.ok(requests.every((request) => request.options.headers["user-agent"].includes("program-hub-reader")));
 });
 
-test("login bootstrap reads only the team directory before background hydration", async () => {
+test("login bootstrap reads only the canonical team directory before background hydration", async () => {
   const requestedTables = [];
   const snapshot = await loadProgramHubBootstrap(
     { email: "member@example.com", role: "member", canScore: false },
@@ -70,6 +76,111 @@ test("login bootstrap reads only the team directory before background hydration"
   assert.deepEqual(snapshot.benefits, []);
   assert.equal(snapshot.metrics.teams, 2);
   assert.equal(snapshot.metrics.collaborationFitStatus, "ready");
+});
+
+test("a secondary Program team member login remains an external partner", async () => {
+  const snapshot = await loadProgramHubBootstrap(
+    {
+      id: "program-participant",
+      email: "coworker@example.com",
+      role: "b2b_partner",
+      roleLabel: "B2B partner",
+      canScore: false,
+      canSubmitProducts: false,
+      canRequestConnections: true,
+      canConnect: true
+    },
+    PROGRAM_ENV,
+    async (url) => {
+      const table = new URL(url).pathname.split("/").pop();
+      return Response.json(fixtures()[table] || []);
+    }
+  );
+
+  assert.equal(snapshot.viewer.role, "b2b_partner");
+  assert.equal(snapshot.viewer.roleLabel, "B2B partner");
+  assert.equal(snapshot.viewer.canSubmitProducts, false);
+  assert.equal(snapshot.viewer.canRequestConnections, true);
+  assert.equal(snapshot.viewer.canConnect, true);
+  assert.equal(snapshot.viewerTeam, null);
+});
+
+test("Program participant resolution does not grant membership to a secondary team email", async () => {
+  const resolved = await resolveProgramParticipantViewer(
+    {
+      id: "program-participant",
+      email: "coworker@example.com",
+      role: "b2b_partner",
+      roleLabel: "B2B partner",
+      canScore: false
+    },
+    PROGRAM_ENV,
+    async (url) => {
+      const table = new URL(url).pathname.split("/").pop();
+      return Response.json(fixtures()[table] || []);
+    }
+  );
+
+  assert.equal(resolved.viewer.role, "b2b_partner");
+  assert.equal(resolved.viewerTeamId, null);
+  assert.equal(resolved.isParticipant, false);
+  assert.equal(resolved.communityDisplayNames.get("coworker@example.com"), "Alpha");
+});
+
+test("an isolated test account is never mapped to a Program team even when its email matches", async () => {
+  const resolved = await resolveProgramParticipantViewer(
+    {
+      id: "isolated-program-test",
+      email: "member@example.com",
+      role: "member",
+      roleLabel: "Isolated test",
+      isIsolatedTest: true,
+      canScore: false
+    },
+    {
+      ...PROGRAM_ENV,
+      SPARKCLAW_ISOLATED_TEST_EMAILS: "member@example.com"
+    },
+    async (url) => {
+      const table = new URL(url).pathname.split("/").pop();
+      return Response.json(fixtures()[table] || []);
+    }
+  );
+
+  assert.equal(resolved.viewerTeamId, null);
+  assert.equal(resolved.isParticipant, false);
+  assert.equal(resolved.viewer.role, "member");
+  assert.equal(resolved.viewer.isIsolatedTest, true);
+});
+
+test("Arena login eligibility requires an exact email on one eligible applicant company", async () => {
+  const data = fixtures();
+  data.teams.push(
+    { id: 3, name: "Rejected", email: "rejected@example.com", status: "rejected" },
+    { id: 4, name: "Same Domain", email: "owner@corporate.example", status: "최종선발" }
+  );
+  const fetchImpl = async (url, options) => {
+    const table = new URL(url).pathname.split("/").pop();
+    assert.equal(options.headers.Authorization, "Bearer server-secret");
+    return Response.json(data[table] || []);
+  };
+
+  const direct = await resolveEligibleProgramApplicantEmail("MEMBER@example.com", PROGRAM_ENV, fetchImpl);
+  assert.equal(direct.eligible, true);
+  assert.equal(direct.team.id, "1");
+  assert.equal(direct.team.name, "Alpha");
+
+  const member = await resolveEligibleProgramApplicantEmail("coworker@example.com", PROGRAM_ENV, fetchImpl);
+  assert.equal(member.eligible, false);
+  assert.equal(member.reason, "not_registered");
+
+  const excluded = await resolveEligibleProgramApplicantEmail("rejected@example.com", PROGRAM_ENV, fetchImpl);
+  assert.equal(excluded.eligible, false);
+  assert.equal(excluded.reason, "not_registered");
+
+  const domainOnly = await resolveEligibleProgramApplicantEmail("employee@corporate.example", PROGRAM_ENV, fetchImpl);
+  assert.equal(domainOnly.eligible, false);
+  assert.equal(domainOnly.reason, "not_registered");
 });
 
 test("member hub exposes its own private workspace and hides other teams' private data", async () => {
@@ -183,7 +294,7 @@ test("B2B partners receive the OT anchor and later public major events only", as
     { id: 62, title: "SparkClaw Demo Day", event_date: "2026-09-30", event_time: "14:00:00", kind: "데모데이", target_group: "전체 공개" }
   ];
   const snapshot = await loadProgramHub(
-    { id: "partner-1", email: "partner@example.com", role: "b2b_partner", canScore: false },
+    { id: "partner-1", email: "partner@external.test", role: "b2b_partner", canScore: false },
     PROGRAM_ENV,
     async (url) => {
       const table = new URL(url).pathname.split("/").pop();
@@ -214,12 +325,14 @@ test("Youngone B2B login receives every eligible participant as a contact-safe b
   const previous = captureEnv([
     "SUPABASE_URL",
     "SUPABASE_ANON_KEY",
+    "SUPABASE_SECRET_KEY",
     "SPARKCLAW_PROGRAM_SUPABASE_URL",
     "SPARKCLAW_PROGRAM_SUPABASE_SECRET_KEY"
   ]);
   const originalFetch = global.fetch;
   process.env.SUPABASE_URL = "https://auth.supabase.co";
   process.env.SUPABASE_ANON_KEY = "anon";
+  process.env.SUPABASE_SECRET_KEY = "server-secret";
   process.env.SPARKCLAW_PROGRAM_SUPABASE_URL = PROGRAM_ENV.SPARKCLAW_PROGRAM_SUPABASE_URL;
   process.env.SPARKCLAW_PROGRAM_SUPABASE_SECRET_KEY = PROGRAM_ENV.SPARKCLAW_PROGRAM_SUPABASE_SECRET_KEY;
 
@@ -231,6 +344,16 @@ test("Youngone B2B login receives every eligible participant as a contact-safe b
         email: "test@gmail.com",
         user_metadata: { role: "member", organization: "Spoofed" }
       });
+    }
+    if (value.endsWith("/rest/v1/rpc/sc_arena_resolve_viewer_access")) {
+      return Response.json([{
+        access_found: true,
+        membership_role: "partner",
+        membership_status: "active",
+        organization_name: "영원무역",
+        partner_profile_id: "youngone-corporation",
+        partner_profile_status: "active"
+      }]);
     }
     if (value.startsWith("https://auth.supabase.co") && value.includes("/rest/v1/sc_arena_team_keywords")) {
       return Response.json([]);
@@ -299,7 +422,9 @@ test("partner directory excludes rejected teams and private contact fields", asy
     { id: 7, name: "-", company_name: "-", status: "approved", sector: "-" },
     { id: 8, name: "-", company_name: "Fallback Corp", status: "최종 선발", sector: "SaaS" },
     { id: 9, name: "test", company_name: "test", status: "approved", sector: "Data Analytics" },
-    { id: 10, name: "TEST", company_name: "Actual Company", status: "approved", sector: "SaaS" }
+    { id: 10, name: "TEST", company_name: "Actual Company", status: "approved", sector: "SaaS" },
+    { id: 11, name: "스파크랩", company_name: "스파크랩", status: "approved", is_test_account: true },
+    { id: 12, name: "batchteam", company_name: "batchteam", status: "최종선발", is_test_account: true }
   ]));
 
   assert.deepEqual(teams.map((team) => team.name), ["Curated AI", "Fallback Corp", "Actual Company"]);
@@ -308,6 +433,28 @@ test("partner directory excludes rejected teams and private contact fields", asy
   assert.equal(Object.hasOwn(teams[0], "isBuilder"), false);
   assert.equal(Object.hasOwn(teams[0], "isSoloFounder"), false);
   assert.equal(teams[0].websiteUrl, "https://curated.example.com/");
+});
+
+test("full staff directory preserves the same test-account exclusions as the fast directory", async () => {
+  const data = fixtures();
+  data.teams.push(
+    { id: 3, name: "safeclaw", company_name: "Safeclaw", status: "최종선발" },
+    { id: 4, name: "batchteam", company_name: "batchteam", status: "최종선발", is_test_account: true },
+    { id: 5, name: "스파크랩", company_name: "스파크랩", status: "approved", is_test_account: true }
+  );
+
+  const snapshot = await loadProgramHub(
+    { email: "staff@sparklabs.co.kr", role: "sparklabs", canScore: true },
+    PROGRAM_ENV,
+    async (url) => {
+      const table = new URL(url).pathname.split("/").pop();
+      return Response.json(data[table] || []);
+    }
+  );
+
+  assert.deepEqual(snapshot.teams.map((team) => team.name), ["Alpha", "Beta", "safeclaw"]);
+  assert.equal(snapshot.metrics.teams, 3);
+  assert.deepEqual(snapshot.partnerDirectory, undefined);
 });
 
 test("partner directory returns every eligible participant without an arbitrary 100-company cap", async () => {
@@ -378,7 +525,7 @@ function fixtures() {
     mentors: [{ id: 8, name: "Mentor", affiliation: "SparkLabs", booking_url: "https://example.com/book" }],
     team_members: [
       { id: 11, team_id: 1, is_founder: true },
-      { id: 12, team_id: 1, is_founder: false }
+      { id: 12, team_id: 1, email: "coworker@example.com", is_founder: false }
     ],
     hypotheses: [{ id: 20, team_id: 1, week_number: 1 }],
     customer_interviews: [{ id: 30, team_id: 1, hypothesis_id: 20, pain_level: 4 }],

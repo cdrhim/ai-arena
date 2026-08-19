@@ -48,7 +48,7 @@ test("latest team setting wins and a partner cannot receive private card content
   assert.deepEqual(team.cardHiddenFields.sort(), ["achievements", "aiIdea", "capabilities", "introduction", "website"].sort());
 });
 
-test("the linked team and SparkLabs staff retain private content while only the owner can edit", () => {
+test("the linked team and SparkLabs staff retain private content and staff can edit every card", () => {
   const settings = latestTeamCardVisibilityByTeam([
     visibilityEvent("2026-08-14T02:00:00.000Z", {
       introduction: "private",
@@ -65,8 +65,8 @@ test("the linked team and SparkLabs staff retain private content while only the 
   assert.equal(ownerView.teams[0].cardVisibility.canEdit, true);
   assert.equal(ownerView.permissions.canEditTeamCardVisibility, true);
   assert.equal(staffView.teams[0].oneLiner, "AI workflow company");
-  assert.equal(staffView.teams[0].cardVisibility.canEdit, false);
-  assert.equal(staffView.permissions.canEditTeamCardVisibility, false);
+  assert.equal(staffView.teams[0].cardVisibility.canEdit, true);
+  assert.equal(staffView.permissions.canEditTeamCardVisibility, true);
 });
 
 function visibilityEvent(createdAt, fields) {

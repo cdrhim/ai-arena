@@ -79,9 +79,6 @@ let announcementDraftMode = false;
 let preferredDraftCategorySlug = "";
 let discoveryGuideStepTimer = null;
 let discoveryGuideHideTimer = null;
-let benefitSurveyViewerKey = "";
-let benefitSurveyRequestId = 0;
-let benefitSurveyPending = false;
 
 const els = {
   discoveryForm: document.querySelector("#agenticDiscoveryForm"),
@@ -101,12 +98,6 @@ const els = {
   liveTitle: document.querySelector("#communityLiveTitle"),
   liveMeta: document.querySelector("#communityLiveMeta"),
   partnerLogoRail: document.querySelector("#partnerLogoRail"),
-  memberBenefitSurveyForm: document.querySelector("#memberBenefitSurveyForm"),
-  memberBenefitSurveyName: document.querySelector("#memberBenefitSurveyName"),
-  memberBenefitSurveyDetails: document.querySelector("#memberBenefitSurveyDetails"),
-  memberBenefitSurveyReason: document.querySelector("#memberBenefitSurveyReason"),
-  memberBenefitSurveyStatus: document.querySelector("#memberBenefitSurveyStatus"),
-  memberBenefitSurveySubmit: document.querySelector('#memberBenefitSurveyForm button[type="submit"]'),
   promptKicker: document.querySelector("#communityPromptKicker"),
   promptTitle: document.querySelector("#communityPromptTitle"),
   promptList: document.querySelector("#communityPromptList"),
@@ -168,7 +159,6 @@ window.addEventListener("spark-arena:data", (event) => {
   renderConversationPrompts();
   configureAnnouncementComposer();
   loadArenaAnnouncements();
-  loadMemberBenefitSurvey();
 });
 
 window.addEventListener("spark-arena:page", (event) => {
@@ -195,7 +185,6 @@ function bindEvents() {
   els.announcementList?.addEventListener("click", handleAnnouncementOpen);
   els.featuredNews?.addEventListener("click", handleAnnouncementOpen);
   els.featuredNews?.addEventListener("keydown", handleAnnouncementOpen);
-  els.memberBenefitSurveyForm?.addEventListener("submit", submitMemberBenefitSurvey);
   els.discoveryResults?.addEventListener("click", (event) => {
     const card = event.target.closest("[data-recommended-product-id]");
     if (!card) return;
@@ -286,87 +275,6 @@ function handleDiscoveryQueryKeydown(event) {
   if (event.repeat || discoveryPending || !els.discoveryForm) return;
   if (els.discoverySubmit) els.discoveryForm.requestSubmit(els.discoverySubmit);
   else els.discoveryForm.requestSubmit();
-}
-
-async function submitMemberBenefitSurvey(event) {
-  event.preventDefault();
-  if (benefitSurveyPending || !els.memberBenefitSurveyForm) return;
-  const formData = new FormData(els.memberBenefitSurveyForm);
-  const solutionName = String(formData.get("solutionName") || "").trim();
-  const solutionDetails = String(formData.get("solutionDetails") || "").trim();
-  const solutionReason = String(formData.get("solutionReason") || "").trim();
-  if (solutionName.length < 2) {
-    setStatus(els.memberBenefitSurveyStatus, "필요한 솔루션 명을 2자 이상 적어주세요.", "error");
-    els.memberBenefitSurveyName?.focus();
-    return;
-  }
-  if (solutionDetails.length < 10) {
-    setStatus(els.memberBenefitSurveyStatus, "솔루션 세부 내용을 10자 이상 적어주세요.", "error");
-    els.memberBenefitSurveyDetails?.focus();
-    return;
-  }
-  if (solutionReason.length < 10) {
-    setStatus(els.memberBenefitSurveyStatus, "필요한 이유를 10자 이상 적어주세요.", "error");
-    els.memberBenefitSurveyReason?.focus();
-    return;
-  }
-  benefitSurveyPending = true;
-  setFormPending(els.memberBenefitSurveyForm, true);
-  if (els.memberBenefitSurveySubmit) els.memberBenefitSurveySubmit.textContent = "혜택 수요를 저장하는 중…";
-  setStatus(els.memberBenefitSurveyStatus, "혜택 수요를 비공개 데이터베이스에 저장하고 있습니다.");
-  try {
-    const response = await fetch("/api/benefit-needs-survey", {
-      method: "POST",
-      headers: { "content-type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ solutionName, solutionDetails, solutionReason })
-    });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(payload?.error || "설문 응답을 저장하지 못했습니다.");
-    applyMemberBenefitSurvey(payload?.survey);
-    setStatus(els.memberBenefitSurveyStatus, "혜택 수요가 저장되었습니다. SparkLabs 운영진만 검토합니다.", "success");
-  } catch (error) {
-    setStatus(els.memberBenefitSurveyStatus, error.message || "설문 응답을 저장하지 못했습니다.", "error");
-  } finally {
-    benefitSurveyPending = false;
-    setFormPending(els.memberBenefitSurveyForm, false);
-    if (els.memberBenefitSurveySubmit) els.memberBenefitSurveySubmit.textContent = "혜택 수요 업데이트하기 →";
-  }
-}
-
-async function loadMemberBenefitSurvey() {
-  const key = viewerKey(context.viewer);
-  if (context.viewer?.role !== "member" || !context.viewer?.id) {
-    if (benefitSurveyViewerKey) resetMemberBenefitSurvey();
-    return;
-  }
-  if (key === benefitSurveyViewerKey) return;
-  benefitSurveyViewerKey = key;
-  const requestId = ++benefitSurveyRequestId;
-  try {
-    const response = await fetch("/api/benefit-needs-survey", { headers: authHeaders() });
-    const payload = await response.json().catch(() => null);
-    if (requestId !== benefitSurveyRequestId || key !== viewerKey(context.viewer)) return;
-    if (!response.ok) {
-      if (response.status !== 503) throw new Error(payload?.error || "기존 설문 응답을 불러오지 못했습니다.");
-      return;
-    }
-    if (payload?.survey) {
-      applyMemberBenefitSurvey(payload.survey);
-      setStatus(els.memberBenefitSurveyStatus, "이전에 저장한 응답입니다. 내용을 바꾸면 새 버전으로 저장됩니다.", "success");
-    }
-  } catch (error) {
-    if (requestId === benefitSurveyRequestId) {
-      setStatus(els.memberBenefitSurveyStatus, error.message || "기존 설문 응답을 불러오지 못했습니다.", "error");
-    }
-  }
-}
-
-function applyMemberBenefitSurvey(survey) {
-  if (!survey || !els.memberBenefitSurveyForm) return;
-  if (els.memberBenefitSurveyName) els.memberBenefitSurveyName.value = survey.solutionName || "";
-  if (els.memberBenefitSurveyDetails) els.memberBenefitSurveyDetails.value = survey.solutionDetails || "";
-  if (els.memberBenefitSurveyReason) els.memberBenefitSurveyReason.value = survey.solutionReason || "";
-  if (els.memberBenefitSurveySubmit) els.memberBenefitSurveySubmit.textContent = "혜택 수요 업데이트하기 →";
 }
 
 function configureCommunitySorts() {
@@ -656,7 +564,6 @@ function resetForumForViewerChange() {
   arenaAnnouncementRequestId += 1;
   arenaAnnouncements = [];
   resetThreadComposer();
-  resetMemberBenefitSurvey();
   toggleCreateChannelForm(false);
   publishCommunityActivity();
   if (els.categories) els.categories.innerHTML = "";
@@ -672,17 +579,6 @@ function publishCommunityActivity() {
     : { loaded: false, summary: { posts: 0, comments: 0, commentsReceived: 0, likesReceived: 0 }, posts: [], comments: [], reactions: [], recent: [] };
   window.__sparkArenaCommunityActivity = activity;
   window.dispatchEvent(new CustomEvent("spark-arena:community-activity", { detail: activity }));
-}
-
-function resetMemberBenefitSurvey() {
-  benefitSurveyRequestId += 1;
-  benefitSurveyViewerKey = "";
-  benefitSurveyPending = false;
-  els.memberBenefitSurveyForm?.reset();
-  if (els.memberBenefitSurveySubmit) {
-    els.memberBenefitSurveySubmit.textContent = els.memberBenefitSurveySubmit.dataset.idleLabel || "혜택 수요 저장하기 →";
-  }
-  setStatus(els.memberBenefitSurveyStatus);
 }
 
 function renderCommunityLive(options = {}) {

@@ -29,6 +29,8 @@ test("browser telemetry is server-bound, allowlisted, and loaded before the Aren
 
 test("admin explorer filters and renders only for staff viewers", async () => {
   const client = await readFile(new URL("../public/arena/market.js", import.meta.url), "utf8");
+  assert.match(client, /\["system", "system\.auth_login", "인증 로그인"\]/);
+  assert.match(client, /\["system", "system\.auth_logout", "인증 로그아웃"\]/);
   assert.match(client, /function isStaffViewer\(\)[\s\S]*?role === "sparklabs"[\s\S]*?role === "admin"/);
   assert.match(client, /fetch\(`\/api\/arena-activity\?\$\{params\.toString\(\)\}`/);
   assert.match(client, /params\.set\("user", filters\.user\)/);
@@ -36,4 +38,9 @@ test("admin explorer filters and renders only for staff viewers", async () => {
   assert.match(client, /params\.set\("action", filters\.action\)/);
   assert.match(client, /els\.adminActivityExplorer\.hidden = !staff/);
   assert.match(client, /requestId !== adminActivityRequestId/);
+  assert.match(client, /\["전체 활동", `\$\{formatNumber\(totalCount\)\}건`/);
+  assert.match(client, /참여사 대표 계정/);
+  assert.match(client, /expectedRepresentativeCount = 75/);
+  assert.doesNotMatch(client, /Supabase에 등록된 Arena 사용자/);
+  assert.doesNotMatch(client, /\["조회된 활동", `\$\{formatNumber\(state\.events\.length\)\}건`/);
 });

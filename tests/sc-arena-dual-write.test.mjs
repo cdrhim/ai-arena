@@ -322,6 +322,13 @@ test("forum dual write supplies the content owner and cannot turn a saved commen
         user_metadata: { organization: "Commenter AI" }
       });
     }
+    if (value === "https://arena.example/rest/v1/rpc/sc_arena_resolve_viewer_access") {
+      return Response.json([{
+        access_found: true,
+        membership_role: "claw_member",
+        membership_status: "active"
+      }]);
+    }
     if (value === "https://arena.example/rest/v1/rpc/sc_arena_append_activity") {
       const payload = JSON.parse(options.body);
       activityCalls.push(payload);
